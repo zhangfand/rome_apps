@@ -1,0 +1,94 @@
+/* Rome's design-token layer: Tailwind + tw-animate-css + the host theme
+   vocabulary. The host mounts this bundle in a Shadow DOM and the tokens are
+   inherited from the live host theme, so values like var(--background) follow
+   light/dark and the active Rome theme automatically. */
+@import "@rome-os/app-web-sdk/styles";
+
+/* Astryx design system (pre-built CSS; layer cascade: reset → astryx-base →
+   astryx-theme). All of it lands inside the shadow root because it is imported
+   here rather than injected into document.head — which is also why the app
+   uses the /built theme object (runtime-injected themes never reach a shadow
+   root). */
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+@import "@astryxdesign/theme-neutral/theme.css";
+
+/* ── Primitive token values ────────────────────────────────────────────────
+   In this environment the host does not inject concrete values for the Rome
+   primitives inside the shadow root (only --radius resolves). An unresolved
+   var() inside `border: 1px solid var(--color-border)` falls back to
+   currentColor — which is where the "black outlines" came from. Define the
+   primitives here on :host with light-dark() pairs; the Astryx <Theme mode>
+   wrapper (synced to the host's .dark ancestor) sets color-scheme, so both
+   Tailwind utilities and the Astryx token bridge resolve correctly in both
+   modes. If the host later injects real values, remove this block. */
+:host {
+  --background: light-dark(oklch(1 0 0), oklch(0.145 0 0));
+  --foreground: light-dark(oklch(0.145 0 0), oklch(0.985 0 0));
+  --card: light-dark(oklch(1 0 0), oklch(0.205 0 0));
+  --card-foreground: light-dark(oklch(0.145 0 0), oklch(0.985 0 0));
+  --popover: light-dark(oklch(1 0 0), oklch(0.235 0 0));
+  --popover-foreground: light-dark(oklch(0.145 0 0), oklch(0.985 0 0));
+  --primary: light-dark(oklch(0.205 0 0), oklch(0.922 0 0));
+  --primary-foreground: light-dark(oklch(0.985 0 0), oklch(0.205 0 0));
+  --secondary: light-dark(oklch(0.97 0 0), oklch(0.269 0 0));
+  --secondary-foreground: light-dark(oklch(0.205 0 0), oklch(0.985 0 0));
+  --muted: light-dark(oklch(0.97 0 0), oklch(0.269 0 0));
+  --muted-foreground: light-dark(oklch(0.556 0 0), oklch(0.708 0 0));
+  --accent: light-dark(oklch(0.97 0 0), oklch(0.269 0 0));
+  --accent-foreground: light-dark(oklch(0.205 0 0), oklch(0.985 0 0));
+  --destructive: light-dark(oklch(0.577 0.245 27.325), oklch(0.704 0.191 22.216));
+  --destructive-foreground: light-dark(oklch(0.985 0 0), oklch(0.985 0 0));
+  --border: light-dark(oklch(0.922 0 0), oklch(1 0 0 / 12%));
+  --input: light-dark(oklch(0.87 0 0), oklch(1 0 0 / 18%));
+  --ring: light-dark(oklch(0.708 0 0), oklch(0.556 0 0));
+}
+
+/* ── Rome primitive tokens → Astryx tokens ─────────────────────────────────
+   The Astryx theme is, by design, a set of CSS custom property overrides.
+   Here we re-point its semantic tokens at Rome's host primitives, so Astryx
+   components render in Rome's palette and flip with the host's light/dark
+   mode (Rome's vars already carry the mode switch). This block is unlayered
+   on purpose: unlayered declarations beat every @layer, so these mappings
+   win over the packaged theme values. */
+[data-astryx-theme] {
+  /* Accent / actions */
+  --color-accent: var(--primary);
+  --color-on-accent: var(--primary-foreground);
+  --color-accent-muted: var(--accent);
+  --color-text-accent: var(--primary);
+  --color-icon-accent: var(--primary);
+
+  /* Surfaces */
+  --color-background-body: var(--background);
+  --color-background-surface: var(--card);
+  --color-background-card: var(--card);
+  --color-background-popover: var(--popover);
+  --color-background-muted: var(--muted);
+  --color-background-inverted: var(--foreground);
+
+  /* Text & icons */
+  --color-text-primary: var(--foreground);
+  --color-text-secondary: var(--muted-foreground);
+  --color-text-disabled: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+  --color-icon-primary: var(--foreground);
+  --color-icon-secondary: var(--muted-foreground);
+  --color-icon-disabled: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+
+  /* Borders & structure */
+  --color-border: var(--border);
+  --color-border-emphasized: var(--input);
+  --color-skeleton: var(--muted);
+  --color-track: var(--muted);
+
+  /* Status */
+  --color-error: var(--destructive);
+  --color-on-error: var(--destructive-foreground, #fff);
+  --color-error-muted: color-mix(in srgb, var(--destructive) 18%, transparent);
+
+  /* Radius: derive Astryx's radius scale from Rome's --radius primitive */
+  --radius-inner: calc(var(--radius) - 4px);
+  --radius-element: var(--radius);
+  --radius-container: calc(var(--radius) + 2px);
+  --radius-page: calc(var(--radius) + 6px);
+}

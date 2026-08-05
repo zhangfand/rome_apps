@@ -1,0 +1,24 @@
+formatVersion: 1
+id: apartment-hunt-convex
+name: Apartment Hunt (Convex)
+version: 0.1.0
+description: Clone of Apartment Hunt using Convex Cloud as the storage layer instead of the app SQLite DB. Tracks apartments, auto-researches Google Maps and ApartmentRatings links, ratings, and rents with promotions.
+icon: assets/icon.svg
+appRoot: dist
+
+web:
+  manifest: web/manifest.json
+  displayName: Apartment Hunt (Convex)
+  navLabel: Apartment Hunt (Convex)
+
+api:
+  entry: api/index
+
+agents:
+  - agents/importer.yaml
+  - agents/researcher.yaml
+
+actions:
+  - actions/import-list
+  - actions/research
+  - actions/sweep

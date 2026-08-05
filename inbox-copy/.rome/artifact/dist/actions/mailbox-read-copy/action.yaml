@@ -1,0 +1,8 @@
+name: mailbox_read_copy
+type: custom
+description: "Copy app: read recent emails from the guardian's own Rome mailbox, grouped into conversation threads (sender, subject, date, body, attachments). Use this to check, summarize, or answer questions about the guardian's email."
+entry: ./index.ts
+complexity: simple
+speed: moderate
+reliability: high
+sideEffects: read-only

@@ -1,0 +1,19 @@
+formatVersion: 1
+id: inbox-copy
+name: Inbox Copy
+icon: assets/icon.svg
+version: 0.3.0-pr1362
+description: Separate copy of the PR #1362 Inbox mailbox reader app
+appRoot: dist
+
+web:
+  manifest: web/manifest.json
+  displayName: Inbox Copy
+  navLabel: Inbox Copy
+
+api:
+  entry: api/index
+
+
+actions:
+  - actions/mailbox-read-copy

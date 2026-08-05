@@ -1,0 +1,37 @@
+{
+  "name": "@rome/app-apartment-hunt-convex",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.6.0",
+  "type": "module",
+  "scripts": {
+    "dev": "rome dev",
+    "build": "rome build",
+    "typecheck": "tsc --noEmit",
+    "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy"
+  },
+  "dependencies": {
+    "@astryxdesign/core": "^0.1.9",
+    "@astryxdesign/theme-neutral": "^0.1.9",
+    "@rome-os/app-runtime": "latest",
+    "@rome-os/app-web-sdk": "latest",
+    "@stylexjs/stylex": "^0.19.0",
+    "clsx": "^2.1.1",
+    "convex": "^1.42.3",
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "pnpm": {
+    "ignoredBuiltDependencies": [
+      "@astryxdesign/core"
+    ]
+  },
+  "devDependencies": {
+    "@astryxdesign/cli": "^0.1.9",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "typescript": "^5.9.3"
+  }
+}

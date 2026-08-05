@@ -1,0 +1,8 @@
+name: apartment_hunt_convex_research
+type: custom
+description: Auto-researches one tracked apartment — finds its Google Maps link, ApartmentRatings page and score, and current rent including promotions — and saves the results.
+entry: ./index.ts
+complexity: moderate
+speed: slow
+reliability: medium
+sideEffects: write

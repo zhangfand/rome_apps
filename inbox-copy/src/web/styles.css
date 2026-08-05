@@ -1,0 +1,98 @@
+/* Tailwind + the SDK semantic-token vocabulary come from the published SDK
+   sheet. Importing it (rather than copying the tokens) keeps this app in
+   lockstep with the SDK. Keep app-specific rules below the import, scoped to
+   :host (global selectors do not apply inside the shadow root). */
+@import "@rome-os/app-web-sdk/styles";
+
+:host {
+  color-scheme: light dark;
+}
+
+.email-renderer {
+  overflow-wrap: anywhere;
+}
+
+.email-renderer__iframe {
+  display: block;
+  width: 100%;
+  min-height: 120px;
+  border: 0;
+  background: transparent;
+}
+
+.email-renderer__markdown,
+.email-renderer__text {
+  overflow-wrap: anywhere;
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+.email-renderer__markdown > :first-child,
+.email-renderer__text > :first-child {
+  margin-top: 0;
+}
+
+.email-renderer__markdown > :last-child,
+.email-renderer__text > :last-child {
+  margin-bottom: 0;
+}
+
+.email-renderer__markdown p,
+.email-renderer__text p {
+  margin: 0.65rem 0;
+}
+
+.email-renderer__markdown ul,
+.email-renderer__markdown ol,
+.email-renderer__text ul,
+.email-renderer__text ol {
+  margin: 0.65rem 0;
+  padding-left: 1.35rem;
+}
+
+.email-renderer__markdown blockquote,
+.email-renderer__text blockquote {
+  margin: 0.75rem 0;
+  border-left: 3px solid hsl(var(--border));
+  padding-left: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.email-renderer__markdown pre,
+.email-renderer__text pre {
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  background: hsl(var(--muted));
+  padding: 0.75rem;
+}
+
+.email-renderer__markdown code,
+.email-renderer__text code {
+  border-radius: 0.25rem;
+  background: hsl(var(--muted));
+  padding: 0.1rem 0.25rem;
+  font-size: 0.85em;
+}
+
+.email-renderer__markdown table,
+.email-renderer__text table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.email-renderer__markdown th,
+.email-renderer__markdown td,
+.email-renderer__text th,
+.email-renderer__text td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.35rem 0.5rem;
+}
+
+.email-renderer__markdown a,
+.email-renderer__text a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

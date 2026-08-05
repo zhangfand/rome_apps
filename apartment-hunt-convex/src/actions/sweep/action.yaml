@@ -1,0 +1,8 @@
+name: apartment_hunt_convex_sweep
+type: custom
+description: Reconciles the Apartment Hunt research pipeline — requeues stale work, applies capped auto-retry, times out stuck imports, and dispatches pending research up to the concurrency cap.
+entry: ./index.ts
+complexity: moderate
+speed: fast
+reliability: high
+sideEffects: write

@@ -1,0 +1,10 @@
+{
+  "entry": "index.js",
+  "styles": [
+    "index.css"
+  ],
+  "assetVersion": "7ef25f6a0f7b",
+  "displayName": "Inbox Copy",
+  "navLabel": "Inbox Copy",
+  "routing": "client"
+}
