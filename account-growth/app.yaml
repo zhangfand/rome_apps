@@ -1,0 +1,29 @@
+formatVersion: 2
+id: account-growth
+name: Account Growth
+version: 0.1.0
+description: Draft-only weekly planning for growing Yunfan's X account.
+icon: assets/icon.svg
+appRoot: dist
+includeSource: true
+
+web:
+  manifest: web/manifest.json
+  displayName: Account Growth
+  navLabel: Account Growth
+
+api:
+  entry: api/index
+
+db:
+  migrations: db/migrations
+  tablePrefix: account_growth
+
+actions:
+  - actions/snapshot
+  - actions/x-research
+  - actions/save-plan
+  - actions/weekly-plan
+
+agents:
+  - agents/coach.yaml

@@ -1,0 +1,2 @@
+import{chunk_Y2CYZVJY_name as t,log as e,configureSvgSize as i}from"./1307.js";var o=t((t,o,d,a)=>{t.attr("class",d);let{width:w,height:g,x,y:n}=r(t,o);i(t,g,w,a);let l=h(x,n,w,g,o);t.attr("viewBox",l),e.debug(`viewBox configured: ${l} with padding: ${o}`)},"setupViewPortForSVG"),r=t((t,e)=>{let i=t.node()?.getBBox()||{width:0,height:0,x:0,y:0};return{width:i.width+2*e,height:i.height+2*e,x:i.x,y:i.y}},"calculateDimensionsWithPadding"),h=t((t,e,i,o,r)=>`${t-r} ${e-r} ${i} ${o}`,"createViewBox");export{o as setupViewPortForSVG};
+//# sourceMappingURL=0~chunk-POPQ4Y6H.js.map

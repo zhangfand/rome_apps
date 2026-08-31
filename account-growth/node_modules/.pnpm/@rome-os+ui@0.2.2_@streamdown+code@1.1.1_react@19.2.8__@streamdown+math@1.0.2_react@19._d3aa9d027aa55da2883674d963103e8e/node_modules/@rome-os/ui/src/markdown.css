@@ -1,0 +1,446 @@
+/*
+ * `@rome-os/ui/markdown.css` — the stylesheet half of `@rome-os/ui/markdown`.
+ *
+ * Deliberately NOT part of `@rome-os/ui/styles.css`: the kit's canon stylesheet
+ * is imported by every host and every app bundle, and Streamdown + KaTeX are
+ * several hundred kilobytes of CSS that only a surface actually rendering
+ * Markdown should carry. Import this alongside the canon in the hosts that do:
+ *
+ *   @import "@rome-os/ui/styles.css";
+ *   @import "@rome-os/ui/markdown.css";
+ *
+ * An app bundle mounted in a Shadow DOM needs this import in its own
+ * stylesheet — the host document's copy does not cross the shadow boundary.
+ * Token values still do (they are inherited custom properties), so the prose
+ * tracks the live host theme and its `.dark` half without anything injected.
+ */
+
+@import "streamdown/styles.css";
+@import "katex/dist/katex.min.css";
+
+/* These are filesystem paths, not package specifiers. Streamdown and its
+   plugins ship Tailwind utility class names in compiled JS, while Tailwind v4
+   ignores node_modules unless a stylesheet explicitly registers a source.
+   The first group covers this package linked from the workspace; the second
+   group covers the published layout at node_modules/@rome-os/ui/src. */
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/code/dist/*.js";
+@source "../node_modules/@streamdown/math/dist/*.js";
+@source "../node_modules/@streamdown/mermaid/dist/*.js";
+@source "../../../streamdown/dist/*.js";
+@source "../../../@streamdown/code/dist/*.js";
+@source "../../../@streamdown/math/dist/*.js";
+@source "../../../@streamdown/mermaid/dist/*.js";
+
+/* Dependency sources and authored docs still expose off-roster candidates.
+   Keep them out of host bundles. Restate inline code on Rome's smallest step. */
+@source not inline("py-0.5");
+@source not inline("p-1.5");
+@source not inline("px-1.5");
+
+/* Streamdown's compiled JS also carries the legacy radius ladder, and repo
+   prose leaks the bare `rounded` word into the scan. Keep the ladder out of
+   host bundles and restate the four names on the radius scale — each lands
+   within 2px of its shadcn value, and the ordering survives.
+   Scale rationale: docs/ui/primitive-token/border-radius-primitives.md. */
+@source not inline("rounded");
+@source not inline("rounded-md");
+@source not inline("rounded-lg");
+@source not inline("rounded-xl");
+
+/* Element selectors never change with density. Compact mode only rebinds the
+   Markdown semantic tokens that the canon stylesheet supplies. */
+.rome-markdown {
+  /* Keep child margins inside the prose container without giving every child
+     grid-item stretching semantics (notably image and diagram wrappers). */
+  display: flow-root;
+  font-size: var(--markdown-body-font-size);
+  font-weight: var(--markdown-body-font-weight);
+  letter-spacing: var(--markdown-body-letter-spacing);
+  line-height: var(--markdown-body-line-height);
+}
+
+.rome-markdown.rome-markdown-compact {
+  --markdown-body-font-size: var(--rome-font-size-14);
+  --markdown-body-line-height: var(--rome-line-height-143);
+
+  --markdown-heading-1-font-size: var(--rome-font-size-20);
+  --markdown-heading-1-line-height: var(--rome-line-height-120);
+  --markdown-heading-2-font-size: var(--rome-font-size-18);
+  --markdown-heading-2-line-height: var(--rome-line-height-133);
+  --markdown-heading-3-font-size: var(--rome-font-size-16);
+  --markdown-heading-3-line-height: var(--rome-line-height-125);
+  --markdown-heading-4-font-size: var(--rome-font-size-14);
+  --markdown-heading-4-line-height: var(--rome-line-height-143);
+  --markdown-heading-floor-font-size: var(--rome-font-size-14);
+  --markdown-heading-floor-line-height: var(--rome-line-height-143);
+
+  --markdown-block-space-between: var(--rome-space-2);
+  --markdown-heading-1-space-before: var(--rome-space-3);
+  --markdown-heading-1-space-after: var(--rome-space-1);
+  --markdown-heading-2-space-before: var(--rome-space-3);
+  --markdown-heading-2-space-after: var(--rome-space-1);
+  --markdown-heading-3-space-before: var(--rome-space-2);
+  --markdown-heading-4-space-before: var(--rome-space-2);
+  --markdown-heading-floor-space-before: var(--rome-space-2);
+  --markdown-list-space-block: var(--rome-space-1);
+  --markdown-code-block-space-block: var(--rome-space-2);
+  --markdown-blockquote-space-block: var(--rome-space-2);
+  --markdown-table-space-block: var(--rome-space-2);
+  --markdown-rule-space-block: var(--rome-space-2);
+  --markdown-media-space-block: var(--rome-space-2);
+}
+
+.rome-markdown > * {
+  margin-block: 0;
+}
+
+.rome-markdown > * + * {
+  margin-block-start: var(--markdown-block-space-between);
+}
+
+.rome-markdown [data-streamdown^="heading-"] {
+  font-weight: var(--markdown-heading-font-weight);
+  letter-spacing: var(--markdown-heading-letter-spacing);
+}
+
+.rome-markdown [data-streamdown="heading-1"] {
+  font-size: var(--markdown-heading-1-font-size);
+  line-height: var(--markdown-heading-1-line-height);
+}
+
+.rome-markdown [data-streamdown="heading-2"] {
+  font-size: var(--markdown-heading-2-font-size);
+  line-height: var(--markdown-heading-2-line-height);
+}
+
+.rome-markdown [data-streamdown="heading-3"] {
+  font-size: var(--markdown-heading-3-font-size);
+  line-height: var(--markdown-heading-3-line-height);
+}
+
+.rome-markdown [data-streamdown="heading-4"] {
+  font-size: var(--markdown-heading-4-font-size);
+  line-height: var(--markdown-heading-4-line-height);
+}
+
+.rome-markdown [data-streamdown="heading-5"] {
+  font-size: var(--markdown-heading-floor-font-size);
+  line-height: var(--markdown-heading-floor-line-height);
+}
+
+.rome-markdown [data-streamdown="heading-6"] {
+  font-size: var(--markdown-heading-floor-font-size);
+  line-height: var(--markdown-heading-floor-line-height);
+}
+
+.rome-markdown > [data-streamdown="heading-1"] {
+  margin-block: var(--markdown-heading-1-space-before) var(--markdown-heading-1-space-after);
+}
+
+.rome-markdown > [data-streamdown="heading-2"] {
+  margin-block: var(--markdown-heading-2-space-before) var(--markdown-heading-2-space-after);
+}
+
+.rome-markdown > [data-streamdown="heading-3"] {
+  margin-block: var(--markdown-heading-3-space-before) var(--markdown-heading-3-space-after);
+}
+
+.rome-markdown > [data-streamdown="heading-4"] {
+  margin-block: var(--markdown-heading-4-space-before) var(--markdown-heading-4-space-after);
+}
+
+.rome-markdown > :is([data-streamdown="heading-5"], [data-streamdown="heading-6"]) {
+  margin-block: var(--markdown-heading-floor-space-before)
+    var(--markdown-heading-floor-space-after);
+}
+
+.rome-markdown > :is([data-streamdown="ordered-list"], [data-streamdown="unordered-list"]) {
+  margin-block: var(--markdown-list-space-block);
+}
+
+.rome-markdown [data-streamdown="list-item"] {
+  padding-block: var(--markdown-list-item-space-block);
+}
+
+.rome-markdown > [data-streamdown="code-block"] {
+  margin-block: var(--markdown-code-block-space-block);
+}
+
+.rome-markdown > [data-streamdown="blockquote"] {
+  margin-block: var(--markdown-blockquote-space-block);
+}
+
+.rome-markdown > [data-streamdown="table-wrapper"] {
+  margin-block: var(--markdown-table-space-block);
+}
+
+.rome-markdown > [data-streamdown="horizontal-rule"] {
+  margin-block: var(--markdown-rule-space-block);
+}
+
+.rome-markdown
+  > :is(
+    [data-streamdown="image-wrapper"],
+    [data-streamdown="mermaid-block"],
+    [data-streamdown="mermaid"]
+  ) {
+  margin-block: var(--markdown-media-space-block);
+}
+
+.rome-markdown
+  > :is(
+      [data-streamdown^="heading-"],
+      [data-streamdown="ordered-list"],
+      [data-streamdown="unordered-list"],
+      [data-streamdown="code-block"],
+      [data-streamdown="blockquote"],
+      [data-streamdown="table-wrapper"],
+      [data-streamdown="horizontal-rule"],
+      [data-streamdown="image-wrapper"],
+      [data-streamdown="mermaid-block"],
+      [data-streamdown="mermaid"]
+    )
+  + * {
+  margin-block-start: 0;
+}
+
+/* A document that opens with a heading should align with one that opens with
+   body copy; heading space-before only separates a heading from prior prose. */
+.rome-markdown > :first-child {
+  margin-block-start: 0;
+}
+
+/* The mirror at the closing edge. A block carrying `margin-block` on both sides
+   leaks its trailing space outside the prose box — invisible on an open column,
+   where it only widens the gap to whatever follows, but a filled container
+   renders it as extra padding under the last line. */
+.rome-markdown > :last-child {
+  margin-block-end: 0;
+}
+
+.rounded {
+  @apply rounded-4;
+}
+.rounded-md {
+  @apply rounded-8;
+}
+.rounded-lg {
+  @apply rounded-12;
+}
+.rounded-xl {
+  @apply rounded-16;
+}
+
+[data-streamdown="inline-code"] {
+  @apply px-2 py-1;
+}
+
+[data-streamdown="code-block-actions"],
+[data-streamdown="mermaid-block-actions"] {
+  @apply px-2;
+}
+
+[data-streamdown="mermaid-block"] button:is([title="Zoom in"], [title="Zoom out"], [title="Reset zoom and pan"]) {
+  @apply p-2;
+}
+
+/* Shiki provides its own inline code-block background. Keep the syntax colors
+   and let the surrounding Streamdown frame inherit the app's surface. */
+[data-streamdown="code-block-body"] pre {
+  background-color: transparent !important;
+}
+
+/* ── Fenced block chrome ──────────────────────────────────────────────────
+   Streamdown frames a code fence and a Mermaid fence the same way: an outer
+   tinted card around an inner bordered body, plus a permanent row holding the
+   language name. Around four lines of code, or one small diagram, that chrome
+   outweighs the thing it frames.
+
+   Rome renders one card. The language name and the buttons ride one band at
+   the card's inline end, floating over the content instead of holding a row of
+   their own: hidden until the block is hovered or holds keyboard focus, and
+   always shown where hover does not exist. A diagram's zoom stack keeps its
+   own corner and joins the same reveal.
+
+   A Mermaid block's parts carry no `data-streamdown` hooks, so its language
+   row is addressed as the card's first child and its canvas as the last —
+   the shape the plugin has rendered since it shipped. Should that change, the
+   chrome falls back into a row of its own rather than breaking. */
+.rome-markdown :is([data-streamdown="code-block"], [data-streamdown="mermaid-block"]) {
+  /* One row, three columns: free space, the language name, the buttons. The
+     content spans all three of that same row, so the band rides over it and
+     the card measures the content alone. */
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: start;
+  gap: 0;
+  padding: 0;
+}
+
+/* One frame, and the two fences hand it to opposite parts. A code fence keeps
+   the card — its tint is what separates code from the prose around it — and
+   the body goes flush inside it. */
+.rome-markdown [data-streamdown="code-block-body"] {
+  border: 0;
+  border-radius: inherit;
+  background-color: transparent;
+}
+
+/* A diagram keeps its canvas instead, and the card goes flush around it:
+   Mermaid fills its nodes with the same `--surface` the card is tinted with,
+   so a diagram drawn straight onto that tint loses every node interior. */
+.rome-markdown [data-streamdown="mermaid-block"] {
+  border: 0;
+  background-color: transparent;
+}
+
+.rome-markdown [data-streamdown="mermaid-block"] > :last-child {
+  border-radius: inherit;
+}
+
+/* The band. Both parts sit in the row's last two columns and both stick, so
+   they stay together and stay reachable down a fence taller than the
+   viewport. */
+.rome-markdown
+  :is(
+    [data-streamdown="code-block-header"],
+    [data-streamdown="mermaid-block"] > :first-child,
+    [data-streamdown="code-block"] > :has(> [data-streamdown="code-block-actions"]),
+    [data-streamdown="mermaid-block"] > :has(> [data-streamdown="mermaid-block-actions"])
+  ) {
+  position: sticky;
+  z-index: 10;
+  inset-block-start: var(--rome-space-2);
+  height: var(--rome-space-8);
+  margin-block-start: var(--rome-space-2);
+}
+
+/* The language name leads the band. The `1fr` column ahead of it takes every
+   spare pixel, which is what carries the pair to the inline end. */
+.rome-markdown
+  :is([data-streamdown="code-block-header"], [data-streamdown="mermaid-block"] > :first-child) {
+  grid-area: 1 / 2;
+  margin-inline-end: var(--rome-space-2);
+  padding-inline: var(--rome-space-2);
+  border-radius: var(--rome-radius-8);
+  /* Opaque, unlike the buttons' translucent pill: it covers content. */
+  background-color: var(--surface-elevated);
+}
+
+.rome-markdown
+  :is([data-streamdown="code-block-header"], [data-streamdown="mermaid-block"] > :first-child)
+  > span {
+  margin-inline-start: 0;
+}
+
+/* A fence opened without a language still renders the name, empty. Collapse it
+   to nothing rather than float a blank chip — it stays in the band, where its
+   height is what the content below measures its climb against. */
+.rome-markdown
+  :is([data-streamdown="code-block-header"], [data-streamdown="mermaid-block"] > :first-child):has(
+    > span:empty
+  ) {
+  margin-inline-end: 0;
+  padding-inline: 0;
+  border: 0;
+  box-shadow: none;
+  background: none;
+}
+
+/* Streamdown lays the buttons out across the full width and pulls the row up
+   over the language row. Here the row is one item on a shared line, holding
+   the band's gap from the card's inline end. */
+.rome-markdown
+  :is(
+    [data-streamdown="code-block"] > :has(> [data-streamdown="code-block-actions"]),
+    [data-streamdown="mermaid-block"] > :has(> [data-streamdown="mermaid-block-actions"])
+  ) {
+  grid-area: 1 / 3;
+  width: auto;
+  padding-inline-end: var(--rome-space-2);
+}
+
+/* The content takes the whole of that same row, so the band costs no height
+   and the card is exactly as tall as the thing it frames. A zero minimum keeps
+   a long line of code inside its own scroll area instead of widening the
+   columns the band sits in. */
+.rome-markdown
+  :is([data-streamdown="code-block-body"], [data-streamdown="mermaid-block"] > :last-child) {
+  grid-row: 1;
+  grid-column: 1 / -1;
+  align-self: stretch;
+  min-width: 0;
+}
+
+/* Every floating part carries the same border and lift, so a reader sees
+   chrome resting on the content rather than a line of it that changed. */
+.rome-markdown
+  :is(
+    [data-streamdown="code-block-header"],
+    [data-streamdown="mermaid-block"] > :first-child,
+    [data-streamdown="code-block-actions"],
+    [data-streamdown="mermaid-block-actions"]
+  ) {
+  border: 1px solid var(--border);
+  box-shadow: var(--rome-shadow-1);
+}
+
+/* The reveal. Opacity rather than visibility keeps the copy button in the tab
+   order, so keyboard focus can bring the chrome back for a pointerless user.
+   A coarse pointer has no hover state to reveal anything with, so there the
+   chrome stays put. Streamdown portals a fullscreen diagram to document.body,
+   outside `.rome-markdown` — its zoom stack is the whole interface at that
+   point, and stays visible. */
+@media (hover: hover) {
+  .rome-markdown
+    :is(
+      [data-streamdown="code-block-header"],
+      [data-streamdown="mermaid-block"] > :first-child,
+      [data-streamdown="code-block-actions"],
+      [data-streamdown="mermaid-block-actions"],
+      [data-streamdown="mermaid"] :has(> button[title="Zoom in"])
+    ) {
+    opacity: 0;
+    transition: opacity 120ms ease-out;
+  }
+
+  .rome-markdown
+    :is([data-streamdown="code-block"], [data-streamdown="mermaid-block"]):is(:hover, :focus-within)
+    :is(
+      [data-streamdown="code-block-header"],
+      [data-streamdown="mermaid-block"] > :first-child,
+      [data-streamdown="code-block-actions"],
+      [data-streamdown="mermaid-block-actions"],
+      [data-streamdown="mermaid"] :has(> button[title="Zoom in"])
+    ) {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rome-markdown
+      :is(
+        [data-streamdown="code-block-header"],
+        [data-streamdown="mermaid-block"] > :first-child,
+        [data-streamdown="code-block-actions"],
+        [data-streamdown="mermaid-block-actions"],
+        [data-streamdown="mermaid"] :has(> button[title="Zoom in"])
+      ) {
+      transition: none;
+    }
+  }
+}
+
+/* Mermaid SVGs are wrapped in a shrink-to-fit pan/zoom layer. Streamdown portals
+   fullscreen diagrams to document.body, so these rules cannot depend on the
+   .rome-markdown ancestor. */
+[data-streamdown="mermaid"] [aria-label="Mermaid chart"] {
+  width: 100%;
+}
+
+[data-streamdown="mermaid"] [aria-label="Mermaid chart"] svg {
+  width: 80% !important;
+  max-width: 80% !important;
+  height: auto;
+  max-height: 80vh;
+}

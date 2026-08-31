@@ -1,0 +1,2 @@
+import{src_select as e,chunk_Y2CYZVJY_name as t}from"./1307.js";var o=t((t,o)=>{let n;return"sandbox"===o&&(n=e("#i"+t)),("sandbox"===o?e(n.nodes()[0].contentDocument.body):e("body")).select(`[id="${t}"]`)},"getDiagramElement");export{o as getDiagramElement};
+//# sourceMappingURL=0~chunk-XXDRQBXY.js.map

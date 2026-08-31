@@ -1,0 +1,10 @@
+name: hello
+type: custom # system | custom
+description: Stub action for the Button Demo app. Replace with something useful.
+entry: ./index.ts
+complexity: simple # simple | moderate | complex
+speed: fast # fast | moderate | slow
+reliability: high # high | medium | low
+sideEffects: write # read-only | write
+# requiresApproval: false # optional, default false — gate execution on guardian approval
+# cancellable: false      # optional, default false

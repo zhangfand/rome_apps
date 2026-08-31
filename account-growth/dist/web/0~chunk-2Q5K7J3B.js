@@ -1,0 +1,2 @@
+import{chunk_Y2CYZVJY_name as t}from"./1307.js";var i=class{constructor(t){this.init=t,this.records=this.init()}static{t(this,"ImperativeState")}reset(){this.records=this.init()}};export{i as ImperativeState};
+//# sourceMappingURL=0~chunk-2Q5K7J3B.js.map

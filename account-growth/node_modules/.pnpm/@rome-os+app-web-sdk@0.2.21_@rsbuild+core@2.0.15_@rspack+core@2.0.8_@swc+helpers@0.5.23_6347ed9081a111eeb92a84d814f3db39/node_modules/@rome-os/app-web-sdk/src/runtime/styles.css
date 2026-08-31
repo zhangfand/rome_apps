@@ -1,0 +1,27 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Design-system layer contract: docs/design-system.md. */
+@import "@rome-os/ui/styles.css";
+
+/* The SDK ships React components of its own (visitor-auth.tsx). Tailwind v4's
+   automatic source detection skips node_modules, so an app importing this
+   stylesheet would never generate the utility classes those components use —
+   `@source` (resolved relative to this file) opts the SDK's component sources
+   back in. Add a line here for every SDK module that emits class names. */
+@source "./visitor-auth.tsx";
+
+/* Theme-specific semantic token values are not defined here — they are
+   inherited from the Rome host. The host mounts this bundle in a Shadow DOM;
+   Rome's semantic tokens are inherited custom properties that pierce the
+   shadow boundary, and the shell toggles `.dark` on an ancestor of the mount,
+   so `var(--background)` etc. resolve to whatever Rome currently has set
+   (including its `.dark` overrides) and repaint live when the shell theme
+   changes. That is what makes an app follow the shell theme by default —
+   nothing is injected.
+
+   To override the host theme, an app author re-declares its semantic values in
+   its own `styles.css` (a `:root` block, and `.dark` if needed). The host scopes
+   those to `:host`, which is an explicit declaration on the shadow host and
+   beats the inherited host value. The kit import above owns constant geometry,
+   typography, and compatibility aliases. */

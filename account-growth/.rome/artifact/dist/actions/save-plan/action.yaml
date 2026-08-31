@@ -1,0 +1,7 @@
+name: save_plan
+type: custom
+description: Save an approved or draft-only weekly account-growth plan so it remains available in the app.
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

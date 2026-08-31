@@ -1,0 +1,710 @@
+/*
+ * Shared design-system stylesheet. Layer contract: docs/design-system.md.
+ *
+ * This Tailwind v4 fragment omits `@import "tailwindcss"` because the importing
+ * host owns that directive.
+ */
+
+/* Tailwind v4's automatic source detection skips node_modules, so a consumer's
+   build would never generate the utility classes the kit's own components use.
+   `@source` (resolved relative to this file) opts the kit's component sources
+   back in — add a line here for every kit module that emits class names.
+   Listed per file rather than as a directory glob so the co-located tests,
+   whose class strings are assertion fixtures and not shipped markup, stay out
+   of every consumer's stylesheet. `styles-source.test.ts` fails when a module
+   that emits class names is missing here — the omission is invisible in this
+   repo, where the host scans the workspace source directly. */
+@source "./alert.tsx";
+@source "./avatar.tsx";
+@source "./badge.tsx";
+@source "./breadcrumb.tsx";
+@source "./button.tsx";
+@source "./button-group.tsx";
+@source "./calendar.tsx";
+@source "./card.tsx";
+@source "./command.tsx";
+@source "./context-menu.tsx";
+@source "./dialog.tsx";
+@source "./dropdown-menu.tsx";
+@source "./empty-state.tsx";
+@source "./field.tsx";
+@source "./filter-chip-group.tsx";
+@source "./icon-button.tsx";
+@source "./input.tsx";
+@source "./markdown.tsx";
+@source "./popover.tsx";
+@source "./segmented-control.tsx";
+@source "./select.tsx";
+@source "./separator.tsx";
+@source "./sheet.tsx";
+@source "./skeleton.tsx";
+@source "./sonner.tsx";
+@source "./spinner.tsx";
+@source "./switch.tsx";
+@source "./table.tsx";
+@source "./tabs.tsx";
+@source "./textarea.tsx";
+@source "./toggle.tsx";
+@source "./tooltip.tsx";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Radix sets data-state / data-orientation; shadcn-derived primitives use
+   these as short Tailwind variants. The mapping is centralized here so any
+   newly-dropped shadcn piece works in every consumer without per-file
+   rewrites. */
+@custom-variant data-active (&[data-state="active"]);
+@custom-variant data-horizontal (&[data-orientation="horizontal"]);
+@custom-variant data-vertical (&[data-orientation="vertical"]);
+@custom-variant data-checked (&[data-state="checked"]);
+@custom-variant data-unchecked (&[data-state="unchecked"]);
+@custom-variant data-open (&[data-state="open"]);
+@custom-variant data-closed (&[data-state="closed"]);
+@custom-variant data-selected (&[data-selected]);
+@custom-variant data-highlighted (&[data-highlighted]);
+@custom-variant data-disabled (&[data-disabled]);
+@custom-variant data-inset (&[data-inset="true"]);
+
+/* ─────────────────────────── CONSTANT TOKENS ──────────────────────────────
+   Values that do not vary with theme, mode, or device live in the kit so the
+   dashboard and every app bundle resolve the same geometry and typography
+   without depending on host declarations. `:host` makes the values available
+   inside an app ShadowRoot. `:root` serves light-DOM consumers. */
+:root,
+:host {
+  /* Typeface stacks. The `--rome-` backing names avoid a cycle with the
+     `--font-*` Tailwind theme keys mapped below. */
+  --rome-font-sans: "Funnel Sans", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC",
+    "Source Han Sans SC", sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji";
+  --rome-font-serif: "Petrona", "Cormorant Garamond", "Times New Roman", serif;
+  --rome-font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
+    Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-sans: var(--rome-font-sans);
+  --font-serif: var(--rome-font-serif);
+  --font-mono: var(--rome-font-mono);
+
+  /* Spacing. Authored in rem so a reader's font-size preference scales the
+     layout. The px note is the value at a 16px root. */
+  --rome-space-0: 0;
+  --rome-space-1: 0.25rem; /* 4px */
+  --rome-space-2: 0.5rem; /* 8px */
+  --rome-space-3: 0.75rem; /* 12px */
+  --rome-space-4: 1rem; /* 16px */
+  --rome-space-5: 1.25rem; /* 20px */
+  --rome-space-6: 1.5rem; /* 24px */
+  --rome-space-7: 1.75rem; /* 28px */
+  --rome-space-8: 2rem; /* 32px */
+  --rome-space-9: 2.25rem; /* 36px */
+  --rome-space-10: 2.5rem; /* 40px */
+  --rome-space-12: 3rem; /* 48px */
+  --rome-space-16: 4rem; /* 64px */
+  --rome-space-20: 5rem; /* 80px */
+  --rome-space-24: 6rem; /* 96px */
+
+  /* Box size. A step's name is its value in px at a 16px root. */
+  --rome-size-4: 0.25rem; /* 4px */
+  --rome-size-6: 0.375rem; /* 6px */
+  --rome-size-8: 0.5rem; /* 8px */
+  --rome-size-10: 0.625rem; /* 10px */
+  --rome-size-12: 0.75rem; /* 12px */
+  --rome-size-14: 0.875rem; /* 14px */
+  --rome-size-16: 1rem; /* 16px */
+  --rome-size-20: 1.25rem; /* 20px */
+  --rome-size-24: 1.5rem; /* 24px */
+  --rome-size-28: 1.75rem; /* 28px */
+  --rome-size-32: 2rem; /* 32px */
+  --rome-size-36: 2.25rem; /* 36px */
+  --rome-size-40: 2.5rem; /* 40px */
+  --rome-size-44: 2.75rem; /* 44px */
+  --rome-size-48: 3rem; /* 48px */
+  --rome-size-56: 3.5rem; /* 56px */
+  --rome-size-64: 4rem; /* 64px */
+
+  --rome-radius-4: 4px;
+  --rome-radius-8: 8px;
+  --rome-radius-12: 12px;
+  --rome-radius-16: 16px;
+  --rome-radius-full: 9999px;
+  --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* shadcn aliases follow the active theme lazily. */
+  --card: var(--surface);
+  --card-foreground: var(--surface-foreground);
+  --popover: var(--surface-elevated);
+  --popover-foreground: var(--surface-foreground);
+
+  --control-h-sm: var(--rome-size-28);
+  --control-h-md: var(--rome-size-36);
+  --control-h-lg: var(--rome-size-44);
+
+  --control-gap: var(--rome-space-2);
+  --control-gap-sm: var(--control-gap);
+  --control-gap-md: var(--control-gap);
+  --control-gap-lg: var(--control-gap);
+
+  --control-r-sm: 8px;
+  --control-r-md: 10px;
+  --control-r-lg: 12px;
+
+  --control-px-start-sm: 10px;
+  --control-px-start-md: 12px;
+  --control-px-start-lg: 16px;
+
+  --control-px-center-sm: 8px;
+  --control-px-center-md: 12px;
+  --control-px-center-lg: 16px;
+
+  /* Compatibility aliases for app artifacts built against the field names. */
+  --field-px-sm: var(--control-px-start-sm);
+  --field-px-md: var(--control-px-start-md);
+  --field-px-lg: var(--control-px-start-lg);
+
+  --badge-h: 22px;
+  --badge-px: 9px;
+  --badge-gap: 6px;
+}
+
+/* ───────────────────────── TYPOGRAPHY PRIMITIVES ───────────────────────────
+   The two scales semantic text tokens read, and the only place a type literal
+   is written. Retuning a token is repointing it at another step; retuning the
+   system is editing a value here. Nothing else in the kit may write a font
+   size or a line height.
+
+   A size step's name is its px size at a 16px root and its value is that size
+   in rem, so raising the browser font size scales the text with it. A line
+   height stays unitless — it multiplies the size it composes with and inherits
+   as a ratio, so a descendant at another size never inherits a stale box — but
+   each step is cut for one size step rather than being interchangeable, since
+   the grid rule below fixes the box the pair has to produce. */
+:root,
+:host {
+  --rome-font-size-13: 0.8125rem;
+  --rome-font-size-14: 0.875rem;
+  --rome-font-size-15: 0.9375rem;
+  --rome-font-size-16: 1rem;
+  --rome-font-size-18: 1.125rem;
+  --rome-font-size-20: 1.25rem;
+  --rome-font-size-22: 1.375rem;
+  --rome-font-size-24: 1.5rem;
+  --rome-font-size-30: 1.875rem;
+
+  /* Every step composes its size step to a line box on the 4px spacing grid, so
+     a line of text occupies whole spacing units and stacked text lands on the
+     same rhythm as the boxes around it. A step is therefore chosen by the box
+     it produces, not by how loose it looks: 13→16, 14→20, 15→20, 16→20,
+     18→24, 20→24, 22→28, 24→32, 30→36.
+
+     Each holds the exact ratio as a division of the two rem values rather than
+     its rounded decimal, which would miss the grid by hundredths of a pixel —
+     a flat 1.43 lands 14px on 20.02. The name is that ratio times 100, rounded,
+     so a name may round where the value never does. */
+  --rome-line-height-120: 1.2;
+  --rome-line-height-123: calc(1 / 0.8125);
+  --rome-line-height-125: 1.25;
+  --rome-line-height-127: calc(1.75 / 1.375);
+  --rome-line-height-133: calc(4 / 3);
+  --rome-line-height-143: calc(1.25 / 0.875);
+}
+
+/* ──────────────────────────── TYPOGRAPHY ROLES ─────────────────────────────
+   Each role is deliberately one Tailwind type key: its utility sets size,
+   leading, tracking, and weight together. Keep letter-spacing explicit so a
+   role nested under a legacy tracking utility resets to the system's zero.
+
+   Size and line height name a primitive step rather than a literal; weight and
+   letter spacing are held directly, having too few distinct values across the
+   roster to earn a scale.
+
+   Section and Badge carry the roster's only non-400 weight. A CJK system
+   fallback ships no 500 face, so CSS weight matching resolves both back to
+   Regular there and the emphasis is Latin-only. Hierarchy on a bilingual
+   surface must also come from size, ink, position, or container geometry.
+
+   This block is not `inline`: Tailwind must emit the variables on `:root,
+   :host` so a scoped preview can override the role values without rebuilding
+   the stylesheet.
+
+   This block and `TYPOGRAPHY_ROLES` in `typography-roles.ts` must name exactly
+   the same roles: an unregistered role is not a font size to tailwind-merge,
+   so a caller's text color deletes it, and a name registered after being
+   dropped here goes on claiming the font-size group. The tests read this block
+   and fail on drift in either direction. */
+@theme {
+  --text-display: var(--rome-font-size-30);
+  --text-display--line-height: var(--rome-line-height-120);
+  --text-display--letter-spacing: 0;
+  --text-display--font-weight: 400;
+
+  --text-title: var(--rome-font-size-20);
+  --text-title--line-height: var(--rome-line-height-120);
+  --text-title--letter-spacing: 0;
+  --text-title--font-weight: 400;
+
+  --text-section: var(--rome-font-size-15);
+  --text-section--line-height: var(--rome-line-height-133);
+  --text-section--letter-spacing: 0;
+  --text-section--font-weight: 500;
+
+  --text-body: var(--rome-font-size-16);
+  --text-body--line-height: var(--rome-line-height-125);
+  --text-body--letter-spacing: 0;
+  --text-body--font-weight: 400;
+
+  --text-ui: var(--rome-font-size-14);
+  --text-ui--line-height: var(--rome-line-height-143);
+  --text-ui--letter-spacing: 0;
+  --text-ui--font-weight: 400;
+
+  --text-badge: var(--rome-font-size-13);
+  --text-badge--line-height: var(--rome-line-height-123);
+  --text-badge--letter-spacing: 0;
+  --text-badge--font-weight: 500;
+
+  --text-aux: var(--rome-font-size-13);
+  --text-aux--line-height: var(--rome-line-height-123);
+  --text-aux--letter-spacing: 0;
+  --text-aux--font-weight: 400;
+}
+
+/* ─────────────────────────── MARKDOWN TOKENS ──────────────────────────────
+   Markdown has a document grammar that is separate from dashboard typography
+   roles. These fixed semantic tokens expose its standard typography and
+   rhythm to every host. The opt-in Markdown stylesheet binds them to rendered
+   elements and rebinds them for compact density. */
+:root,
+:host {
+  --markdown-body-font-size: var(--rome-font-size-16);
+  --markdown-body-line-height: var(--rome-line-height-125);
+  --markdown-body-font-weight: 400;
+  --markdown-body-letter-spacing: 0;
+
+  --markdown-heading-1-font-size: var(--rome-font-size-24);
+  --markdown-heading-1-line-height: var(--rome-line-height-133);
+  --markdown-heading-2-font-size: var(--rome-font-size-22);
+  --markdown-heading-2-line-height: var(--rome-line-height-127);
+  --markdown-heading-3-font-size: var(--rome-font-size-20);
+  --markdown-heading-3-line-height: var(--rome-line-height-120);
+  --markdown-heading-4-font-size: var(--rome-font-size-18);
+  --markdown-heading-4-line-height: var(--rome-line-height-133);
+  --markdown-heading-floor-font-size: var(--rome-font-size-16);
+  --markdown-heading-floor-line-height: var(--rome-line-height-125);
+  --markdown-heading-font-weight: 500;
+  --markdown-heading-letter-spacing: 0;
+
+  --markdown-block-space-between: var(--rome-space-4);
+  --markdown-heading-1-space-before: var(--rome-space-6);
+  --markdown-heading-1-space-after: var(--rome-space-2);
+  --markdown-heading-2-space-before: var(--rome-space-6);
+  --markdown-heading-2-space-after: var(--rome-space-2);
+  --markdown-heading-3-space-before: var(--rome-space-4);
+  --markdown-heading-3-space-after: var(--rome-space-1);
+  --markdown-heading-4-space-before: var(--rome-space-4);
+  --markdown-heading-4-space-after: var(--rome-space-1);
+  --markdown-heading-floor-space-before: var(--rome-space-4);
+  --markdown-heading-floor-space-after: var(--rome-space-1);
+  --markdown-list-space-block: var(--rome-space-2);
+  --markdown-list-item-space-block: var(--rome-space-1);
+  --markdown-code-block-space-block: var(--rome-space-4);
+  --markdown-blockquote-space-block: var(--rome-space-4);
+  --markdown-table-space-block: var(--rome-space-4);
+  --markdown-rule-space-block: var(--rome-space-6);
+  --markdown-media-space-block: var(--rome-space-4);
+}
+
+/* ─────────────────────────── DESIGN TOKEN REFERENCE ───────────────────────────
+   The `@theme inline` block below is the canonical vocabulary a component may
+   paint with: every Tailwind color/font utility the host theme supports, and
+   nothing else. Each `--color-*` maps onto a bare custom property the host
+   supplies (`--color-primary` → `var(--primary)`); the same name works in every
+   theme × mode, so a UI built only from these is correct everywhere with no
+   `dark:` variants. Anything NOT registered below — raw shades (`bg-gray-100`),
+   raw scrims (`bg-black/40`), arbitrary colors — is a regression.
+
+   Each token's comment is the author-facing meaning. Reach a token through the
+   utility prefix that fits (`--color-primary` → `bg-primary` / `text-primary` /
+   `border-primary` / `ring-primary`; `--font-serif` → `font-serif`). A
+   `-foreground` token is the text/icon color that sits ON its base fill
+   (`bg-primary` pairs with `text-primary-foreground`). The status families do
+   not work that way: their bare name is a saturated fill for indicators —
+   dots, rules, rings — and carries no text, so it has no `-foreground`
+   partner. Their one foreground is `-fg`, a deep step of the family's own hue
+   that reads both on `-bg` and standalone on a plain surface, which is what
+   keeps colour-coded status text legible as that status. */
+@theme inline {
+  /* ── Font. Each key maps onto the host's `--rome-font-*` backing token —
+     never onto its own name. Tailwind echoes referenced theme keys onto
+     `:root, :host`, and a same-name reference (`--font-sans: var(--font-sans)`)
+     becomes a custom-property cycle on an app's shadow host, masking the
+     inherited host value (see "Rules that keep the two layers sound" in
+     docs/design-system.md). Don't inline a
+     font-family literal here either; it would break the host's single source
+     of truth. ──────────────────────────────────────────────────────────────── */
+
+  /* UI sans family — the default for body and controls. */
+  --font-sans: var(--rome-font-sans);
+  /* Display serif — hero/empty-state headings only. */
+  --font-serif: var(--rome-font-serif);
+  /* Monospace family — code, tabular numbers, IDs. */
+  --font-mono: var(--rome-font-mono);
+
+  /* ── Surface (figure-ground). `--background` is the page canvas (NOT white);
+     `--surface` is the raised card/panel that floats above it. ──────────────── */
+
+  /* Page canvas — NOT white; raised surfaces float above it. */
+  --color-background: var(--background);
+  /* Default body text on the canvas. */
+  --color-foreground: var(--foreground);
+  /* Raised card/panel fill above the canvas (`card` aliases this). */
+  --color-surface: var(--surface);
+  /* Text/icons on a `surface`. */
+  --color-surface-foreground: var(--surface-foreground);
+  /* Recessed/inset region inside a card (wells, code blocks). */
+  --color-surface-muted: var(--surface-muted);
+  /* Secondary text on a `surface-muted` region. */
+  --color-surface-muted-foreground: var(--surface-muted-foreground);
+  /* Highest layer — popovers, menus, floating panels. */
+  --color-surface-elevated: var(--surface-elevated);
+  /* Hover/active fill for rows and list items on a card. */
+  --color-surface-hover: var(--surface-hover);
+  /* shadcn alias of `surface`; backs `<Card>`. */
+  --color-card: var(--card);
+  /* Text/icons on a `card`. */
+  --color-card-foreground: var(--card-foreground);
+  /* shadcn alias of the elevated layer; backs menus/popovers. */
+  --color-popover: var(--popover);
+  /* Text on a `popover`. */
+  --color-popover-foreground: var(--popover-foreground);
+  /* Streamdown wraps code / table / mermaid blocks (and their action toolbars)
+     in a `bg-sidebar` frame. Rome has no sidebar token; alias it to the
+     standard card surface. Not `surface-elevated` (an abrupt ring on warm
+     canvases) and not `surface-muted` (which equals `muted`, so a table
+     header's `bg-muted/80` would vanish into the frame). Theme/mode-aware. */
+  --color-sidebar: var(--surface);
+
+  /* ── Foreground (text emphasis). ──────────────────────────────────────────── */
+
+  /* De-emphasized text — captions, metadata, helper copy. */
+  --color-muted-foreground: var(--muted-foreground);
+  /* Quietest text role, below `muted` (timestamps, faint hints). */
+  --color-subtle-foreground: var(--subtle-foreground);
+  /* Neutral low-contrast fill (skeletons, disabled chips). */
+  --color-muted: var(--muted);
+
+  /* ── Primary / Brand / Accent. `primary` is the single strong color — it does
+     interactive duty (solid CTA fills) AND highlight duty via alpha modulation
+     (`bg-primary/5` selected card, `ring-primary/30` selection ring). ───────── */
+
+  /* Primary CTA fill and the highlight color (via alpha). */
+  --color-primary: var(--primary);
+  /* Text/icons on a `primary` fill. */
+  --color-primary-foreground: var(--primary-foreground);
+  /* Hover state for a `primary` fill. */
+  --color-primary-hover: var(--primary-hover);
+  /* Legacy alias of `primary` (every built-in theme points both at the same
+     color). Don't use in new code — write `primary`. */
+  --color-brand: var(--brand);
+  /* Text/icons on a solid `brand` fill. A neutral: each theme picks the ink or
+     paper step its own `brand` fill can carry. */
+  --color-brand-fg: var(--brand-fg);
+  /* shadcn's neutral hover/selected background. Reserved for shadcn primitives
+     — NOT the highlight (that's `primary` with alpha). */
+  --color-accent: var(--accent);
+  /* Text on an `accent` background. */
+  --color-accent-foreground: var(--accent-foreground);
+  /* Low-emphasis secondary button/chip fill. */
+  --color-secondary: var(--secondary);
+  /* Text on a `secondary` fill. */
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  /* ── Status — destructive / success / warning / info. Each family: bare =
+     solid fill, `-bg` = soft tint, `-fg` = the one foreground, `-border` =
+     hairline. `-fg` is a deep step of the family's own hue: it reads on the
+     soft tint and standalone on a plain surface, which is what makes a status
+     colour-coded run of text or an icon legible as that status. The bare fill
+     carries indicators, not text, so nothing pairs a foreground with it. ── */
+
+  /* Destructive/error fill for an indicator, or standalone error text. The
+     error token is `destructive`, not `danger`. */
+  --color-destructive: var(--destructive);
+  /* Soft destructive tint behind an inline error message. */
+  --color-destructive-bg: var(--destructive-bg);
+  /* Readable text on `destructive-bg` and `destructive-hover-bg`. */
+  --color-destructive-fg: var(--destructive-fg);
+  /* Hairline around a soft destructive region. */
+  --color-destructive-border: var(--destructive-border);
+  /* Hover state for a soft destructive region. */
+  --color-destructive-hover-bg: var(--destructive-hover-bg);
+  /* Success fill for an indicator — a dot, rule or ring, not a label. */
+  --color-success: var(--success);
+  /* Soft success tint behind an inline success message. */
+  --color-success-bg: var(--success-bg);
+  /* Readable text on `success-bg`. */
+  --color-success-fg: var(--success-fg);
+  /* Hairline around a soft success region. */
+  --color-success-border: var(--success-border);
+  /* Warning fill for an indicator — a dot, rule or ring, not a label. */
+  --color-warning: var(--warning);
+  /* Soft warning tint behind an inline warning. */
+  --color-warning-bg: var(--warning-bg);
+  /* Readable text on `warning-bg` and `warning-hover-bg`. */
+  --color-warning-fg: var(--warning-fg);
+  /* Hairline around a soft warning region. */
+  --color-warning-border: var(--warning-border);
+  /* Hover state for a soft warning region. */
+  --color-warning-hover-bg: var(--warning-hover-bg);
+  /* Info fill for an indicator — a dot, rule or ring, not a label. */
+  --color-info: var(--info);
+  /* Soft info tint behind an inline note. */
+  --color-info-bg: var(--info-bg);
+  /* Readable text on `info-bg`. */
+  --color-info-fg: var(--info-fg);
+  /* Hairline around a soft info region. */
+  --color-info-border: var(--info-border);
+
+  /* ── Border, ring & input. ────────────────────────────────────────────────── */
+
+  /* Default hairline between regions. */
+  --color-border: var(--border);
+  /* Heavier divider where `border` reads too faint. */
+  --color-border-strong: var(--border-strong);
+  /* Fainter divider for dense lists. */
+  --color-border-subtle: var(--border-subtle);
+  /* Focus ring color. */
+  --color-ring: var(--ring);
+  /* Border of form inputs (text fields, selects). */
+  --color-input: var(--input);
+  /* Dialog/sheet scrim. Translucency is baked in — use `bg-overlay`, NOT
+     `bg-black/40`. */
+  --color-overlay: var(--overlay);
+
+  /* ── Shadow. Theme-aware utilities; each value resolves at the element from
+     the host's mode-halved `--rome-shadow-*` backing token, so theme and mode
+     swaps repaint it live. The numbered steps are the elevation scale
+     (docs/ui/primitive-token/elevation-primitives.md). ─────────────────────── */
+  --shadow-1: var(--rome-shadow-1);
+  --shadow-4: var(--rome-shadow-4);
+  --shadow-10: var(--rome-shadow-10);
+  --shadow-25: var(--rome-shadow-25);
+  /* Semantic card-hover elevation; reads step 4. */
+  --shadow-card-hover: var(--rome-shadow-card-hover);
+
+  /* ── Radius. The Rome scale and its steps:
+     docs/ui/primitive-token/border-radius-primitives.md. The numbered
+     Tailwind namespace reads Rome's host-owned primitives. The legacy shadcn
+     names remain byte-identical because third-party app shadow roots compile
+     against them. ─────────────────────────────────────────────────────────── */
+
+  --radius-4: var(--rome-radius-4);
+  --radius-8: var(--rome-radius-8);
+  --radius-12: var(--rome-radius-12);
+  --radius-16: var(--rome-radius-16);
+  --radius-full: var(--rome-radius-full);
+
+  /* Tight corners — small controls, chips. */
+  --radius-sm: calc(var(--radius) - 4px);
+  /* Inputs and buttons. */
+  --radius-md: calc(var(--radius) - 2px);
+  /* Cards and panels (the base `--radius`). */
+  --radius-lg: var(--radius);
+  /* Modals and the largest surfaces. */
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* ── Spacing. The scale and its steps: docs/ui/primitive-token/spacing-primitives.md.
+     Rome's steps are `--rome-space-*`; Tailwind's namespace is `--spacing-*`. The
+     names differ on purpose — a same-name reference is the custom-property
+     cycle described under Font above.
+
+     The sizing utilities (`w-*`, `size-*`, `inset-*`) ride the same namespace
+     and deliver the box-size scale, `--rome-size-*`
+     (docs/ui/primitive-token/box-size-primitives.md) — every size step is a
+     quarter-rem multiple, so the utility number is the step's px name divided
+     by 4. Steps both scales admit resolve through the spacing entry below to
+     the identical value.
+
+     Tailwind's `--spacing` multiplier stays on. It carries what a named key
+     cannot: the fractional size steps (a custom property name cannot hold a
+     dot, so 1.5, 2.5, and 3.5 have no entry) and the region measures past
+     both scales' ceilings that the container widths use. ──────────────────── */
+  --spacing-0: var(--rome-space-0);
+  --spacing-1: var(--rome-space-1);
+  --spacing-2: var(--rome-space-2);
+  --spacing-3: var(--rome-space-3);
+  --spacing-4: var(--rome-space-4);
+  --spacing-5: var(--rome-space-5);
+  --spacing-6: var(--rome-space-6);
+  --spacing-7: var(--rome-space-7);
+  --spacing-8: var(--rome-space-8);
+  --spacing-9: var(--rome-space-9);
+  --spacing-10: var(--rome-space-10);
+  /* 11 and 14 exist on the box-size scale only (44 and 56px); the spacing
+     scale skips them. */
+  --spacing-11: var(--rome-size-44);
+  --spacing-12: var(--rome-space-12);
+  --spacing-14: var(--rome-size-56);
+  --spacing-16: var(--rome-space-16);
+  --spacing-20: var(--rome-space-20);
+  --spacing-24: var(--rome-space-24);
+}
+
+/* ─────────────────────── CONTROL GEOMETRY REFERENCE ───────────────────────
+   Interactive control geometry is tokenized in the kit's constant-token block
+   above. The scale is the one source of truth for how tall a control is, how it
+   pads, and how round it is; Button, Toggle, Input, SelectTrigger, Textarea,
+   SegmentedControl, IconButton and Badge all read it, so a button and a field
+   on the same row are the same height by construction.
+
+   `sm` and `md` are the shared size vocabulary: every control offers both, and
+   names its steps from that set and no other — the name is what composes, so a
+   private spelling for a shared height defeats the scale as surely as a private
+   pixel. Button and Input also accept `default`, and Button `icon`, as the
+   older spellings of `md` and `icon-md`. IconButton and Button's `icon-*`
+   variants are the square form of the same steps, value-identical at every name.
+
+   `lg` is in the scale but not in that vocabulary, and only the square members
+   carry it: IconButton and Button's `icon-lg`, for a 44px hit area. A labelled
+   Button has no `lg` — every step carries one typography role, so a taller box
+   around one line of text buys air rather than emphasis.
+
+     --control-h-{sm,md,lg}    28 / 36 / 44px   explicit control height
+     --control-gap                        8px   icon/label gap, every size
+     --control-r-{sm,md,lg}     8 / 10 / 12px   corner radius
+     --control-px-start-{sm,md,lg}
+                               10 / 12 / 16px   horizontal padding for content
+                                                that starts at an alignment edge
+     --control-px-center-{sm,md,lg}
+                                8 / 12 / 16px   horizontal padding for centred
+                                                content
+     --badge-{h,px,gap}        22 / 9 / 6px      chips sit below the scale
+
+   Horizontal padding is two groups keyed by how the content sits, and every
+   control reads one of them rather than a raw spacing step. Input, Textarea,
+   SelectTrigger, CommandInput and a start-aligned Button take `start`, the
+   inset every control stacked in one column lines up on. A centred Button
+   label, a SegmentedControl segment and a TabsTrigger take `center`, which has
+   no such edge to hold and sits tighter at `sm`. Both groups set symmetric
+   padding — the words name the content's alignment, not a side.
+
+   Components read the tokens in bracket form — `h-[var(--control-h-md)]`,
+   `px-[var(--control-px-start-md)]` — never Tailwind v4's parenthesis shorthand:
+   tailwind-merge doesn't classify the shorthand, so a caller's `className`
+   override silently stops winning. Typography comes from the role utilities,
+   not the geometry scale. Controls set an explicit height and pad horizontally
+   only — the border sits inside the box (global `border-box`), so a focus or
+   invalid border never changes the height. */
+
+@layer base {
+  /* shadcn contract: an element with a border-width utility and no color
+     utility gets the theme hairline, not preflight's currentColor. */
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+
+  /* Kill image-drag ghosts everywhere. */
+  * {
+    -webkit-user-drag: none;
+  }
+
+  button,
+  a,
+  summary,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"] {
+    touch-action: manipulation;
+  }
+
+  /* Keep actionable chrome discoverable on hover. This lives in the base layer
+     so deliberate component utilities such as `cursor-default` on menu items or
+     `cursor-grab` on drag handles can still override it. */
+  :where(
+    button:not(:disabled),
+    a[href],
+    select:not(:disabled),
+    summary,
+    [type="button"]:not(:disabled),
+    [type="submit"]:not(:disabled),
+    [type="reset"]:not(:disabled),
+    input[type="checkbox"]:not(:disabled),
+    input[type="radio"]:not(:disabled),
+    label[for],
+    [role="button"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="link"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="tab"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="menuitem"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="option"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="treeitem"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="checkbox"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="radio"]:not([aria-disabled="true"]):not([data-disabled]),
+    [role="switch"]:not([aria-disabled="true"]):not([data-disabled])
+  ) {
+    cursor: pointer;
+  }
+
+  :where(
+    button:disabled,
+    select:disabled,
+    [type="button"]:disabled,
+    [type="submit"]:disabled,
+    [type="reset"]:disabled,
+    input[type="checkbox"]:disabled,
+    input[type="radio"]:disabled,
+    [aria-disabled="true"],
+    [data-disabled]
+  ) {
+    cursor: not-allowed;
+  }
+}
+
+/* Raises a control to the 44px touch floor on pointerless devices, so a step
+   sized for desktop density stays reachable by thumb. `IconButton`'s `xs` (24px,
+   the WCAG 2.5.8 minimum) is the step that needs it.
+
+   A floor, so `min-*` rather than `width`/`height` — an exact size would also
+   shrink a control already larger than the floor, and it constrains one axis
+   at a time, so an element with wide content grows past the floor rather than
+   being squared off.
+
+   Unlayered, because a `min-w-*` utility would otherwise outrank the floor and
+   remove it. `min-width` is a different property from the `width` a size
+   utility sets, so the two never compete — layering matters here only against
+   another `min-width`.
+
+   The literal fallback carries the guarantee where the host declares no size
+   scale: an unresolvable `var()` drops the declaration, and a silently absent
+   touch floor is the one failure this rule exists to prevent. */
+@media (hover: none) {
+  .touch-target {
+    min-width: var(--rome-size-44, 2.75rem);
+    min-height: var(--rome-size-44, 2.75rem);
+  }
+}
+
+/* The floor needs a non-inline display to take effect at all — `min-*` does
+   not apply to a non-replaced inline element — so the utility supplies one.
+
+   It belongs in `base` rather than beside the floor above: unlayered, this
+   would outrank every display utility, and `hidden` on a touch device would
+   render the control anyway. As a base-layer default it only fills in where
+   the caller expressed no intent, and `hidden` / `flex` / `items-*` win. */
+@layer base {
+  @media (hover: none) {
+    .touch-target {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+}

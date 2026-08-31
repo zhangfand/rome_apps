@@ -1,0 +1,7 @@
+name: snapshot
+type: custom
+description: Read Yunfan's current X and LinkedIn profiles, recent posts, and visible engagement metrics. Read-only; never publishes or engages.
+complexity: moderate
+speed: slow
+reliability: medium
+sideEffects: read-only

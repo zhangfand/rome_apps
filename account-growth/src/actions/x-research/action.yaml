@@ -1,0 +1,7 @@
+name: x_research
+type: custom
+description: Search X or inspect a public X profile and its recent posts for engagement research. Read-only; never follows, likes, replies, or publishes.
+complexity: moderate
+speed: slow
+reliability: medium
+sideEffects: read-only

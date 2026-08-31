@@ -1,0 +1,1101 @@
+{
+  "capturedAt": "2026-08-20T21:42:00.000Z",
+  "xProfile": [
+    {
+      "screen_name": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "bio": "",
+      "location": "",
+      "url": "",
+      "followers": 0,
+      "following": 0,
+      "tweets": 0,
+      "likes": 0,
+      "verified": true,
+      "created_at": "Thu Jan 23 23:02:51 +0000 2025"
+    }
+  ],
+  "xPosts": [
+    {
+      "id": "2090544252426322405",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Tried Grok Bot. It looked pretty nice initially, but it kept returning errors since last night. The VM lost internet access too. Any idea why? @cursor_ai @xai @bot https://t.co/vsIs1iORS4",
+      "likes": 0,
+      "retweets": 0,
+      "replies": 1,
+      "views": 51,
+      "is_retweet": false,
+      "created_at": "Thu Aug 20 20:59:24 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2090544252426322405",
+      "has_media": true,
+      "media_urls": [
+        "https://pbs.twimg.com/media/HQMakX5bkAAy_ma.jpg",
+        "https://pbs.twimg.com/media/HQMam1pbUAAkCPH.jpg"
+      ],
+      "media_posters": [
+        "https://pbs.twimg.com/media/HQMakX5bkAAy_ma.jpg",
+        "https://pbs.twimg.com/media/HQMam1pbUAAkCPH.jpg"
+      ],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2090158536152293601",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Lenny's jobs launched yesterday. It reminded me of Fenty Beauty. Lenny's jobs is powered by TrueUp, while Fenty Beauty by LVMH.\n\nSo what historical parallels can software industry draw from the beauty industry?\n\nSome interesting predictions:\n\n1) As software becomes easier to build, the person who owns the brand may no longer need to own the software company\n2) Users might see @lennysan operating brands for tech professionals, while Zubin Damania or @EricTopol for healthcare, and an ex-Goldman MD run a finance-careers brand\n3) The next major software conglomerate may own almost no famous consumer-facing brand, but quietly operate 100 independent expert-led brands.",
+      "likes": 8,
+      "retweets": 0,
+      "replies": 2,
+      "views": 391,
+      "is_retweet": false,
+      "created_at": "Wed Aug 19 19:26:42 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2090158536152293601",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2090158898821181696",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "That said, I am wondering when we don't need jobs anymore",
+      "likes": 0,
+      "retweets": 0,
+      "replies": 0,
+      "views": 33,
+      "is_retweet": false,
+      "created_at": "Wed Aug 19 19:28:09 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2090158898821181696",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2089429929792577740",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Stumbled upon Niko's 30 biology essays curation. Initially, I was thinking saving it for my spare time but then realized that I would probably never come back to it.\n\nSo I have @RomeAILab to extract the essays, note down the takeaways and make a web app to help me track the progress.",
+      "likes": 8,
+      "retweets": 1,
+      "replies": 0,
+      "views": 743,
+      "is_retweet": false,
+      "created_at": "Mon Aug 17 19:11:29 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2089429929792577740",
+      "has_media": true,
+      "media_urls": [
+        "https://video.twimg.com/amplify_video/2089429855880597504/vid/avc1/480x270/d3lJZXjbVtJPXOhz.mp4?tag=29"
+      ],
+      "media_posters": [
+        "https://pbs.twimg.com/amplify_video_thumb/2089429855880597504/img/hRArjgBFV6B-_BRq.jpg"
+      ],
+      "quoted_tweet": {
+        "id": "1820918122691305486",
+        "author": "NikoMcCarty",
+        "name": "Niko McCarty.",
+        "text": "This is an ongoing thread for my series, \"30 Essays to Make You Love Biology.\" ❤️🧬\n\nI'll pin it on my profile.",
+        "created_at": "Tue Aug 06 20:21:26 +0000 2024",
+        "url": "https://x.com/NikoMcCarty/status/1820918122691305486",
+        "has_media": false,
+        "media_urls": [],
+        "media_posters": []
+      }
+    },
+    {
+      "id": "2089404022222619095",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "RT @zoolsher: My favorite recent feature in @RomeAILab. Track @ChatGPT and @claudeai token usage side by side! https://t.co/JZ7qOkx8UT",
+      "likes": 0,
+      "retweets": 5,
+      "replies": 0,
+      "views": 1,
+      "is_retweet": true,
+      "created_at": "Mon Aug 17 17:28:32 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2089404022222619095",
+      "has_media": true,
+      "media_urls": [
+        "https://pbs.twimg.com/media/HP6gOHsaQAEHAJq.jpg"
+      ],
+      "media_posters": [
+        "https://pbs.twimg.com/media/HP6gOHsaQAEHAJq.jpg"
+      ],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2088692338579361870",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "X open sourced its algorithm. People told me that a link sharing worths 40 likes and 20 reposts.\n\nThat sounds odd.\n\nI have Rome analyze the codebase. Its answer:\n\n\"Every like adds points, go viral by accumulating engagement\" does not exist anywhere in the code. The past engagement is only used to predict the probability a new user will engage with the content.\n\n...Reading the numbers honestly: weights are calibrated for how rare each action is. Copy-link sharing at 20 doesn't mean one share equals forty likes. It means copy-link sharing is rare. A common action at 60% probability (0.6 × 0.05 = 0.03) can outscore a rare one at 0.1% (0.001 × 20 = 0.02).\n\nWhat is more, there are total 6 stages. The weights are only used in the ranking stage. Reposts and likes help with the retrieval stage. Full post in the comment",
+      "likes": 5,
+      "retweets": 0,
+      "replies": 3,
+      "views": 284,
+      "is_retweet": false,
+      "created_at": "Sat Aug 15 18:20:34 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2088692338579361870",
+      "has_media": true,
+      "media_urls": [
+        "https://pbs.twimg.com/media/HPyEdK6bQAAY5tU.jpg"
+      ],
+      "media_posters": [
+        "https://pbs.twimg.com/media/HPyEdK6bQAAY5tU.jpg"
+      ],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2088703092053422365",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Full post link: https://t.co/fyS9JNfmUI",
+      "likes": 1,
+      "retweets": 0,
+      "replies": 0,
+      "views": 25,
+      "is_retweet": false,
+      "created_at": "Sat Aug 15 19:03:18 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2088703092053422365",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2088702195772559620",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "As a founder who just started using X. Two more things caught my attention:\n\n1. Cold start subsidy. For original posts in a new account, X would pay to find out if you're good. Takeaway: post many good original posts.\n\n2. There is no explicit external link penalty despite that there is consensus that external link would hurt. This might be because people clicking the external link would hurt other engagement metrics, e.g. if clicking an external link reduce the probability to reply, then there is an implicit penalty",
+      "likes": 2,
+      "retweets": 0,
+      "replies": 0,
+      "views": 43,
+      "is_retweet": false,
+      "created_at": "Sat Aug 15 18:59:44 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2088702195772559620",
+      "has_media": true,
+      "media_urls": [
+        "https://pbs.twimg.com/media/HPyNyhqaEAAUaEq.png"
+      ],
+      "media_posters": [
+        "https://pbs.twimg.com/media/HPyNyhqaEAAUaEq.png"
+      ],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2088024019891261752",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "RT @_meimeimei_: I’m glad to have early access to this cool new project. I’ve enjoyed creating my own apps, tailored to the way I work and…",
+      "likes": 0,
+      "retweets": 1,
+      "replies": 0,
+      "views": 1,
+      "is_retweet": true,
+      "created_at": "Thu Aug 13 22:04:54 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2088024019891261752",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2088023956674727937",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "RT @zhangfan_x: When @realYunfanYe and I first talked, it clicked. AI puts common knowledge everywhere. What's scarce is your own principle…",
+      "likes": 0,
+      "retweets": 1,
+      "replies": 0,
+      "views": 1,
+      "is_retweet": true,
+      "created_at": "Thu Aug 13 22:04:39 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2088023956674727937",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2087952216183431619",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "RT @MVXMXM: Move over Romulus &amp; Remus, because Rome has a new founder… congrats to @realYunfanYe on the launch!",
+      "likes": 0,
+      "retweets": 1,
+      "replies": 0,
+      "views": 1,
+      "is_retweet": true,
+      "created_at": "Thu Aug 13 17:19:35 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2087952216183431619",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2087946894102384922",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "RT @deviparikh: Go Yunfan!",
+      "likes": 0,
+      "retweets": 1,
+      "replies": 0,
+      "views": 1,
+      "is_retweet": true,
+      "created_at": "Thu Aug 13 16:58:26 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2087946894102384922",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2087936397193969715",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "RT @zoolsher: I’ve been building Rome for the past four months, since leaving @rspack_dev.\n\nI genuinely love this product and this team. Yu…",
+      "likes": 0,
+      "retweets": 13,
+      "replies": 0,
+      "views": 1,
+      "is_retweet": true,
+      "created_at": "Thu Aug 13 16:16:43 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2087936397193969715",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2087926743445500352",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Every app was designed for a million users. Yours should be designed for one.\n\nWelcome to Rome OS, an operating system where your agent builds your apps.\n\nIt builds what it needs to run your life, uses it, sees what works, and improves it. Each pass, your apps fit you a little better. That's the recursive loop.\n\nApps that grow around one person: you.\n\nComment \"ROME\" and I'll send you early access.",
+      "likes": 49,
+      "retweets": 18,
+      "replies": 23,
+      "views": 12136,
+      "is_retweet": false,
+      "created_at": "Thu Aug 13 15:38:22 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2087926743445500352",
+      "has_media": true,
+      "media_urls": [
+        "https://video.twimg.com/amplify_video/2087924349584187392/vid/avc1/480x270/cS4EmOH9K16JkOfx.mp4?tag=29"
+      ],
+      "media_posters": [
+        "https://pbs.twimg.com/amplify_video_thumb/2087924349584187392/img/zBZj1Pj6PkuRATEB.jpg"
+      ],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2087932893205311996",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Join our private preview at: https://t.co/IfFiyYy42x",
+      "likes": 5,
+      "retweets": 0,
+      "replies": 0,
+      "views": 382,
+      "is_retweet": false,
+      "created_at": "Thu Aug 13 16:02:48 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2087932893205311996",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2077868869893677517",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "My AI agent just helped me make $200.\n\nBy beating @Wayfair's customer service at their own game in ONE day, after they stonewalled me for two months.\n\nHere's the story. 👇",
+      "likes": 11,
+      "retweets": 0,
+      "replies": 3,
+      "views": 583,
+      "is_retweet": false,
+      "created_at": "Thu Jul 16 21:31:58 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2077868869893677517",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2077869700382683204",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "@Wayfair https://t.co/s8622bni5H",
+      "likes": 2,
+      "retweets": 0,
+      "replies": 0,
+      "views": 111,
+      "is_retweet": false,
+      "created_at": "Thu Jul 16 21:35:16 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2077869700382683204",
+      "has_media": true,
+      "media_urls": [
+        "https://pbs.twimg.com/media/HNYTeSQaAAAks7z.png"
+      ],
+      "media_posters": [
+        "https://pbs.twimg.com/media/HNYTeSQaAAAks7z.png"
+      ],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2077868875350409565",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "My agent organized the timeline, preserved every screenshot and tracking ref, drafted a formal complaint, and filed it with the BBB, FTC, and the state AG.\n\nThe very NEXT DAY, a \"Customer Advocacy Manager\" appeared out of nowhere and refunded $203.12.",
+      "likes": 1,
+      "retweets": 0,
+      "replies": 1,
+      "views": 82,
+      "is_retweet": false,
+      "created_at": "Thu Jul 16 21:31:59 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2077868875350409565",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2077868876629745828",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "They still owe me $16—a recycling fee that MRC policy says MUST be refunded for returns within 30 days. My agent is already on it.\n\nLesson: companies profit from your exhaustion. An AI agent never gets tired.\n\nHas a company ever exhausted you into giving up a refund?👇",
+      "likes": 1,
+      "retweets": 0,
+      "replies": 0,
+      "views": 71,
+      "is_retweet": false,
+      "created_at": "Thu Jul 16 21:31:59 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2077868876629745828",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2077868874197004522",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "What makes me angriest: they're not counting on being right. They're counting on you being TIRED.\n\nMost people give up here. I almost did. Who has 2 months to chase $219?\n\nSo I handed the whole fight to my AI agent.",
+      "likes": 0,
+      "retweets": 0,
+      "replies": 1,
+      "views": 36,
+      "is_retweet": false,
+      "created_at": "Thu Jul 16 21:31:59 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2077868874197004522",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2077866605053395015",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "What makes me angriest: they're not counting on being right. They're counting on you being TIRED.\n\nMost people give up here. I almost did. Who has 2 months to chase $219?\n\nSo I handed the whole fight to my AI agent.",
+      "likes": 1,
+      "retweets": 0,
+      "replies": 0,
+      "views": 38,
+      "is_retweet": false,
+      "created_at": "Thu Jul 16 21:22:58 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2077866605053395015",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2077866370113610142",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Then… nothing. For TWO months.\n\nI did everything \"right.\" Chatted with support. Gave them the order #, pickup date, 3 tracking numbers.\n\nWhat I got back: copy-paste scripts, \"a specialist will email you in 1–3 days\" (they never did), no case number, the support chat auto-closed",
+      "likes": 1,
+      "retweets": 0,
+      "replies": 0,
+      "views": 27,
+      "is_retweet": false,
+      "created_at": "Thu Jul 16 21:22:02 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2077866370113610142",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2077865629995180515",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Search \"Wayfair bait and switch\". The internet is full of complaints about attractive delivery dates that change right after you pay.\n\nI started the return just 2 days after ordering, the moment I noticed the date change. Never opened. Wayfair's own carrier picked it up May 19.",
+      "likes": 0,
+      "retweets": 0,
+      "replies": 0,
+      "views": 25,
+      "is_retweet": false,
+      "created_at": "Thu Jul 16 21:19:05 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2077865629995180515",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2077865091987607703",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "May 4: I ordered a $219 mattress from Wayfair, promised by May 7. Then the delivery date quietly slipped by more than a week.\n\nSound familiar? Search \"Wayfair bait and switch\". The internet is full of complaints about attractive delivery dates that change right after you pay.",
+      "likes": 0,
+      "retweets": 0,
+      "replies": 0,
+      "views": 24,
+      "is_retweet": false,
+      "created_at": "Thu Jul 16 21:16:57 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2077865091987607703",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2077181467139145897",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Nothing says product-market fit like a 502. ChatGPT didn't go down, it got validated.\n\nJokes aside, We do need our beloved GPT 5.6 back @thsottiaux https://t.co/RxTp5t1G13",
+      "likes": 8,
+      "retweets": 0,
+      "replies": 1,
+      "views": 1104,
+      "is_retweet": false,
+      "created_at": "Wed Jul 15 00:00:28 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2077181467139145897",
+      "has_media": true,
+      "media_urls": [
+        "https://pbs.twimg.com/media/HNOguC0awAE3K9V.jpg"
+      ],
+      "media_posters": [
+        "https://pbs.twimg.com/media/HNOguC0awAE3K9V.jpg"
+      ],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2077184291747086680",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "@thsottiaux Also, are we getting another weekly limit reset? Thank you whoever wrote the bug?",
+      "likes": 0,
+      "retweets": 0,
+      "replies": 0,
+      "views": 79,
+      "is_retweet": false,
+      "created_at": "Wed Jul 15 00:11:42 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2077184291747086680",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2076895388104368213",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "“When owning a piece of a building, a bond, or a fund becomes as easy as sending a message, ownership stops being a privilege.”\n\nThis line hits me hardest.\n\nFrontier labs are building extraordinary companies on top of humanity’s accumulated knowledge—yet most people whose lives, labor, and ideas helped create that foundation will never own a single piece of the upside, because access to that equity is tightly guarded by a small, privileged circle.",
+      "likes": 9,
+      "retweets": 0,
+      "replies": 1,
+      "views": 386,
+      "is_retweet": false,
+      "created_at": "Tue Jul 14 05:03:42 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2076895388104368213",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2074979644865122322",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Grok 4.5 is an impressive model! But is it cheap?\n\nWhile the headline pricing is 3-4x reduced input/output price, the actual cost difference is much smaller. I grabbed my Claude's token usage from yesterday (99M cache read, 3.4M cache write, 0.75M output) and did a quick estimate. Grok 4.5 can only save me 32%. The main culprit is that the cache price is 0.5$/M, exactly the same as Opus 4.8.\n\nGiven that Grok 4.5 is roughly comparable to Opus 4.7 (which is worse than 4.8). It probably makes sense to reduce the cache token price even further to attract more users?",
+      "likes": 9,
+      "retweets": 1,
+      "replies": 4,
+      "views": 1164,
+      "is_retweet": false,
+      "created_at": "Wed Jul 08 22:11:13 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2074979644865122322",
+      "has_media": true,
+      "media_urls": [
+        "https://pbs.twimg.com/media/HMvO_Bya4AAb_EN.jpg"
+      ],
+      "media_posters": [
+        "https://pbs.twimg.com/media/HMvO_Bya4AAb_EN.jpg"
+      ],
+      "quoted_tweet": {
+        "id": "2074911038286295049",
+        "author": "elonmusk",
+        "name": "Elon Musk",
+        "text": "Our internal assessment is that Grok 4.5 is roughly comparable to Opus 4.7, but much faster. The combination of capability, faster speed and lower cost is what makes it competitive. \n\nWe are closing the loop on real-world usefulness, not benchmarks. Hardcore engineers at Tesla & SpaceX find Grok 4.5 genuinely useful, which is what actually matters.",
+        "created_at": "Wed Jul 08 17:38:36 +0000 2026",
+        "url": "https://x.com/elonmusk/status/2074911038286295049",
+        "has_media": false,
+        "media_urls": [],
+        "media_posters": []
+      }
+    },
+    {
+      "id": "2072034802581299278",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Sonnet 5 just launched, and for the first time, @AnthropicAI official chart uses model cost on the x-axis.\n\nIMO, this signals a shift: companies are getting more rational about cost-benefit tradeoffs, instead of simply tokenmaxxing.\n\nFor most AI products, cost has always been the constraint. Many products only expose Sonnet-tier models to users, while still claiming they can deliver top-tier quality. The exception is usually companies where FOMO outweighs margin math.\n\nSonnet 5 is clearly an upgrade from Sonnet 4.6. But looking at @claudeai's own chart, it doesn’t seem to make sense to run Sonnet above medium reasoning. The takeaway: use Sonnet for simple/medium tasks, but don’t overclock it for hard reasoning — route to Opus.",
+      "likes": 6,
+      "retweets": 0,
+      "replies": 0,
+      "views": 340,
+      "is_retweet": false,
+      "created_at": "Tue Jun 30 19:09:28 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2072034802581299278",
+      "has_media": true,
+      "media_urls": [
+        "https://pbs.twimg.com/media/HMFSMoHbgAA7XT-.jpg",
+        "https://pbs.twimg.com/media/HMFT0DPbwAA-nBP.jpg"
+      ],
+      "media_posters": [
+        "https://pbs.twimg.com/media/HMFSMoHbgAA7XT-.jpg",
+        "https://pbs.twimg.com/media/HMFT0DPbwAA-nBP.jpg"
+      ],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2070351121357627558",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Bought a ticket to #WorldCup US vs 3BEFIJ , hoping the 3rd-place team would be Ecuador or Sweden.\n\nOnly realized today it'd be 🇺🇸 vs 🇧🇦.\n\nI got curious and learned about the Annex C rule: the best 8 of 12 third-place teams create 495 possible combos, and FIFA has a fixed bracket mapping for each one.\n\nSo I had my agent make an app to predict the remaining games and likely bracket:",
+      "likes": 4,
+      "retweets": 0,
+      "replies": 0,
+      "views": 702,
+      "is_retweet": false,
+      "created_at": "Fri Jun 26 03:39:07 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2070351121357627558",
+      "has_media": true,
+      "media_urls": [
+        "https://pbs.twimg.com/media/HLtb7QMaEAA470Q.jpg",
+        "https://pbs.twimg.com/media/HLtdV4WboAArIDW.jpg"
+      ],
+      "media_posters": [
+        "https://pbs.twimg.com/media/HLtb7QMaEAA470Q.jpg",
+        "https://pbs.twimg.com/media/HLtdV4WboAArIDW.jpg"
+      ],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2066942222495621449",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Congrats! Looking forward to seeing you back founders before the category has a name.",
+      "likes": 3,
+      "retweets": 0,
+      "replies": 1,
+      "views": 631,
+      "is_retweet": false,
+      "created_at": "Tue Jun 16 17:53:22 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2066942222495621449",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": {
+        "id": "2066924262674616643",
+        "author": "HenryYin_",
+        "name": "Henry Yin✈️ICML",
+        "text": "Most AI investing happens downstream of the frontier: a capability emerges, a category gets named, and capital rushes in.\n\nBut by the time a category earns a clean box on a market map, the best builders have usually been living in the messy version for months.\n\nAgents. Reasoning. RL environments. World models. AI for Science. Recursive self-improvement.\n\nI call this frontier proximity: the ability to see what is becoming possible before it becomes consensus.\n\nMy frontier proximity ladder:\n\nL0 Wrapper: uses today’s models.\nL1 Reactor: reacts fast to releases, but roadmap is downstream.\nL2 Anticipator: builds for where capabilities are going.\nL3 Native: depends on a non-obvious frontier bet.\nL4 Shaper: helps move the frontier itself.\n\nThe point is not that every company needs to train models.\n\nApps can have high frontier proximity if they understand what models will make possible next.\n\nInfra can have high frontier proximity if it knows what future agents, multimodal systems, robotics stacks, or scientific workflows will need.\n\nThat is why we’re launching MoE Capital.\n\nMoE stands for Mixture of Experts.\n\nThe idea is simple: build an AI fund around people closest to the frontier: frontier researchers, technical founders, AI-native builders, and seasoned operators.\n\nWe don’t want to be another AI fund with a newsletter-level understanding of the frontier.\n\nWe want to build the AI fund closest to the frontier.\n\nMore in The Information: https://t.co/CXWJAy34zi",
+        "created_at": "Tue Jun 16 16:42:00 +0000 2026",
+        "url": "https://x.com/HenryYin_/status/2066924262674616643",
+        "has_media": true,
+        "media_urls": [
+          "https://pbs.twimg.com/media/HK8wnVubUAI-J0a.jpg"
+        ],
+        "media_posters": [
+          "https://pbs.twimg.com/media/HK8wnVubUAI-J0a.jpg"
+        ]
+      }
+    },
+    {
+      "id": "2064641829602267252",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "I asked Claude Fable 5 to make the best music game app for me. The most astounding part is that it actually hand-rolled three decent original sound tracks in one shot! https://t.co/zg4NZCjTRg",
+      "likes": 0,
+      "retweets": 0,
+      "replies": 1,
+      "views": 145,
+      "is_retweet": false,
+      "created_at": "Wed Jun 10 09:32:26 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2064641829602267252",
+      "has_media": true,
+      "media_urls": [
+        "https://video.twimg.com/amplify_video/2064641539800981504/vid/avc1/320x342/1CYKX03bOkKQYwzS.mp4?tag=14"
+      ],
+      "media_posters": [
+        "https://pbs.twimg.com/amplify_video_thumb/2064641539800981504/img/CUxh7E1CGt0vHNp6.jpg"
+      ],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2047360590713442375",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Congrats on the launch! Been waiting for this forever. So excited!",
+      "likes": 11,
+      "retweets": 2,
+      "replies": 0,
+      "views": 2542,
+      "is_retweet": false,
+      "created_at": "Thu Apr 23 17:02:57 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2047360590713442375",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": {
+        "id": "2047345080365969648",
+        "author": "abhshkdz",
+        "name": "Abhishek Das",
+        "text": "We're excited to launch Delegate. An agent you delegate work to and move on with your life. https://t.co/tiaQI0oyHm",
+        "created_at": "Thu Apr 23 16:01:19 +0000 2026",
+        "url": "https://x.com/abhshkdz/status/2047345080365969648",
+        "has_media": true,
+        "media_urls": [
+          "https://video.twimg.com/amplify_video/2047344063486283776/vid/avc1/480x270/MjiU2gxA5pyNNTFu.mp4?tag=21"
+        ],
+        "media_posters": [
+          "https://pbs.twimg.com/amplify_video_thumb/2047344063486283776/img/AOcoy7BtWlVcDkfT.jpg"
+        ]
+      }
+    },
+    {
+      "id": "2034150197438386467",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "M2.7 from @MiniMax_AI now fully available in the official APIs but the open weights have not dropped yet. I guess it is a good strategy to draw more users to the official API? Maybe as the model gets better, the gap between the official and the open weights will become larger? https://t.co/WBxtdzMlkk",
+      "likes": 2,
+      "retweets": 0,
+      "replies": 1,
+      "views": 174,
+      "is_retweet": false,
+      "created_at": "Wed Mar 18 06:09:34 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2034150197438386467",
+      "has_media": true,
+      "media_urls": [
+        "https://pbs.twimg.com/media/HDq_ZoOboAAN9L7.jpg"
+      ],
+      "media_posters": [
+        "https://pbs.twimg.com/media/HDq_ZoOboAAN9L7.jpg"
+      ],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2034150243206631702",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "That said, as long as the weights are still open, I would support them making more money :D",
+      "likes": 0,
+      "retweets": 0,
+      "replies": 0,
+      "views": 82,
+      "is_retweet": false,
+      "created_at": "Wed Mar 18 06:09:45 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2034150243206631702",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2027578364253392964",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Dario isn't dumb. Anthropic deliberately made public what caused the split with the Department of War. Now anyone who signs with the Pentagon is essentially co-signing \"mass domestic surveillance.\" That's a massive reputation hit. So the real question: will we see TACO again? https://t.co/EGtgMbTlU8",
+      "likes": 0,
+      "retweets": 0,
+      "replies": 0,
+      "views": 163,
+      "is_retweet": false,
+      "created_at": "Sat Feb 28 02:55:27 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2027578364253392964",
+      "has_media": true,
+      "media_urls": [
+        "https://pbs.twimg.com/media/HCNmhaeXYAAqT8s.jpg"
+      ],
+      "media_posters": [
+        "https://pbs.twimg.com/media/HCNmhaeXYAAqT8s.jpg"
+      ],
+      "quoted_tweet": {
+        "id": "2027507717469049070",
+        "author": "SecWar",
+        "name": "Secretary of War Pete Hegseth",
+        "text": "This week, Anthropic delivered a master class in arrogance and betrayal as well as a textbook case of how not to do business with the United States Government or the Pentagon.\n\nOur position has never wavered and will never waver: the Department of War must have full, unrestricted access to Anthropic’s models for every LAWFUL purpose in defense of the Republic.  \n\nInstead, @AnthropicAI and its CEO @DarioAmodei, have chosen duplicity. Cloaked in the sanctimonious rhetoric of “effective altruism,” they have attempted to strong-arm the United States military into submission - a cowardly act of corporate virtue-signaling that places Silicon Valley ideology above American lives.  \n\nThe Terms of Service of Anthropic’s defective altruism will never outweigh the safety, the readiness, or the lives of American troops on the battlefield.\n\nTheir true objective is unmistakable: to seize veto power over the operational decisions of the United States military. That is unacceptable.\n \nAs President Trump stated on Truth Social, the Commander-in-Chief and the American people alone will determine the destiny of our armed forces, not unelected tech executives.  \n \nAnthropic’s stance is fundamentally incompatible with American principles. Their relationship with the United States Armed Forces and the Federal Government has therefore been permanently altered.  \n\nIn conjunction with the President's directive for the Federal Government to cease all use of Anthropic's technology, I am directing the Department of War to designate Anthropic a Supply-Chain Risk to National Security. Effective immediately, no contractor, supplier, or partner that does business with the United States military may conduct any commercial activity with Anthropic. Anthropic will continue to provide the Department of War its services for a period of no more than six months to allow for a seamless transition to a better and more patriotic service.\n\nAmerica’s warfighters will never be held hostage by the ideological whims of Big Tech. This decision is final.",
+        "created_at": "Fri Feb 27 22:14:43 +0000 2026",
+        "url": "https://x.com/SecWar/status/2027507717469049070",
+        "has_media": false,
+        "media_urls": [],
+        "media_posters": []
+      }
+    },
+    {
+      "id": "2027187948362608665",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "RT @AnthropicAI: A statement from Anthropic CEO, Dario Amodei, on our discussions with the Department of War.\n\nhttps://t.co/rM77LJejuk",
+      "likes": 0,
+      "retweets": 9070,
+      "replies": 0,
+      "views": 0,
+      "is_retweet": true,
+      "created_at": "Fri Feb 27 01:04:04 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2027187948362608665",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "2015216456829637115",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "This is absurd. Americans are being killed in the street by their government.",
+      "likes": 1,
+      "retweets": 0,
+      "replies": 0,
+      "views": 115,
+      "is_retweet": false,
+      "created_at": "Sun Jan 25 00:13:38 +0000 2026",
+      "url": "https://x.com/realYunfanYe/status/2015216456829637115",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": {
+        "id": "2015158465686102451",
+        "author": "TheJFreakinC",
+        "name": "Jesus Freakin Congress",
+        "text": "🚨BREAKING: NEW footage proves DHS lied.\n\nU.S. citizen Alex Jeffrey Pretti never pulled his LEGAL FIREARM on ICE/Border Patrol agents in Minneapolis…\n\nEven when HIS LIFE was in danger.\n\nHe was helping one woman when an agent violently shoved another. Alex stepped in to help.\n\nThe agent assaulted him, shoving him back and pepper spraying him in the face.\n\nAlex turns away. The agent doesn’t stop… he jumps on Alex’s back, trying to spray him continuously.\n\nMultiple agents then jump him… kicking him and hitting him with gas canisters, as Alex is on his hands and knees trying to protect himself.\n\nAn agent in grey grabs Alex’s LEGAL FIREARM… which Alex never pulled.\n\nAnd then… agents opened fire on an unarmed U.S. citizen.\n\nAlex was never a threat. \nAgents’ lives were never in danger.\n\nThe only life in danger was Alex’s… and he still never drew his weapon.\n\nICE/Border Patrol removed a U.S. citizen’s legal firearm…\n\nThen killed him for exercising his Second Amendment right.",
+        "created_at": "Sat Jan 24 20:23:12 +0000 2026",
+        "url": "https://x.com/TheJFreakinC/status/2015158465686102451",
+        "has_media": true,
+        "media_urls": [
+          "https://video.twimg.com/amplify_video/2015158412493864960/vid/avc1/320x568/4Y_gNC_ZZWcSMn-_.mp4?tag=21"
+        ],
+        "media_posters": [
+          "https://pbs.twimg.com/amplify_video_thumb/2015158412493864960/img/n-2mr5SJFHGu78Y0.jpg"
+        ]
+      }
+    },
+    {
+      "id": "2003169174399725997",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Our 24/7 long-running scouts with compounding knowledge base!",
+      "likes": 7,
+      "retweets": 1,
+      "replies": 0,
+      "views": 1468,
+      "is_retweet": false,
+      "created_at": "Mon Dec 22 18:22:02 +0000 2025",
+      "url": "https://x.com/realYunfanYe/status/2003169174399725997",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": {
+        "id": "2003150235737162229",
+        "author": "DhruvBatra_",
+        "name": "Dhruv Batra",
+        "text": "What happens when the web is an agent’s context?\n\nScouts monitor the web 24/7 for weeks & months. \n\nAn average scout run invokes 76 agents and processes ~1M tokens.\n\nHow did we build a multi-agent system that gathers relevant and comprehensive reports without blowing up the budget?\n\nKey ideas\n\n• Modularize into specialized subagents\n• Design for coverage and persistence\n• Recognize that tools are heterogeneous: design for trade-offs between speed, cost, and reliability\n• Let agents evolve and learn from user feedback\n• Build long-term external memory\n\nDetails 👇🏼",
+        "created_at": "Mon Dec 22 17:06:47 +0000 2025",
+        "url": "https://x.com/DhruvBatra_/status/2003150235737162229",
+        "has_media": true,
+        "media_urls": [
+          "https://pbs.twimg.com/media/G8ydrioagAMl7df.jpg"
+        ],
+        "media_posters": [
+          "https://pbs.twimg.com/media/G8ydrioagAMl7df.jpg"
+        ]
+      }
+    },
+    {
+      "id": "1998802186114052176",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Excited to share what we have been working on! An effective AI agent is not just the core LLM, but the precise engineering of its context, tooling, and surrounding infrastructure working seamlessly together.",
+      "likes": 18,
+      "retweets": 4,
+      "replies": 3,
+      "views": 2309,
+      "is_retweet": false,
+      "created_at": "Wed Dec 10 17:09:11 +0000 2025",
+      "url": "https://x.com/realYunfanYe/status/1998802186114052176",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": {
+        "id": "1998799861983170986",
+        "author": "abhshkdz",
+        "name": "Abhishek Das",
+        "text": "Today, we're making Scouts available to everyone!\n\nEarlier this year, Scouts was born out of a simple observation — that so many of life's background (or even foreground!) tasks have a recurring flavor, e.g. house hunting, early stages of travel planning, sourcing leads, discovering rare products, job search, staying on top of niche news / research / podcasts, discovering local events, etc.\n\nIt's been gratifying to see all the love and feedback from our closed beta users who've helped shape the product over the last few months ❤️\n\nWith just a simple query, Scouts lets you deploy a team of AI agents to monitor anything for you. Running 24x7 in the background on the web. So you have the mental space to focus on what's most meaningful to you.\n\nThe underlying agent architecture is incredibly powerful — subagents all the way down, powered by our own web navigation agent, and with access to way more tools / APIs than before.\n\nThis what the future of interfacing with the web looks like. Where you're not sitting there manually browsing and refreshing, buried in tabs, ads, noise, distractions, context switches. Think Google Alerts on steroids.\n\nThis has been, hands down, the most fun and challenging release from our team. As with all things agentic, there's a lot of noise out there, and every micro-decision matters in shipping reliable agents.\n\nTo celebrate this release, we're offering all paid plans at 50% off, and here's a video we recently shot. Hope you like it.",
+        "created_at": "Wed Dec 10 16:59:57 +0000 2025",
+        "url": "https://x.com/abhshkdz/status/1998799861983170986",
+        "has_media": true,
+        "media_urls": [
+          "https://video.twimg.com/amplify_video/1998797098612043788/vid/avc1/512x270/1UxTonaYcWb0YOEA.mp4?tag=21"
+        ],
+        "media_posters": [
+          "https://pbs.twimg.com/amplify_video_thumb/1998797098612043788/img/vuk2QenV3t0pMAEb.jpg"
+        ]
+      }
+    },
+    {
+      "id": "1998802187263291427",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "At Yutori, we’ve carefully designed a system that orchestrates all of these pieces and, combined with our state-of-the-art web-use model, the agent consistently delivers high-quality intelligence in real-world settings.",
+      "likes": 2,
+      "retweets": 0,
+      "replies": 0,
+      "views": 69,
+      "is_retweet": false,
+      "created_at": "Wed Dec 10 17:09:12 +0000 2025",
+      "url": "https://x.com/realYunfanYe/status/1998802187263291427",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    },
+    {
+      "id": "1991193764745081251",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "Yutori Navigator was first trained on high-fidelity, web-based RL environments and then on live websites, which has led to a fast and accurate model. I expect to see many more of these RL environments on macOS, iOS, and Android, as well as in increasingly rich “world simulators.”",
+      "likes": 25,
+      "retweets": 3,
+      "replies": 0,
+      "views": 6436,
+      "is_retweet": false,
+      "created_at": "Wed Nov 19 17:16:02 +0000 2025",
+      "url": "https://x.com/realYunfanYe/status/1991193764745081251",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": {
+        "id": "1991190291089649665",
+        "author": "DhruvBatra_",
+        "name": "Dhruv Batra",
+        "text": "Introducing Yutori Navigator\n\n31 years ago, the modern web era began with Netscape Navigator.\n\nToday, we’re introducing Yutori Navigator — a web agent that autonomously navigates websites on its own cloud browser to complete tasks for you. \n\nNavigator achieves pareto-domination over Gemini 2.5, Claude 4.5, and OpenAI Operator\n\n  • 10%-20% accuracy gains across benchmarks\n  • 2-3x faster\n  • Uniformly preferred in head-to-head human-evals\n\nSimply put, the best web agent in the world",
+        "created_at": "Wed Nov 19 17:02:14 +0000 2025",
+        "url": "https://x.com/DhruvBatra_/status/1991190291089649665",
+        "has_media": true,
+        "media_urls": [
+          "https://pbs.twimg.com/media/G6Iel4NaMAAuttS.jpg"
+        ],
+        "media_posters": [
+          "https://pbs.twimg.com/media/G6Iel4NaMAAuttS.jpg"
+        ]
+      }
+    },
+    {
+      "id": "1882566883033112925",
+      "author": "realYunfanYe",
+      "name": "Yunfan Ye",
+      "text": "RT @deviparikh: Excited to share a sneak peek into what we've been building at Yutori!\n\nWhat you see below is our trained model and interna…",
+      "likes": 0,
+      "retweets": 52,
+      "replies": 0,
+      "views": 0,
+      "is_retweet": true,
+      "created_at": "Thu Jan 23 23:11:35 +0000 2025",
+      "url": "https://x.com/realYunfanYe/status/1882566883033112925",
+      "has_media": false,
+      "media_urls": [],
+      "media_posters": [],
+      "quoted_tweet": null
+    }
+  ],
+  "linkedInProfile": [
+    {
+      "profile_url": "https://www.linkedin.com/in/yunfanye/",
+      "name": "Yunfan Ye",
+      "headline": "AI Agents, Ex-Google, Ex-Meta",
+      "location": "San Francisco Bay Area",
+      "about": "About Learning machine.",
+      "about_character_count": "",
+      "about_skills": "",
+      "experience": "",
+      "education": "",
+      "services": "",
+      "featured": "Featured Post Every app was designed for a million users. Yours should be designed for one. Welcome to Rome OS, an operating system where your agent builds your apps. It builds what it needs to run your life, uses it, sees what works, and improves it. Each pass, your apps fit you a little better. That's the recursive loop. Apps that grow around one person: you. Comment \"ROME\" and I'll send you early access. 17 reactions · 17 comments 17 · 17 comments Reshared by Yunfan Ye Our 24/7 long-running scouts with compounding knowledge base! 10 reactions 10"
+    }
+  ],
+  "linkedInPosts": [
+    {
+      "rank": 1,
+      "author": "Yunfan Ye",
+      "posted_at": "1d",
+      "body": "Lenny's jobs launched yesterday. It reminded me of Fenty Beauty. Lenny's jobs is powered by TrueUp, while Fenty Beauty by LVMH. So what historical parallels can software industry draw from the beauty industry? Some interesting predictions: 1) As software becomes easier to build, the person who owns the brand may no longer need to own the software company 2) Users might see Lenny Rachitsky operating brands for tech professionals, while Zubin Damania for healthcare, and an ex-Goldman MD run a finance-careers brand 3) The next major software conglomerate may own almost no famous consumer-facing brand, but quietly operate 100 independent expert-led brands. How can we ride this wave?",
+      "reactions": 4,
+      "comments": 0,
+      "reposts": 0,
+      "impressions": 824,
+      "media": "image: View Yunfan Ye’s graphic link",
+      "media_urls": "",
+      "url": "",
+      "raw_text": "Feed post number 1 Yunfan Ye • You AI Agents, Ex-Google, Ex-Meta | Angel Investor 1d • Lenny's jobs launched yesterday. It reminded me of Fenty Beauty. Lenny's jobs is powered by TrueUp, while Fenty Beauty by LVMH. So what historical parallels can software industry draw from the beauty industry? Some interesting predictions: 1) As software becomes easier to build, the person who owns the brand may no longer need to own the software company 2) Users might see Lenny Rachitsky operating brands for tech professionals, while Zubin Damania for healthcare, and an ex-Goldman MD run a finance-careers brand 3) The next major software conglomerate may own almost no famous consumer-facing brand, but quietly operate 100 independent expert-led brands. How can we ride this wave? …more 4 Henry Wang and 3 others Like Comment Repost Send 824 impressions View analytics"
+    },
+    {
+      "rank": 2,
+      "author": "Yunfan Ye",
+      "posted_at": "1w",
+      "body": "Every app was designed for a million users. Yours should be designed for one. Welcome to Rome OS, an operating system where your agent builds your apps. It builds what it needs to run your life, uses it, sees what works, and improves it. Each pass, your apps fit you a little better. That's the recursive loop. Apps that grow around one person: you. Comment \"ROME\" and I'll send you early access.",
+      "reactions": 17,
+      "comments": 17,
+      "reposts": 4,
+      "impressions": 813,
+      "media": "image: View Yunfan Ye’s graphic link | video",
+      "media_urls": "",
+      "url": "",
+      "raw_text": "Feed post number 2 Yunfan Ye • You AI Agents, Ex-Google, Ex-Meta | Angel Investor 1w • Every app was designed for a million users. Yours should be designed for one. Welcome to Rome OS, an operating system where your agent builds your apps. It builds what it needs to run your life, uses it, sees what works, and improves it. Each pass, your apps fit you a little better. That's the recursive loop. Apps that grow around one person: you. Comment \"ROME\" and I'll send you early access. …more Pause Loaded: 51.97% Remaining time 1:12 1x Playback speed Turn closed captions on Unmute Turn fullscreen on Auto captions have been added to your video Edit captions 17 You and 16 others 17 comments 4 reposts Like Comment Repost Send 813 impressions View analytics"
+    },
+    {
+      "rank": 3,
+      "author": "Yunfan Ye",
+      "posted_at": "4w",
+      "body": "Please submit your work",
+      "reactions": 8,
+      "comments": 1,
+      "reposts": 0,
+      "impressions": 1192,
+      "media": "image: View Yunfan Ye’s graphic link | image: View Aaron Tian’s graphic link | image: graphical user interface, website | link: https://lnkd.in/gHbbSZNF https://lnkd.in/gHbbSZNF",
+      "media_urls": "https://media.licdn.com/dms/image/v2/D5622AQGYuH2McLdynw/feedshare-shrink_800/B56Z.BUWpTG4Ac-/0/1784581024811?e=1788998400&v=beta&t=L48Qhw9hIU4-Q7QKNxtVCVzN7ZNAS04yhFIgUb2GgBc | https://lnkd.in/gHbbSZNF",
+      "url": "https://www.linkedin.com/feed/update/urn:li:activity:7485075335898669056/",
+      "raw_text": "Feed post number 3 Yunfan Ye • You AI Agents, Ex-Google, Ex-Meta | Angel Investor 4w • Please submit your work Aaron Tian • 1st Delivering Safe, AI-Powered, Human-Centered Mobility 1mo • Edited • 📢 The Call for Papers is out for our NeurIPS 2026 workshop: Physical Understanding for Decision-Making (PhysUnderstand). Foundation models are becoming remarkably capable, yet reliable decision-making in the physical world remains an open challenge. PhysUnderstand brings together researchers working on physical understanding, world models, and embodied agents to close this gap. We invite submissions on topics including: • Modeling physical systems • Physical perception and active interaction • Causal and counterfactual physical reasoning • Decision-making, evaluation, and deployment 🗓️ December 11/12, 2026 · Sydney, Australia (in person) 📅 Submissions open: July 29, 2026 ⏰ Submission deadline: August 26, 2026, 08:00 UTC 🔗 https://lnkd.in/gHbbSZNF We're grateful to our invited speakers and panelists: Saining Xie, Lu Lu, Sergey Levine, Danijar Hafner, Shanghang Zhang, Jiajun Wu, Xiaolong Wang, Shuang Li, and Georgia Chalvatzaki. Organizing team: Mengyue Yang (Lead), Felix Juefei Xu, Tianyu Shi, Shirley Z, Aaron Tian, and Zhenyu Zhang. Advisory Board: Charles Ruizhongtai Qi, Jim Fan, Yuke Zhu, Steven Lake Waslander, and Michael Rabbat Questions? Reach us at physicalunderstanding.workshop@gmail.com. Please share with colleagues who might be interested. hashtag #NeurIPS2026 hashtag #CallForPapers hashtag #WorldModels hashtag #EmbodiedAI hashtag #FoundationModels hashtag #Robotics …more Activate to view larger image, Activate to view larger image, 8 Pijus Stankevicius and 7 others 1 comment Like Comment Repost Send 1,192 impressions View analytics"
+    },
+    {
+      "rank": 4,
+      "author": "Yunfan Ye",
+      "posted_at": "2mo",
+      "body": "I asked Claude Fable 5 to make the best music game app for me. The most astounding part is that it actually hand-rolled three decent original sound tracks in one shot!",
+      "reactions": 10,
+      "comments": 1,
+      "reposts": 0,
+      "impressions": 1307,
+      "media": "image: View Yunfan Ye’s graphic link | video",
+      "media_urls": "",
+      "url": "",
+      "raw_text": "Feed post number 4 Yunfan Ye • You AI Agents, Ex-Google, Ex-Meta | Angel Investor 2mo • I asked Claude Fable 5 to make the best music game app for me. The most astounding part is that it actually hand-rolled three decent original sound tracks in one shot! Play 10 Matthew Kim and 9 others 1 comment Like Comment Repost Send 1,307 impressions View analytics"
+    },
+    {
+      "rank": 5,
+      "author": "Yunfan Ye",
+      "posted_at": "5mo",
+      "body": "M2.7 from MiniMax now fully available in the official APIs but the open weights have not dropped yet. I guess it is a good strategy to draw more users to the official API? Maybe as the model gets better, the gap between the official and the open weights will become larger? That said, as long as the weights are still open, I would support them making more money :D",
+      "reactions": 47,
+      "comments": 0,
+      "reposts": 0,
+      "impressions": 6021,
+      "media": "image: View Yunfan Ye’s graphic link | image: chart, timeline",
+      "media_urls": "https://media.licdn.com/dms/image/v2/D5622AQFE811Enc89bw/feedshare-shrink_800/B56Zz_kwV4H0Ac-/0/1773814351433?e=1788998400&v=beta&t=15zL9Tv39aFSiuWK6wkzq2t-sCnmu_KsSO1ygtzPBBs",
+      "url": "",
+      "raw_text": "Feed post number 5 Yunfan Ye • You AI Agents, Ex-Google, Ex-Meta | Angel Investor 5mo • M2.7 from MiniMax now fully available in the official APIs but the open weights have not dropped yet. I guess it is a good strategy to draw more users to the official API? Maybe as the model gets better, the gap between the official and the open weights will become larger? That said, as long as the weights are still open, I would support them making more money :D …more Activate to view larger image, Activate to view larger image, 47 Ishu Darshan and 46 others Like Comment Repost Send 6,021 impressions View analytics"
+    },
+    {
+      "rank": 6,
+      "author": "Aaron Tian",
+      "posted_at": "1mo",
+      "body": "📢 The Call for Papers is out for our NeurIPS 2026 workshop: Physical Understanding for Decision-Making (PhysUnderstand). Foundation models are becoming remarkably capable, yet reliable decision-making in the physical world remains an open challenge. PhysUnderstand brings together researchers working on physical understanding, world models, and embodied agents to close this gap. We invite submissions on topics including: • Modeling physical systems • Physical perception and active interaction • Causal and counterfactual physical reasoning • Decision-making, evaluation, and deployment 🗓️ December 11/12, 2026 · Sydney, Australia (in person) 📅 Submissions open: July 29, 2026 ⏰ Submission deadline: August 26, 2026, 08:00 UTC 🔗 https://lnkd.in/gHbbSZNF We're grateful to our invited speakers and panelists: Saining Xie, Lu Lu, Sergey Levine, Danijar Hafner, Shanghang Zhang, Jiajun Wu, Xiaolong Wang, Shuang Li, and Georgia Chalvatzaki. Organizing team: Mengyue Yang (Lead), Felix Juefei Xu, Tianyu Shi, Shirley Z, Aaron Tian, and Zhenyu Zhang. Advisory Board: Charles Ruizhongtai Qi, Jim Fan, Yuke Zhu, Steven Lake Waslander, and Michael Rabbat Questions? Reach us at physicalunderstanding.workshop@gmail.com. Please share with colleagues who might be interested. hashtag #NeurIPS2026 hashtag #CallForPapers hashtag #WorldModels hashtag #EmbodiedAI hashtag #FoundationModels hashtag #Robotics",
+      "reactions": 77,
+      "comments": 4,
+      "reposts": 11,
+      "impressions": 306,
+      "media": "image: View Aaron Tian’s graphic link | image: graphical user interface, website | image: View Zihan Wang’s | image: View Laura. L’s | image: View Yichi Zhang’s | image: View Wanyan Xu’s | image: View Tianchen Zhong’s | image: View Yingjun Wu’s | image: View Jiachen (Amber) Liu’s | image: Yunfan Ye | image: View Aaron Tian’s graphic | image: View Yunfan Ye’s graphic | image: View Jiachen (Amber) Liu’s graphic | image: View Abhimanyu Aryan’s graphic | link: https://lnkd.in/gHbbSZNF https://lnkd.in/gHbbSZNF | link: https://docs.google.com/forms/d/e/1FAIpQLSdYkdqQUnXzvey85dob0LS-4hrpNvmHn11dDzxrVW1w9l3ENw/viewform https://docs.google.com/forms/d/e/1FAIpQLSdYkdqQUnXzvey85dob0LS-4hrpNvmHn11dDzxrVW1w9l3ENw/viewform",
+      "media_urls": "https://media.licdn.com/dms/image/v2/D5622AQGYuH2McLdynw/feedshare-shrink_800/B56Z.BUWpTG4Ac-/0/1784581024811?e=1788998400&v=beta&t=L48Qhw9hIU4-Q7QKNxtVCVzN7ZNAS04yhFIgUb2GgBc | https://lnkd.in/gHbbSZNF | https://docs.google.com/forms/d/e/1FAIpQLSdYkdqQUnXzvey85dob0LS-4hrpNvmHn11dDzxrVW1w9l3ENw/viewform",
+      "url": "",
+      "raw_text": "Feed post Aaron Tian • 1st Delivering Safe, AI-Powered, Human-Centered Mobility 1mo • Edited • 📢 The Call for Papers is out for our NeurIPS 2026 workshop: Physical Understanding for Decision-Making (PhysUnderstand). Foundation models are becoming remarkably capable, yet reliable decision-making in the physical world remains an open challenge. PhysUnderstand brings together researchers working on physical understanding, world models, and embodied agents to close this gap. We invite submissions on topics including: • Modeling physical systems • Physical perception and active interaction • Causal and counterfactual physical reasoning • Decision-making, evaluation, and deployment 🗓️ December 11/12, 2026 · Sydney, Australia (in person) 📅 Submissions open: July 29, 2026 ⏰ Submission deadline: August 26, 2026, 08:00 UTC 🔗 https://lnkd.in/gHbbSZNF We're grateful to our invited speakers and panelists: Saining Xie, Lu Lu, Sergey Levine, Danijar Hafner, Shanghang Zhang, Jiajun Wu, Xiaolong Wang, Shuang Li, and Georgia Chalvatzaki. Organizing team: Mengyue Yang (Lead), Felix Juefei Xu, Tianyu Shi, Shirley Z, Aaron Tian, and Zhenyu Zhang. Advisory Board: Charles Ruizhongtai Qi, Jim Fan, Yuke Zhu, Steven Lake Waslander, and Michael Rabbat Questions? Reach us at physicalunderstanding.workshop@gmail.com. Please share with colleagues who might be interested. hashtag #NeurIPS2026 hashtag #CallForPapers hashtag #WorldModels hashtag #EmbodiedAI hashtag #FoundationModels hashtag #Robotics Activate to view larger image, Activate to view larger image, 77 You and 76 others 4 comments 11 reposts Reactions +69 Like Comment Repost Send Add a comment… Open Emoji Keyboard Current selected sort order is Most relevant Most relevant Aaron Tian Author Delivering Safe, AI-Powered, Human-Centered Mobility 1w We're also recruiting reviewers: up to 3 papers, due September 20, reduced load of 1-2 is fine. Sign up: https://docs.google.com/forms/d/e/1FAIpQLSdYkdqQUnXzvey85dob0LS-4hrpNvmHn11dDzxrVW1w9l3ENw/viewform Like Reply Yunfan Ye • You AI Agents, Ex-Google, Ex-Meta | Angel Investor 1mo Great initiative! Physical understanding is essential for building reliable, real-world AI systems. Like 1 Reply 306 impressions Jiachen (Amber) Liu • 1st Define agent native research | Meta MSL | CS PhD @ UMich - Systems for LLM | SJTU 1mo great initiative! Like 1 Reply Abhimanyu Aryan • 2nd Onboarding 50k people to #PhysicalAI with #Dyad #JuliaHub by 2027 🌊 1mo Aaron, this is amazing. I'll send you a message on Discord. I have a few questions. Like 2 Reply"
+    },
+    {
+      "rank": 7,
+      "author": "Aaron Tian",
+      "posted_at": "1w",
+      "body": "We're also recruiting reviewers: up to 3 papers, due September 20, reduced load of 1-2 is fine. Sign up: https://docs.google.com/forms/d/e/1FAIpQLSdYkdqQUnXzvey85dob0LS-4hrpNvmHn11dDzxrVW1w9l3ENw/viewform",
+      "reactions": 0,
+      "comments": 0,
+      "reposts": 0,
+      "impressions": 0,
+      "media": "image: View Aaron Tian’s graphic | link: https://docs.google.com/forms/d/e/1FAIpQLSdYkdqQUnXzvey85dob0LS-4hrpNvmHn11dDzxrVW1w9l3ENw/viewform https://docs.google.com/forms/d/e/1FAIpQLSdYkdqQUnXzvey85dob0LS-4hrpNvmHn11dDzxrVW1w9l3ENw/viewform",
+      "media_urls": "https://docs.google.com/forms/d/e/1FAIpQLSdYkdqQUnXzvey85dob0LS-4hrpNvmHn11dDzxrVW1w9l3ENw/viewform",
+      "url": "",
+      "raw_text": "Aaron Tian Author Delivering Safe, AI-Powered, Human-Centered Mobility 1w We're also recruiting reviewers: up to 3 papers, due September 20, reduced load of 1-2 is fine. Sign up: https://docs.google.com/forms/d/e/1FAIpQLSdYkdqQUnXzvey85dob0LS-4hrpNvmHn11dDzxrVW1w9l3ENw/viewform Like Reply"
+    },
+    {
+      "rank": 8,
+      "author": "Yunfan Ye",
+      "posted_at": "1mo",
+      "body": "Great initiative! Physical understanding is essential for building reliable, real-world AI systems.",
+      "reactions": 0,
+      "comments": 0,
+      "reposts": 0,
+      "impressions": 306,
+      "media": "image: View Yunfan Ye’s graphic",
+      "media_urls": "",
+      "url": "",
+      "raw_text": "Yunfan Ye • You AI Agents, Ex-Google, Ex-Meta | Angel Investor 1mo Great initiative! Physical understanding is essential for building reliable, real-world AI systems. Like 1 Reply 306 impressions"
+    },
+    {
+      "rank": 9,
+      "author": "Jiachen (Amber) Liu",
+      "posted_at": "1mo",
+      "body": "great initiative!",
+      "reactions": 0,
+      "comments": 0,
+      "reposts": 0,
+      "impressions": 0,
+      "media": "image: View Jiachen (Amber) Liu’s graphic",
+      "media_urls": "",
+      "url": "",
+      "raw_text": "Jiachen (Amber) Liu • 1st Define agent native research | Meta MSL | CS PhD @ UMich - Systems for LLM | SJTU 1mo great initiative! Like 1 Reply"
+    },
+    {
+      "rank": 10,
+      "author": "Abhimanyu Aryan",
+      "posted_at": "1mo",
+      "body": "Aaron, this is amazing. I'll send you a message on Discord. I have a few questions.",
+      "reactions": 0,
+      "comments": 0,
+      "reposts": 0,
+      "impressions": 0,
+      "media": "image: View Abhimanyu Aryan’s graphic",
+      "media_urls": "",
+      "url": "",
+      "raw_text": "Abhimanyu Aryan • 2nd Onboarding 50k people to #PhysicalAI with #Dyad #JuliaHub by 2027 🌊 1mo Aaron, this is amazing. I'll send you a message on Discord. I have a few questions. Like 2 Reply"
+    }
+  ],
+  "linkedInAnalytics": [
+    {
+      "posts_analyzed": 10,
+      "total_reactions": 163,
+      "total_comments": 23,
+      "total_reposts": 15,
+      "total_impressions": 10770,
+      "posts_with_media": 10,
+      "posts_with_urls": 1,
+      "latest_posted_at": "1d",
+      "latest_reactions": 4,
+      "latest_comments": 0,
+      "latest_reposts": 0,
+      "latest_impressions": 825,
+      "latest_url": ""
+    }
+  ]
+}

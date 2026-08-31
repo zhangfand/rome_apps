@@ -1,0 +1,49 @@
+formatVersion: 2
+id: button-demo
+name: Button Demo
+version: 0.1.0
+description: Button Demo app
+icon: assets/icon.svg
+appRoot: dist
+includeSource: true
+
+web:
+  manifest: web/manifest.json
+  displayName: Button Demo
+  navLabel: Button Demo
+
+api:
+  entry: api/index
+  # By default every `/api/app-api/<appId>/*` route is gated by the dashboard
+  # session cookie. To expose endpoints to the public internet (third-party
+  # webhooks, public callbacks), opt them out of the session check below.
+  # `true` opens every sub-path of this app; an array opens only the listed
+  # sub-paths (a trailing `/*` makes the entry a prefix match).
+  # noAuth: true
+  # noAuth:
+  #   - /webhooks/stripe
+  #   - /public/*
+
+# Uncomment the block below to enable a per-app SQLite database (Drizzle ORM).
+# After uncommenting, run `pnpm db:generate` to produce migrations from
+# src/db/schema.ts. If you don't need a DB, delete the src/db/ directory and
+# drizzle.config.ts. See src/db/README.md for details.
+# db:
+#   migrations: db/migrations
+#   tablePrefix: button_demo
+
+actions:
+  - actions/hello
+  # Uncomment to enable the ask-agent example, which calls the platform
+  # `system:summon` action to run the demo agent and return its final result. Requires
+  # the `agents:` block below so the `button-demo:demo` agent is registered. The API
+  # route `POST /ask` in src/api/index.ts calls this action through `runAction`.
+  # - actions/ask-agent
+
+# Uncomment the block below to register app-owned agents. Each entry points at
+# a YAML file under src/agents/. The demo agent in src/agents/demo.yaml
+# is a sensible template — edit its tools, model, and systemPromptPrefix to fit
+# the app, then list it here. If you don't need an agent, delete the
+# src/agents/ directory.
+# agents:
+#   - agents/demo.yaml

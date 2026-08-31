@@ -1,0 +1,7 @@
+name: weekly_plan
+type: custom
+description: "Run the saved draft-only weekly X account-growth workflow: refresh X and LinkedIn, analyze performance, research genuine engagement opportunities, draft five posts and replies, and save the plan."
+complexity: complex
+speed: slow
+reliability: medium
+sideEffects: write

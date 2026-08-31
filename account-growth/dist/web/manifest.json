@@ -1,0 +1,10 @@
+{
+  "entry": "index.js",
+  "styles": [
+    "1307.css"
+  ],
+  "assetVersion": "4df6bf9badb5",
+  "displayName": "Account Growth",
+  "navLabel": "Account Growth",
+  "routing": "client"
+}

@@ -1,0 +1,51 @@
+/* Rome's design-token layer: Tailwind + tw-animate-css + the host theme
+   vocabulary (the `@theme inline` token set and base resets). The token
+   reference — every utility and what it means — lives in the design-system
+   canon (@rome-os/ui → src/styles.css). The host mounts this bundle in a Shadow
+   DOM and the tokens are inherited from the live host theme, so a UI built only
+   from the registered utilities follows light/dark and the active theme with no
+   `dark:` variants. */
+@import "@rome-os/app-web-sdk/styles";
+@import "@rome-os/ui/styles.css";
+@import "streamdown/styles.css";
+
+/* Rome's Markdown stylesheet also imports KaTeX's local font files. The app
+   host currently scopes CSS from an app-relative stylesheet URL, so those
+   relative font URLs fail before the app can mount. Register the Markdown
+   renderer's utility sources and its Shadow DOM-safe rules directly until the
+   host resolves app stylesheet URLs against window.location. */
+@source "../../node_modules/streamdown/dist/*.js";
+@source "../../node_modules/@streamdown/code/dist/*.js";
+@source "../../node_modules/@streamdown/math/dist/*.js";
+@source "../../node_modules/@streamdown/mermaid/dist/*.js";
+
+[data-streamdown="code-block-body"] pre {
+  background-color: transparent !important;
+}
+
+[data-streamdown="mermaid"] [aria-label="Mermaid chart"] {
+  width: 100%;
+}
+
+[data-streamdown="mermaid"] [aria-label="Mermaid chart"] svg {
+  width: 80% !important;
+  max-width: 80% !important;
+  height: auto;
+  max-height: 80vh;
+}
+
+/* The canon again, resolved from THIS app's @rome-os/ui — deliberately not
+   redundant. The SDK sheet imports the canon too, but through the SDK's own
+   copy of the kit, and a component import (`@rome-os/ui/button`) resolves this
+   app's copy. Upgrade the kit across a 0.x minor and those become two different
+   installs: without the line below Tailwind would scan the *old* copy's
+   `@source` files while the bundle ships the *new* components, so their classes
+   would silently vanish from the CSS with a passing build. Importing here keeps
+   the version that supplies the components as the one that supplies their
+   styles. Costs nothing when both resolve to the same install. */
+@import "@rome-os/ui/styles.css";
+
+/* App-specific rules go below. Paint only with the registered tokens
+   (`bg-card`, `text-muted-foreground`, `rounded-lg`, …) — never raw shades
+   (`bg-gray-100`) or scrims (`bg-black/40`). To override a host token (e.g. pin
+   a corner radius), re-declare it in a `:root` block here. */

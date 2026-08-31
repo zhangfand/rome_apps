@@ -1,0 +1,1 @@
+export{mount,mountComponent,unmount,unmountComponent}from"./1307.js";

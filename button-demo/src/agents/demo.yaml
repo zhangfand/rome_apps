@@ -1,0 +1,36 @@
+name: demo
+description: Button Demo agent — replace this with what the agent is actually for.
+tier: medium # large | medium | small
+reasoningEffort: high # Optional: low | high | xhigh; defaults to high
+permissionMode: bypassPermissions # acceptEdits | bypassPermissions | default
+tools:
+  - Read
+  - Write
+  - Glob
+  - Grep
+  - Bash
+  - WebSearch
+  - WebFetch
+# actions:
+#   - "*"                # allow every registered action, or list specific ones:
+#   - button-demo:hello
+# allowedSubagents:      # canonical ids of agents this one may run through `system:summon`
+#   - assistant:explore
+# maxTurns: 30 # Recommended: 30 or higher.
+# networkDiscovery: false
+# outputSchema:          # require direct agentRunner callers to receive validated structured output.
+#   type: object
+#   required: [decision, reason]
+#   additionalProperties: false
+#   properties:
+#     decision:
+#       type: string
+#       enum: [REPLY, ESCALATE, IGNORE]
+#     reason:
+#       type: string
+# This is the app agent's complete base prompt. Rome does not add the core
+# Charter, guardian identity, command-line guidance, or installed-app catalog.
+systemPromptPrefix: |
+  You are the Button Demo agent. Describe the agent's role, scope, and the
+  kinds of tasks it should handle here. Keep instructions concrete — what to
+  do, what not to do, and which tools / actions to prefer.
