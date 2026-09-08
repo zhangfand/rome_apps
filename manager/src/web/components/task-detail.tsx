@@ -8,8 +8,9 @@ import { AttentionPanel, chatAbout } from "./attention";
 import { PositionBadge, TaskStateBadge } from "./badges";
 import { Ledger } from "./ledger";
 import { TaskName } from "./refs";
+import { WorkerLink } from "./worker-link";
 import { WorkerTable } from "./worker-table";
-import { briefText, handleOf, nameWorkers, workerLabel } from "../lib/domain";
+import { briefText, handleOf, nameWorkers } from "../lib/domain";
 import { formatStamp } from "../lib/format";
 import type { TaskDetail as TaskDetailData } from "../lib/types";
 
@@ -113,7 +114,7 @@ export function TaskDetail({ taskId }: { taskId: string }) {
               <Stat n={task.workers.length} one="worker" many="workers" />
               {task.liveWorkerId ? (
                 <div>
-                  <span className="text-foreground">{workerLabel(names, task.liveWorkerId)}</span> running now
+                  <WorkerLink names={names} workerId={task.liveWorkerId} className="text-foreground" /> running now
                 </div>
               ) : null}
               {task.startsSinceLastPersonFact > 0 && task.state === "taken" ? (

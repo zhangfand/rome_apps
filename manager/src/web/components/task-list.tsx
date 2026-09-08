@@ -5,7 +5,8 @@ import { EmptyState, EmptyStateDescription, EmptyStateTitle } from "@rome-os/ui/
 import { SegmentedControl } from "@rome-os/ui/segmented-control";
 import { StateDot, stateLabel } from "./badges";
 import { TaskName } from "./refs";
-import { type TaskHandle, type WorkerNames, briefText, plain, workerLabel } from "../lib/domain";
+import { WorkerLink } from "./worker-link";
+import { type TaskHandle, type WorkerNames, briefText, plain } from "../lib/domain";
 import { formatRelative, truncate, useNow } from "../lib/format";
 import type { TaskSummary } from "../lib/types";
 
@@ -147,7 +148,9 @@ function TaskRow({
 
         <div className="flex flex-wrap items-center gap-x-3 text-aux text-muted-foreground">
           {task.liveWorkerId ? (
-            <span className="text-foreground/80">{workerLabel(names, task.liveWorkerId)} running</span>
+            <span className="text-foreground/80">
+              <WorkerLink names={names} workerId={task.liveWorkerId} /> running
+            </span>
           ) : null}
           <span>
             {task.workers.length} {task.workers.length === 1 ? "worker" : "workers"}

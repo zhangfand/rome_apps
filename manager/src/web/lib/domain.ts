@@ -123,6 +123,8 @@ export interface WorkerName {
   ordinal: number;
   label: string;
   taskId: string;
+  /** Where the worker runs (or ran), when the ledger has recorded it. */
+  session?: { id: string; type: string };
 }
 
 export type WorkerNames = ReadonlyMap<string, WorkerName>;
@@ -132,7 +134,7 @@ export function nameWorkers(tasks: readonly { id: string; workers: WorkerSummary
   for (const task of tasks) {
     const ordered = [...task.workers].sort((a, b) => a.startedSeq - b.startedSeq);
     ordered.forEach((w, i) => {
-      map.set(w.workerId, { ordinal: i + 1, label: `worker ${i + 1}`, taskId: task.id });
+      map.set(w.workerId, { ordinal: i + 1, label: `worker ${i + 1}`, taskId: task.id, session: w.romeSession });
     });
   }
   return map;
@@ -192,4 +194,44 @@ export function plain(markdown: string): string {
     .replace(/^\s*[-*+]\s+/gm, "")
     .replace(/^\s*\d+\.\s+/gm, "")
     .replace(/^\s*>\s?/gm, "");
+}
+
+/**
+ * The substance of a worker's report, for the card that asks for sign-off.
+ * Workers write whatever they like; the useful part is usually under a
+ * "Summary"-like heading, and the opening is often housekeeping ("I restored
+ * your stash…"). So: prefer a section whose heading says it is the summary,
+ * then the first section under any heading, then the first paragraph that
+ * is not a parenthetical aside. `partial` says whether there is more.
+ */
+export function gist(markdown: string): { text: string; partial: boolean } {
+  const src = markdown.trim();
+  if (!src) return { text: "", partial: false };
+
+  const lines = src.split("\n");
+  type Section = { heading: string | null; body: string };
+  const sections: Section[] = [];
+  let current: Section = { heading: null, body: "" };
+  for (const line of lines) {
+    const h = line.match(/^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/);
+    const bold = line.match(/^\s*\*\*([^*]{2,60})\*\*\s*:?\s*$/);
+    if (h || bold) {
+      sections.push(current);
+      current = { heading: (h?.[1] ?? bold?.[1] ?? "").trim(), body: "" };
+    } else {
+      current.body += (current.body ? "\n" : "") + line;
+    }
+  }
+  sections.push(current);
+  const named = sections.filter((s) => s.heading !== null && s.body.trim());
+  const preferred = named.find((s) => /\b(summary|outcome|result|tl;?dr|what (i|we) did|done)\b/i.test(s.heading ?? ""));
+  const pick = preferred ?? named[0];
+  if (pick) {
+    const body = pick.body.trim();
+    return { text: body, partial: body.length < src.length - 40 };
+  }
+
+  const paragraphs = src.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const first = paragraphs.find((p) => !/^\(/.test(p)) ?? paragraphs[0] ?? src;
+  return { text: first, partial: paragraphs.length > 1 };
 }

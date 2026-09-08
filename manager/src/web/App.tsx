@@ -191,7 +191,6 @@ function Dashboard({ tab }: { tab: Tab }) {
                   evidence={task.attention!.evidence}
                   updatedAt={task.updatedAt}
                   names={names}
-                  clamp
                 />
               ))
             )}

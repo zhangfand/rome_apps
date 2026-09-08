@@ -41,6 +41,7 @@ export const KIND: Record<FactKind, { tone: Tone; said: boolean }> = {
   Completed: { tone: "success", said: false },
   Cancelled: { tone: "muted", said: false },
   Started: { tone: "brand", said: false },
+  Opened: { tone: "muted", said: false },
   Restarted: { tone: "warning", said: false },
   Returned: { tone: "success", said: false },
   Failed: { tone: "destructive", said: false },

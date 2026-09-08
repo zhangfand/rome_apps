@@ -9,6 +9,7 @@ export type FactKind =
   | "Completed"
   | "Cancelled"
   | "Started"
+  | "Opened"
   | "Restarted"
   | "Returned"
   | "Failed"
@@ -23,6 +24,7 @@ export const FACT_KINDS: FactKind[] = [
   "Completed",
   "Cancelled",
   "Started",
+  "Opened",
   "Restarted",
   "Returned",
   "Failed",
@@ -57,6 +59,7 @@ export interface WorkerSummary {
   resumedSessionId?: string;
   restarted?: { rejectedSessionId: string; error: string };
   sessionId?: string;
+  romeSession?: { id: string; type: string };
 }
 
 export interface TaskSummary {

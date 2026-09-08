@@ -5,6 +5,7 @@ import { EmptyState, EmptyStateDescription, EmptyStateTitle } from "@rome-os/ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@rome-os/ui/select";
 import { KindDot, KindWord } from "./badges";
 import { LightMarkdown } from "./light-markdown";
+import { WorkerLink } from "./worker-link";
 import { type Author, type TaskHandle, type WorkerNames, authorOf, humanize, plain, workerLabel } from "../lib/domain";
 import { dayKey, formatDay, formatTime, truncate, useNow } from "../lib/format";
 import { FACT_KINDS, type FactSummary } from "../lib/types";
@@ -144,6 +145,8 @@ function bodyOf(fact: FactSummary, names: WorkerNames): string {
       return p.resumeSessionId
         ? `${workerLabel(names, String(p.workerId ?? ""))} started, resuming session ${shortSession(String(p.resumeSessionId))}`
         : `${workerLabel(names, String(p.workerId ?? ""))} started`;
+    case "Opened":
+      return `${workerLabel(names, String(p.workerId ?? ""))} is running in session ${shortSession(String(p.romeSessionId ?? ""))}`;
     case "Restarted":
       return `${workerLabel(names, String(p.workerId ?? ""))} could not resume session ${shortSession(String(p.rejectedSessionId ?? ""))} (${humanize(String(p.error ?? ""), names)}) — started a fresh session`;
     case "Returned":
@@ -215,9 +218,13 @@ function FactRow({
       >
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-aux text-muted-foreground">
           <KindWord kind={fact.kind} />
-          <span className={cn(author.kind === "person" && "font-medium text-foreground")} title={author.raw}>
-            {author.label}
-          </span>
+          {author.kind === "worker" ? (
+            <WorkerLink names={names} workerId={author.raw} />
+          ) : (
+            <span className={cn(author.kind === "person" && "font-medium text-foreground")} title={author.raw}>
+              {author.label}
+            </span>
+          )}
           {showTask ? (
             <button
               type="button"

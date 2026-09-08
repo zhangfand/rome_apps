@@ -9,6 +9,13 @@ import { createLedgerRepository, type LedgerRepository } from "../../db/reposito
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import type { ManagerConfig } from "../../lib/config.js";
 import type { StartedFact } from "../../lib/facts.js";
+
+/** What `system:summon` publishes the moment the summoned agent's Rome session exists. */
+interface SummonSessionStartedEvent {
+  type: "rome_session_started";
+  agentName: string;
+  romeSession: { _romeSessionId: string; _type: string };
+}
 import { foldTask } from "../../lib/fold.js";
 import { buildWorkerPrompt } from "../../lib/prompt.js";
 
@@ -151,7 +158,18 @@ async function summonWithFallback(input: {
   const { taskId } = started;
   const { workerId, resumeSessionId } = started.payload;
 
-  const first = await summon(appContext, managerConfig.workerAgent, started.payload.prompt, resumeSessionId);
+  const onSession = (session: { id: string; type: string }) => {
+    ledger.append({
+      taskId,
+      kind: "Opened",
+      by: workerId,
+      source,
+      payload: { workerId, romeSessionId: session.id, sessionType: session.type },
+    });
+    log.info("worker session opened", { taskId, workerId, romeSessionId: session.id });
+  };
+
+  const first = await summon(appContext, managerConfig.workerAgent, started.payload.prompt, resumeSessionId, onSession);
   if (first.ok || !resumeSessionId || !isResumeRejection(first.error)) {
     return { ...first, restarted: false };
   }
@@ -179,7 +197,7 @@ async function summonWithFallback(input: {
     error: first.error,
   });
 
-  const second = await summon(appContext, managerConfig.workerAgent, prompt, undefined);
+  const second = await summon(appContext, managerConfig.workerAgent, prompt, undefined, onSession);
   return { ...second, restarted: true };
 }
 
@@ -188,13 +206,31 @@ async function summon(
   agentName: string,
   prompt: string,
   sessionId: string | undefined,
+  onSession?: (session: { id: string; type: string }) => void,
 ): Promise<{ ok: true; reply: string; sessionId?: string } | { ok: false; error: string; sessionId?: string }> {
   try {
-    const result = await appContext.runAction("system:summon", {
+    // invokeAction rather than runAction: summon publishes the Rome session as
+    // an event long before it returns, and that is when a person wants the link.
+    const invocation = appContext.invokeAction<SummonSessionStartedEvent | { type: string }>("system:summon", {
       agentName,
       prompt,
       ...(sessionId ? { sessionId } : {}),
     });
+    const listen = (async () => {
+      try {
+        for await (const event of invocation.events) {
+          if (event.type === "rome_session_started" && "romeSession" in event) {
+            const { romeSession } = event as SummonSessionStartedEvent;
+            onSession?.({ id: romeSession._romeSessionId, type: romeSession._type });
+          }
+        }
+      } catch (err) {
+        // Losing the event stream must not lose the worker's result.
+        log.warn("summon event stream ended early", { error: err instanceof Error ? err.message : String(err) });
+      }
+    })();
+    const result = await invocation.result;
+    await listen;
     if (result.status === "ok") {
       const { reply, sessionId: ran } = readSummonOutput(result.data);
       return { ok: true, reply, sessionId: ran };

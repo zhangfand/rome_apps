@@ -11,7 +11,7 @@
 export const TASK_STATE_KINDS = ["Created", "Taken", "Completed", "Cancelled"] as const;
 
 /** Execution facts. A worker writes three of them; the runtime writes the rest. */
-export const EXECUTION_KINDS = ["Started", "Restarted", "Returned", "Failed", "Lost"] as const;
+export const EXECUTION_KINDS = ["Started", "Opened", "Restarted", "Returned", "Failed", "Lost"] as const;
 
 /** Dialogue facts. The runtime asks and reports; a person replies. */
 export const DIALOGUE_KINDS = ["Question", "Report", "Reply"] as const;
@@ -85,6 +85,16 @@ export type StartedFact = FactOf<
   }
 >;
 /**
+ * The worker's Rome session exists. Written by run_worker the moment summon
+ * reports it, so a live worker can be opened while it runs rather than after.
+ * Sits between a Started and that worker's outcome; it ends nothing and moves
+ * nothing — a pointer, not a state.
+ */
+export type OpenedFact = FactOf<
+  "Opened",
+  { workerId: string; romeSessionId: string; sessionType: string }
+>;
+/**
  * A worker was told to resume a session and the runner refused. The worker
  * started a fresh session with `prompt` instead — a full brief, since the new
  * session holds none of the history the delta on its Started assumed. Written
@@ -123,6 +133,7 @@ export type Fact =
   | CompletedFact
   | CancelledFact
   | StartedFact
+  | OpenedFact
   | RestartedFact
   | ReturnedFact
   | FailedFact
@@ -138,6 +149,7 @@ export type NewFact = Omit<Fact, "seq" | "id" | "createdAt">;
 export function workerIdOf(fact: Fact): string | undefined {
   switch (fact.kind) {
     case "Started":
+    case "Opened":
     case "Restarted":
     case "Returned":
     case "Failed":
@@ -165,6 +177,8 @@ export function describeFact(fact: Fact): string {
         return fact.payload.resumeSessionId
           ? `worker ${fact.payload.workerId}, resuming session ${fact.payload.resumeSessionId}`
           : `worker ${fact.payload.workerId}`;
+      case "Opened":
+        return `worker ${fact.payload.workerId} runs in session ${fact.payload.romeSessionId}`;
       case "Restarted":
         return `worker ${fact.payload.workerId}: resume of session ${fact.payload.rejectedSessionId} rejected (${fact.payload.error}); started a fresh session`;
       case "Returned":

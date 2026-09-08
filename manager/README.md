@@ -46,6 +46,7 @@ something somebody said.
 | `Completed` | a person | `reason?` |
 | `Cancelled` | a person | `reason?` |
 | `Started` | the runtime | `workerId`, `prompt`, `resumeSessionId?` |
+| `Opened` | the worker | `workerId`, `romeSessionId`, `sessionType` — the worker's Rome session, recorded the moment it exists so the dashboard can open a live worker |
 | `Restarted` | the worker | `workerId`, `rejectedSessionId`, `error`, `prompt` |
 | `Returned` | the worker | `workerId`, `reply`, `sessionId?` |
 | `Failed` | the worker | `workerId`, `error`, `sessionId?` |

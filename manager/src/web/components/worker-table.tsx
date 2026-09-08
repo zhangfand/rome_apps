@@ -5,7 +5,8 @@ import { EmptyState, EmptyStateDescription, EmptyStateTitle } from "@rome-os/ui/
 import { SegmentedControl } from "@rome-os/ui/segmented-control";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rome-os/ui/table";
 import { WorkerStatusBadge } from "./badges";
-import { type TaskHandle, type WorkerNames, humanize, plain, workerLabel } from "../lib/domain";
+import { WorkerLink } from "./worker-link";
+import { type TaskHandle, type WorkerNames, humanize, plain } from "../lib/domain";
 import { formatDuration, formatStamp, truncate, useNow } from "../lib/format";
 import type { WorkerSummary } from "../lib/types";
 
@@ -73,8 +74,8 @@ export function WorkerTable({
                 const handle = handles?.get(w.taskId);
                 return (
                   <TableRow key={w.workerId}>
-                    <TableCell className="text-ui" title={w.workerId}>
-                      {workerLabel(names, w.workerId)}
+                    <TableCell className="text-ui">
+                      <WorkerLink names={names} workerId={w.workerId} icon />
                     </TableCell>
                     <TableCell>
                       <WorkerStatusBadge status={w.status} />

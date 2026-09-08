@@ -42,6 +42,8 @@ export interface WorkerSummary {
   restarted?: { rejectedSessionId: string; error: string };
   /** Session the worker ran in, once it has reported back. */
   sessionId?: string;
+  /** The worker's Rome session, once summon has reported it. Present while running. */
+  romeSession?: { id: string; type: string };
 }
 
 export interface TaskSummary {
@@ -144,6 +146,15 @@ export function workersOf(
         candidate.kind === "Restarted" &&
         candidate.payload.workerId === fact.payload.workerId,
     );
+    // The newest Opened wins: a restarted worker opens a second session.
+    const opened = [...facts]
+      .reverse()
+      .find(
+        (candidate) =>
+          candidate.seq > fact.seq &&
+          candidate.kind === "Opened" &&
+          candidate.payload.workerId === fact.payload.workerId,
+      );
     workers.push({
       workerId: fact.payload.workerId,
       taskId,
@@ -155,6 +166,10 @@ export function workersOf(
       outcome,
       startedSeq: fact.seq,
       resumedSessionId: fact.payload.resumeSessionId,
+      romeSession:
+        opened?.kind === "Opened"
+          ? { id: opened.payload.romeSessionId, type: opened.payload.sessionType }
+          : undefined,
       restarted:
         restarted?.kind === "Restarted"
           ? { rejectedSessionId: restarted.payload.rejectedSessionId, error: restarted.payload.error }
