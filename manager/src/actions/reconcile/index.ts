@@ -6,9 +6,11 @@ import {
   type AppActionRuntimeDeps,
 } from "@rome-os/app-runtime";
 import { createLedgerRepository, type LedgerRepository } from "../../db/repositories/ledger.js";
+import { createBoardRepository } from "../../db/repositories/board.js";
 import { createLockRepository, RECONCILE_LOCK } from "../../db/repositories/lock.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import type { ManagerConfig } from "../../lib/config.js";
+import { syncRepository } from "../../lib/board-sync.js";
 import { RUNTIME } from "../../lib/facts.js";
 import { fold } from "../../lib/fold.js";
 import { issueApiPath } from "../../lib/github-refs.js";
@@ -71,6 +73,10 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         // worker stopped — the same as after a person's Completed or
         // Cancelled. A poll that cannot reach GitHub writes nothing.
         const taken = await intakeIssues(ledger, managerConfig, appContext);
+        // The board is a cached read model, never task state. Refresh every
+        // configured repo after intake; a provider failure is logged per repo
+        // and cannot prevent issue observation or the Manager runtime below.
+        const refreshed = await refreshBoardSnapshots(managerConfig, appContext);
         const observed = await observeIssues(ledger, managerConfig, appContext);
 
         const snapshot = fold(new Date(), ledger.all());
@@ -87,7 +93,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         }
 
         log.info("reconcile finished", { tasks: snapshot.tasks.length, applied: applied.length });
-        return { status: "ok", data: { tasks: snapshot.tasks.length, applied } };
+        return { status: "ok", data: { tasks: snapshot.tasks.length, applied, refreshed } };
       } finally {
         locks.release(RECONCILE_LOCK);
       }
@@ -95,10 +101,32 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
   };
 }
 
+async function refreshBoardSnapshots(
+  config: ManagerConfig,
+  appContext: AppActionRuntimeDeps["appContext"],
+): Promise<string[]> {
+  const board = createBoardRepository(appContext.db);
+  const repos = [...new Set([board.getSelectedRepo(), ...config.intakeRepos].filter((repo): repo is string => Boolean(repo)))];
+  const refreshed: string[] = [];
+  for (const repo of repos) {
+    try {
+      await syncRepository(
+        { runAction: appContext.runAction.bind(appContext), db: appContext.db, log: appContext.log },
+        repo,
+      );
+      refreshed.push(repo);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      log.warn("board snapshot refresh failed; preserving last good snapshot", { repo, reason });
+    }
+  }
+  return refreshed;
+}
+
 /**
  * List each watched repo's open issues carrying the intake label and open a
  * task for every one that has none yet. One GET per page of 100, through
- * `connector_proxy` so the app never holds a GitHub token. A repo whose list
+ * `connector:connector_proxy` so the app never holds a GitHub token. A repo whose list
  * cannot be read — GitHub not connected, a 404, a network error — is logged
  * and skipped until the next pass; the loop must never stall on the poll.
  */
@@ -161,7 +189,7 @@ async function intakeIssues(
  * Poll the issues that open tasks name in their briefs and end each task whose
  * issues are all closed: Completed when closed as done, Cancelled when closed
  * as not planned. One GET per issue,
- * through `connector_proxy` so the app never holds a GitHub token. Any failure
+ * through `connector:connector_proxy` so the app never holds a GitHub token. Any failure
  * — GitHub not connected, a 404, a network error — is logged and that task is
  * left alone until the next pass; the loop must never stall on the poll.
  */
