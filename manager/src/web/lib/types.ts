@@ -59,6 +59,7 @@ export interface WorkerSummary {
   outcome?: string;
   startedSeq: number;
   resumedSessionId?: string;
+  workspace?: { commonDir: string; root: string; workingDir: string; branch: string; baseCommit: string };
   restarted?: { rejectedSessionId: string; error: string };
   sessionId?: string;
   romeSession?: { id: string; type: string };

@@ -1,4 +1,9 @@
-import { beforeEach, describe, expect, it, rs } from "@rstest/core";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { prepareWorkspace } from "../../lib/worktree.js";
+import { afterEach, beforeEach, describe, expect, it, rs } from "@rstest/core";
 import type { ActionConfig, AppActionRuntimeDeps } from "@rome-os/app-runtime";
 import * as ledgerModule from "../../db/repositories/ledger.js";
 import * as settingsModule from "../../db/repositories/settings.js";
@@ -11,8 +16,31 @@ import { LedgerBuilder } from "../../lib/test-facts.js";
 const WAIT = { outcome: "waiting", reason: "Check job /jobs/7 again", revisitAfterSeconds: 300 };
 let b: LedgerBuilder;
 
-beforeEach(() => {
-  const config = parseConfig({ workingDir: "/srv/project" });
+let parent: string;
+afterEach(async () => {
+  if (parent) await rm(parent, { recursive: true, force: true });
+});
+beforeEach(async () => {
+  parent = await mkdtemp(path.join(tmpdir(), "manager-protocol-test-"));
+  const source = path.join(parent, "repo");
+  await mkdir(source);
+  const git = (...args: string[]) => execFileSync("git", ["-C", source, ...args], { stdio: "pipe" });
+  git("init", "-b", "main");
+  await writeFile(path.join(source, "code.txt"), "fixture");
+  git("add", "code.txt");
+  git(
+    "-c",
+    "user.name=Test",
+    "-c",
+    "user.email=test@example.invalid",
+    "-c",
+    "commit.gpgsign=false",
+    "commit",
+    "-m",
+    "fixture",
+  );
+  const workspace = await prepareWorkspace({ workingDir: source, taskId: "t1", workerId: "w0" });
+  const config = parseConfig({ workingDir: source });
   if (!config.ok) throw new Error(config.error);
   rs.restoreAllMocks();
   rs.spyOn(settingsModule.SettingsRepository.prototype, "get").mockReturnValue(config.config);
@@ -23,7 +51,7 @@ beforeEach(() => {
       taskId: "t1",
       kind: "Started",
       by: "runtime",
-      payload: { workerId: "w0", prompt: "go", replyProtocol: 1 },
+      payload: { workerId: "w0", prompt: "go", replyProtocol: 1, workspace },
     });
   rs.spyOn(ledgerModule.LedgerRepository.prototype, "factsFor").mockImplementation((id) =>
     b.facts.filter((f) => f.taskId === id),

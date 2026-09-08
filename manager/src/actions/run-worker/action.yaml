@@ -1,7 +1,8 @@
 name: run_worker
 type: custom
 description: >-
-  Internal. Runs the coding session named by a Started fact — resuming the
+  Internal. Validates the isolated Git worktree recorded on Started, then runs
+  the coding session named by that fact — resuming the
   session it names, or falling back to a fresh one with a Restarted fact when
   the resume is rejected — records the worker's Rome session (Opened) as soon as
   it exists, and writes what came back (Returned or Failed) to the ledger on the

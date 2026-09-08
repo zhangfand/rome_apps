@@ -39,7 +39,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       properties: {
         workingDir: {
           type: "string",
-          description: "Absolute path of the directory every worker works in.",
+          description: "Absolute source project directory inside a Git repository. Workers run in isolated worktrees, preserving this repo-relative path.",
         },
         workerAgent: {
           type: "string",

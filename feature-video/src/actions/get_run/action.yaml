@@ -1,0 +1,9 @@
+name: get_run
+type: custom
+description: >-
+  Read one Feature Video run: its status, its cue-by-cue timing report, and the
+  files it produced.
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: read-only

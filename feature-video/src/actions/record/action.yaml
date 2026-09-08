@@ -1,0 +1,11 @@
+name: record
+type: custom
+description: >-
+  Record a queued Feature Video run: stage its playscript in a browser, capture
+  the screen, and mux the recording with a subtitle track built from the
+  narration. Takes the id of a run that already exists; it runs as long as the
+  video is long, so start it detached and poll get_run.
+complexity: complex
+speed: slow
+reliability: medium
+sideEffects: write

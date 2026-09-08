@@ -55,7 +55,7 @@ something somebody said.
 | `Taken` | the runtime | — |
 | `Completed` | a person, or `github` | `reason?`, `issues?` — the closed issues, when `github` wrote it |
 | `Cancelled` | a person, or `github` | `reason?`, `issues?` — the issues closed as not planned, when `github` wrote it |
-| `Started` | the runtime | `workerId`, `prompt`, `resumeSessionId?`, `replyProtocol?` |
+| `Started` | the runtime | `workerId`, `prompt`, `resumeSessionId?`, `replyProtocol?`, `workspace?` |
 | `Opened` | the worker | `workerId`, `romeSessionId`, `sessionType` — the worker's Rome session, recorded the moment it exists so the dashboard can open a live worker |
 | `Restarted` | the worker | `workerId`, `rejectedSessionId`, `error`, `prompt` |
 | `Returned` | the worker | `workerId`, `reply`, `sessionId?`, validated `result?`, `repair?` |
@@ -93,6 +93,42 @@ The existing reconcile routine supplies the ticks — there is no new per-task
 routine, event watcher, or PR/CI logic in the scheduler. Normal waits reset the
 failure-attempt budget and consume no live worker slot. Human steering and
 terminal facts still take precedence.
+
+## Worker worktrees
+
+Every new worker gets an isolated Git worktree **before** its `Started` is
+recorded and its agent is launched. `workingDir` is the **source** project,
+not the shared directory workers edit. If it points inside a repository (for
+example `packages/app`), workers use that same subdirectory in their worktree.
+The source must be inside a non-bare Git repository with at least one commit.
+
+- New tasks get separate branches (`manager/<taskId>/<workerId>`) and checkouts
+  under `.manager-worktrees/<repo-key>/` next to the repository. The recorded
+  `workspace` carries the root, working directory, initial branch, base commit,
+  and repository identity; it is also in the worker read model and ledger.
+- A new tree starts from the first locally available ref in this order:
+  `origin/HEAD`, local `main`, local `master`, then `HEAD`. Manager does not fetch;
+  update the source repository's refs when a newer base is needed. Uncommitted
+  source changes and unrelated checked-out feature branches are not copied.
+- A follow-up reuses the latest worker's tree only after **Returned or Failed**,
+  preserving its branch and dirty files even with `reuseSessions: false`.
+  A running or **Lost** worker never hands its tree to a replacement: it may
+  still be writing. The replacement starts from the normal base; prior work
+  remains in the old tree and task history for recovery.
+- Legacy sessions that ran in the shared checkout start fresh with a full
+  history when migrated. Existing running workers are not moved mid-run.
+- Missing/changed worktrees, repository mismatches, and creation errors become
+  ordinary `Failed` outcomes under the existing retry cap. There is no fallback
+  to the source checkout and no destructive reset, clean, stash, or deletion.
+- Worktrees remain after return, failure, or task closure for follow-ups and
+  recovery. Cleanup is manual once the worker has actually stopped and its
+  work is saved. Dependencies are installed per tree, not shared or copied.
+
+The isolated directory is repeated in fresh, resumed, and fallback prompts.
+Rome's summon still cannot set the agent process cwd or sandbox its tools:
+Manager creates and validates the real worktree, then instructs the worker to
+move there and keep all work there. This is checkout isolation, not a security
+boundary. See the platform limit below.
 
 ## Taking in from GitHub
 
@@ -153,7 +189,7 @@ false` in `manager:setup` turns the poll off.
 ## Setting it up
 
 ```jsonc
-// manager:setup — the only required field is the directory workers work in.
+// manager:setup — the only required field is the source project directory.
 {
   "workingDir": "/absolute/path/to/your/project",
   "workerAgent": "coding:coding",  // default
@@ -207,8 +243,9 @@ These are limits of what Rome exposes to an app today, not choices.
   `RomeAppContext`.
 - **No working directory on summon.** `RunParams.workingDir` exists on the agent
   runner, but `system:summon` does not pass it through, and an app must go
-  through summon to run another app's agent. So the configured `workingDir` is
-  stated in the worker's brief instead of being enforced by the platform.
+  through summon to run another app's agent. Manager creates and validates an isolated Git worktree, then states its
+  directory in every worker brief. The actual process cwd is still not
+  enforced by the platform.
 - **No boot-time restart detection.** An app cannot ask whether an execution it
   launched is still alive, so the runtime cannot write `Lost(why="host restart")`
   on boot. The age cap covers the same case: a worker silent past `ageCapHours`
@@ -255,6 +292,8 @@ src/
 │   ├── judge.ts               the other model call site
 │   ├── intake.ts              labeled issues -> Created facts
 │   ├── observe.ts             closed issues -> Completed / Cancelled facts
+│   ├── worktree.ts            isolated Git checkout creation and validation
+│   ├── worker-start.ts        prepare workspace and persist the exact brief
 │   ├── prompt.ts              the worker's brief
 │   ├── worker-reply.ts        shared return schema, prompt contract, bounded repair
 │   ├── config.ts              settings and the routine's trigger

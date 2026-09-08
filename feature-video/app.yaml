@@ -1,0 +1,27 @@
+formatVersion: 2
+id: feature-video
+name: Feature Video
+version: 0.1.0
+description: >-
+  Records narrated feature videos of a web app from a playscript: stages the
+  script in a headed browser on a virtual display, captures the screen, and
+  muxes the recording with a subtitle track built from the narration.
+icon: assets/icon.svg
+appRoot: dist
+
+web:
+  manifest: web/manifest.json
+  displayName: Feature Video
+  navLabel: Feature Video
+
+api:
+  entry: api/index
+
+db:
+  migrations: db/migrations
+  tablePrefix: feature_video
+
+actions:
+  - actions/check_playscript
+  - actions/record
+  - actions/get_run

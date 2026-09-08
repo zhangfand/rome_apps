@@ -1,4 +1,5 @@
 import { replyText, type ReplyRepair, type WorkerReply } from "./worker-reply.js";
+import type { WorkerWorkspace } from "./worktree.js";
 
 /**
  * The ledger's vocabulary. Every fact kind is named by one rule: a participle
@@ -157,6 +158,8 @@ export type StartedFact = FactOf<
     resumeSessionId?: string;
     /** Absent on historical starts whose workers were taught the old prose protocol. */
     replyProtocol?: 1;
+    /** Isolated checkout prepared before launch; absent on legacy facts. */
+    workspace?: WorkerWorkspace;
   }
 >;
 /**
@@ -260,10 +263,11 @@ export function describeFact(fact: Fact): string {
       case "Completed":
       case "Cancelled":
         return fact.payload.reason ?? "";
-      case "Started":
-        return fact.payload.resumeSessionId
-          ? `worker ${fact.payload.workerId}, resuming session ${fact.payload.resumeSessionId}`
-          : `worker ${fact.payload.workerId}`;
+      case "Started": {
+        const session = fact.payload.resumeSessionId ? `, resuming session ${fact.payload.resumeSessionId}` : "";
+        const workspace = fact.payload.workspace ? ` in ${fact.payload.workspace.workingDir}` : "";
+        return `worker ${fact.payload.workerId}${session}${workspace}`;
+      }
       case "Opened":
         return `worker ${fact.payload.workerId} runs in session ${fact.payload.romeSessionId}`;
       case "Restarted":

@@ -9,7 +9,7 @@ import { createLedgerRepository, type LedgerRepository } from "../../db/reposito
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import type { ManagerConfig } from "../../lib/config.js";
 import { REPLY_PROTOCOL, validateWorkerRun, type ValidatedWorkerRun } from "../../lib/worker-reply.js";
-import type { StartedFact } from "../../lib/facts.js";
+import { isWorkerTerminalKind, type StartedFact } from "../../lib/facts.js";
 
 /** What `system:summon` publishes the moment the summoned agent's Rome session exists. */
 interface SummonSessionStartedEvent {
@@ -19,6 +19,8 @@ interface SummonSessionStartedEvent {
 }
 import { foldTask } from "../../lib/fold.js";
 import { buildWorkerPrompt } from "../../lib/prompt.js";
+
+import { bindWorkspacePrompt, validateWorkspace } from "../../lib/worktree.js";
 
 const log = createAppLogger("manager:run_worker");
 
@@ -78,6 +80,10 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         };
       }
 
+      if (ledger.factsFor(taskId).some((fact) => isWorkerTerminalKind(fact.kind) &&
+          (fact.payload as { workerId?: string }).workerId === workerId)) {
+        return { status: "ok", data: { taskId, workerId, outcome: "skipped (worker already closed)" } };
+      }
       const source = "manager:run_worker, on the worker's behalf";
       const resumeSessionId = started.payload.resumeSessionId;
       log.info("worker starting", {
@@ -174,9 +180,9 @@ type SummonRun =
  * worker returns hours later. A second failure, or any error that is not a
  * resume rejection, is the worker's real outcome.
  */
-async function summonWithFallback(input: {
+export async function summonWithFallback(input: {
   appContext: AppActionRuntimeDeps["appContext"];
-  ledger: LedgerRepository;
+  ledger: Pick<LedgerRepository, "append" | "factsFor">;
   managerConfig: ManagerConfig;
   started: StartedFact;
   source: string;
@@ -184,6 +190,13 @@ async function summonWithFallback(input: {
   const { appContext, ledger, managerConfig, started, source } = input;
   const { taskId } = started;
   const { workerId, resumeSessionId } = started.payload;
+
+  try {
+    if (!started.payload.workspace) throw new Error("Worker has no isolated worktree; refusing shared-checkout launch");
+    await validateWorkspace(started.payload.workspace);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err), restarted: false };
+  }
 
   const onSession = (session: { id: string; type: string }) => {
     ledger.append({
@@ -210,11 +223,11 @@ async function summonWithFallback(input: {
   // The delta brief on the Started assumed a session that holds the history.
   // The fresh session holds nothing, so it gets the full brief instead.
   const task = foldTask(ledger.factsFor(taskId));
-  const prompt = buildWorkerPrompt({
+  const prompt = bindWorkspacePrompt(buildWorkerPrompt({
     task,
     config: managerConfig,
     reason: `resuming session ${resumeSessionId} was rejected: ${first.error}`,
-  });
+  }), started.payload.workspace, managerConfig.workingDir);
 
   ledger.append({
     taskId,
