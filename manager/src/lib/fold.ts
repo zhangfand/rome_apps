@@ -17,7 +17,7 @@ import {
 export type TaskState = "created" | "taken" | "completed" | "cancelled";
 
 /** Where a Taken task sits between wakes, named by what the runtime waits for. */
-export type Position = "working" | "stuck" | "reported";
+export type Position = "working" | "waiting" | "stuck" | "reported";
 
 /** A worker with a Started and no terminal fact after it. */
 export interface WorkerRef {
@@ -52,10 +52,13 @@ export interface TaskView {
    * worker starts fresh.
    */
   resumableSession?: ResumableSession;
-  /** Order of the newest fact a person wrote. The start cap counts from here. */
+  /** Order of the newest fact a person wrote, for attention and total start counts. */
   lastPersonFactSeq: number;
-  /** Started facts newer than {@link lastPersonFactSeq}. This is the cap's counter. */
+  /** Started facts newer than {@link lastPersonFactSeq}, including normal waiting cycles. */
   startsSinceLastPersonFact: number;
+  /** Retry budget counts starts since the last person fact or successful deferral. */
+  startsSinceLastProgress: number;
+  waiting?: { reason: string; resumeAfter: string };
 }
 
 export interface LedgerSnapshot {
@@ -68,6 +71,7 @@ export class MalformedTaskError extends Error {}
 
 const POSITION_BY_KIND: Partial<Record<FactKind, Position>> = {
   Started: "working",
+  Deferred: "waiting",
   Question: "stuck",
   Report: "reported",
 };
@@ -88,6 +92,8 @@ export function foldTask(facts: readonly Fact[]): TaskView {
   let liveWorker: WorkerRef | undefined;
   let resumableSession: ResumableSession | undefined;
   let lastPersonFactSeq = created.seq;
+  let lastProgressSeq = created.seq;
+  let waiting: TaskView["waiting"];
 
   for (const fact of ordered) {
     switch (fact.kind) {
@@ -106,6 +112,10 @@ export function foldTask(facts: readonly Fact[]): TaskView {
           startedAt: fact.createdAt,
           startedSeq: fact.seq,
         };
+        break;
+      case "Deferred":
+        lastProgressSeq = fact.seq;
+        waiting = { reason: fact.payload.reason, resumeAfter: fact.payload.resumeAfter };
         break;
       case "Restarted":
         // The runner refused this session; nobody should ask for it again.
@@ -139,6 +149,7 @@ export function foldTask(facts: readonly Fact[]): TaskView {
 
     if (isPersonKind(fact.kind)) {
       lastPersonFactSeq = fact.seq;
+      lastProgressSeq = fact.seq;
     }
   }
 
@@ -157,6 +168,8 @@ export function foldTask(facts: readonly Fact[]): TaskView {
     resumableSession,
     lastPersonFactSeq,
     startsSinceLastPersonFact,
+    startsSinceLastProgress: ordered.filter((fact) => fact.kind === "Started" && fact.seq > lastProgressSeq).length,
+    waiting: state === "taken" && position === "waiting" ? waiting : undefined,
   };
 }
 

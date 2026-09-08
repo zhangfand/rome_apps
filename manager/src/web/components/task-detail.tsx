@@ -53,7 +53,7 @@ export function TaskDetail({ taskId }: { taskId: string }) {
   const openWord = task
     ? [...task.facts].reverse().find((f) => f.kind === "Question" || f.kind === "Report")
     : undefined;
-  const awaiting = task && openWord && task.state === "taken" && task.position !== "working";
+  const awaiting = task && openWord && task.state === "taken" && (task.position === "stuck" || task.position === "reported");
 
   return (
     <div className="flex flex-col gap-5">
@@ -128,6 +128,16 @@ export function TaskDetail({ taskId }: { taskId: string }) {
               </div>
             </dl>
           </header>
+
+          {task.waiting ? (
+            <section className="rounded-12 border border-border p-4 text-ui">
+              <h2 className="font-medium">Waiting for an automatic revisit</h2>
+              <p className="mt-1 whitespace-pre-wrap">{task.waiting.reason}</p>
+              <p className="mt-1 text-muted-foreground">
+                Eligible after {formatStamp(task.waiting.resumeAfter)}. Resumes on a scheduled pass with a free worker slot. No input needed.
+              </p>
+            </section>
+          ) : null}
 
           {awaiting && openWord ? (
             <AttentionPanel

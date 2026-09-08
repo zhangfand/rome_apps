@@ -3,7 +3,9 @@ import type { TaskView } from "./fold.js";
 /**
  * The judge is one of the two places a model may enter this app. It answers a
  * single question — is the task done, given what the worker returned — and the
- * default answer needs no model at all.
+ * default answer needs no model at all. Protocol routing happens before this:
+ * v1 waiting and blocked outcomes never reach the judge. It receives only a
+ * ready summary, or the prose reply of a historical pre-v1 worker.
  *
  * Nothing else in the runtime asks that question, so an instance that wants a
  * model-graded "done" swaps the function here and changes nothing else.
@@ -19,7 +21,7 @@ export type Judge = (task: TaskView, reply: string, evidence: string) => JudgeVe
 
 /**
  * The line prefix a worker uses to say it could not finish. It is part of the
- * worker's brief, so a worker that hits a wall says so in a form the judge can
+ * pre-v1 worker's brief, so a worker that hits a wall says so in a form the judge can
  * read without a model.
  */
 export const BLOCKED_PREFIX = "BLOCKED:";

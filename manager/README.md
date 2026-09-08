@@ -22,11 +22,19 @@ word the fact; the app stamps who said it and cites the message. When the words
 map to none of those, the agent answers in chat and writes nothing. Its system
 prompt carries no scheduling logic — no caps, no retries, no age.
 
-**The judge.** `src/lib/judge.ts` answers one question: is the task done, given
-what the worker returned. The default answer needs no model — done when the
-reply is not empty and no line opens with `BLOCKED:`. The worker's brief states
-that contract, so a worker that hits a wall says so in a form a plain function
-can read. Swapping in a model-graded judge is a change to that one file.
+**The judge.** `src/lib/judge.ts` is the optional result grader. The runtime first
+routes the validated worker outcome: `waiting` schedules a revisit, `blocked`
+asks a person, and only `ready` reaches the judge. The default judge accepts a
+nonempty summary without a legacy `BLOCKED:` line; it does not independently
+verify the task's delivery requirements. Those are the worker's responsibility.
+Swapping in a model-graded judge remains a change to that one file.
+
+**The return protocol.** Every new worker is taught the exact JSON contract in
+`src/lib/worker-reply.ts`, on fresh starts and resumes. `system:summon` returns
+its final reply to `run_worker`, which validates it and allows one format-only
+repair in the same session. A second invalid reply becomes a `Failed` fact
+marked `reply_protocol`, then a Question — never an implicit success or an
+unbounded retry. See [docs/worker-replies.md](docs/worker-replies.md).
 
 Everything else — when to take a task, when to start a worker, how many at once,
 when to retry, when to ask, when to stop — is `src/lib/reconcile.ts`, a pure
@@ -47,12 +55,13 @@ something somebody said.
 | `Taken` | the runtime | — |
 | `Completed` | a person, or `github` | `reason?`, `issues?` — the closed issues, when `github` wrote it |
 | `Cancelled` | a person, or `github` | `reason?`, `issues?` — the issues closed as not planned, when `github` wrote it |
-| `Started` | the runtime | `workerId`, `prompt`, `resumeSessionId?` |
+| `Started` | the runtime | `workerId`, `prompt`, `resumeSessionId?`, `replyProtocol?` |
 | `Opened` | the worker | `workerId`, `romeSessionId`, `sessionType` — the worker's Rome session, recorded the moment it exists so the dashboard can open a live worker |
 | `Restarted` | the worker | `workerId`, `rejectedSessionId`, `error`, `prompt` |
-| `Returned` | the worker | `workerId`, `reply`, `sessionId?` |
-| `Failed` | the worker | `workerId`, `error`, `sessionId?` |
+| `Returned` | the worker | `workerId`, `reply`, `sessionId?`, validated `result?`, `repair?` |
+| `Failed` | the worker | `workerId`, `error`, `sessionId?`, `failureKind?`, `reply?`, `repair?` |
 | `Lost` | the runtime | `workerId`, `why` |
+| `Deferred` | the runtime | `workerId`, `reason`, `resumeAfter` (ISO time) |
 | `Question` | the runtime | `why` |
 | `Report` | the runtime | `what`, `evidence` |
 | `Reply` | a person | `text` |
@@ -72,8 +81,18 @@ resume, the worker writes `Restarted` and runs fresh with a full brief. See
 ends from Created or Taken on a person's word, or when its issue closes
 (below); the runtime never ends one on its own reading of a worker's result.
 **Positions** live inside Taken and are never stored: `working` (the runtime's
-last word is a Started), `stuck` (a Question), `reported` (a Report). The
-runtime never leaves Taken on its own.
+last word is a Started), `waiting` (a Deferred), `stuck` (a Question), `reported`
+(a Report). The runtime never leaves Taken on its own.
+
+`waiting` means the runtime still owns unfinished work, no worker is running,
+and a durable revisit time is recorded. On the first reconciliation tick at or
+after that time with a free slot, the runtime appends Started and resumes the
+worker. Until then, even if overdue, it stays waiting. The **worker**, not the
+runtime, checks whether external work is ready and can yield waiting again.
+The existing reconcile routine supplies the ticks — there is no new per-task
+routine, event watcher, or PR/CI logic in the scheduler. Normal waits reset the
+failure-attempt budget and consume no live worker slot. Human steering and
+terminal facts still take precedence.
 
 ## Taking in from GitHub
 
@@ -138,7 +157,7 @@ false` in `manager:setup` turns the poll off.
 {
   "workingDir": "/absolute/path/to/your/project",
   "workerAgent": "coding:coding",  // default
-  "startCap": 2,                   // starts per task since the last person fact
+  "startCap": 2,                   // starts since the last person fact or successful deferral
   "maxWorkers": 3,                 // workers running at once, across tasks
   "ageCapHours": 3,                // silence before a worker is declared lost
   "intervalMinutes": 5,            // how often reconcile runs
@@ -162,7 +181,10 @@ Then talk to the `manager` agent, or call `manager:create` directly:
 
 `manager:reconcile` also runs at the end of every person-fact action and at the
 end of every worker, so a new fact is acted on immediately rather than at the
-next tick.
+next tick. A waiting return records a future deadline, so it does not create an
+immediate restart loop. New GitHub intake briefs require handling automated
+review feedback and required checks before returning ready. Existing briefs
+and reports are not rewritten or automatically restarted on upgrade.
 
 ## Known gaps
 
@@ -206,7 +228,7 @@ The app ships a read-only web UI at `/apps/manager`. It is the same fold as
 `manager:snapshot`, rendered:
 
 - **Tasks** — every task with its state and position, the open Question or
-  newest Report it is waiting on, its live worker, and how many starts it has
+  newest Report it is waiting on, or its automatic revisit reason/time, its live worker, and how many starts it has
   spent since you last spoke. Click a task for its full history and worker list
   (`/apps/manager/<taskId>`).
 - **Workers** — every Started fact ever written, with the terminal fact that
@@ -234,6 +256,7 @@ src/
 │   ├── intake.ts              labeled issues -> Created facts
 │   ├── observe.ts             closed issues -> Completed / Cancelled facts
 │   ├── prompt.ts              the worker's brief
+│   ├── worker-reply.ts        shared return schema, prompt contract, bounded repair
 │   ├── config.ts              settings and the routine's trigger
 │   ├── identity.ts            who a person's fact is stamped with
 │   └── person-fact.ts         stamp, append, reconcile

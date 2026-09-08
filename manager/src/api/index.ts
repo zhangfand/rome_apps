@@ -46,6 +46,7 @@ class ManagerApiHandler implements RomeAppApiHandler {
           brief: task.brief,
           state: task.state,
           position: task.position,
+          waiting: task.waiting,
           liveWorkerId: task.liveWorker?.workerId,
           startsSinceLastPersonFact: task.startsSinceLastPersonFact,
           facts: task.facts.map(summarizeFact),

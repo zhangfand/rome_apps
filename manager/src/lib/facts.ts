@@ -1,3 +1,5 @@
+import { replyText, type ReplyRepair, type WorkerReply } from "./worker-reply.js";
+
 /**
  * The ledger's vocabulary. Every fact kind is named by one rule: a participle
  * is something that happened, a noun is something somebody said.
@@ -15,7 +17,7 @@
 export const TASK_STATE_KINDS = ["Created", "Taken", "Completed", "Cancelled"] as const;
 
 /** Execution facts. A worker writes three of them; the runtime writes the rest. */
-export const EXECUTION_KINDS = ["Started", "Opened", "Restarted", "Returned", "Failed", "Lost"] as const;
+export const EXECUTION_KINDS = ["Started", "Opened", "Restarted", "Returned", "Failed", "Lost", "Deferred"] as const;
 
 /** Dialogue facts. The runtime asks and reports; a person replies. */
 export const DIALOGUE_KINDS = ["Question", "Report", "Reply"] as const;
@@ -63,6 +65,7 @@ export const RUNTIME_KINDS: readonly FactKind[] = [
   "Lost",
   "Question",
   "Report",
+  "Deferred",
 ];
 
 /** Kinds that end a worker's run. A Started with none of these after it is live. */
@@ -152,6 +155,8 @@ export type StartedFact = FactOf<
     prompt: string;
     /** Session this worker continues. Absent means it starts fresh. */
     resumeSessionId?: string;
+    /** Absent on historical starts whose workers were taught the old prose protocol. */
+    replyProtocol?: 1;
   }
 >;
 /**
@@ -179,6 +184,9 @@ export type ReturnedFact = FactOf<
   {
     workerId: string;
     reply: string;
+    /** Validated v1 result. Absent only for pre-protocol workers. */
+    result?: WorkerReply;
+    repair?: ReplyRepair;
     /** Session the worker ran in, as summon reported it. */
     sessionId?: string;
   }
@@ -188,11 +196,19 @@ export type FailedFact = FactOf<
   {
     workerId: string;
     error: string;
+    failureKind?: "reply_protocol";
+    reply?: string;
+    repair?: ReplyRepair;
     /** Session the worker ran in; absent if it failed before one existed. */
     sessionId?: string;
   }
 >;
 export type LostFact = FactOf<"Lost", { workerId: string; why: string }>;
+/** Runtime took responsibility for revisiting unfinished work. This is not a live worker. */
+export type DeferredFact = FactOf<
+  "Deferred",
+  { workerId: string; reason: string; resumeAfter: string }
+>;
 export type QuestionFact = FactOf<"Question", { why: string }>;
 export type ReportFact = FactOf<"Report", { what: string; evidence: string }>;
 export type ReplyFact = FactOf<"Reply", { text: string }>;
@@ -208,6 +224,7 @@ export type Fact =
   | ReturnedFact
   | FailedFact
   | LostFact
+  | DeferredFact
   | QuestionFact
   | ReportFact
   | ReplyFact;
@@ -252,11 +269,13 @@ export function describeFact(fact: Fact): string {
       case "Restarted":
         return `worker ${fact.payload.workerId}: resume of session ${fact.payload.rejectedSessionId} rejected (${fact.payload.error}); started a fresh session`;
       case "Returned":
-        return `worker ${fact.payload.workerId}: ${fact.payload.reply}`;
+        return `worker ${fact.payload.workerId}: ${fact.payload.result ? `${fact.payload.result.outcome}: ${replyText(fact.payload.result)}` : fact.payload.reply}`;
       case "Failed":
         return `worker ${fact.payload.workerId}: ${fact.payload.error}`;
       case "Lost":
         return `worker ${fact.payload.workerId}: ${fact.payload.why}`;
+      case "Deferred":
+        return `revisit after ${fact.payload.resumeAfter}: ${fact.payload.reason}`;
       case "Question":
         return fact.payload.why;
       case "Report":

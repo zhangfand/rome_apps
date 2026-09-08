@@ -197,7 +197,7 @@ describe("prompt: a resumed brief carries only the delta", () => {
     expect(prompt).not.toContain("Created by ann");
     expect(prompt).not.toContain("Working directory:");
     // Still told how to end.
-    expect(prompt).toContain("BLOCKED:");
+    expect(prompt).toContain("Worker reply protocol v1");
   });
 
   it("gives a fresh worker the whole history, as before", () => {

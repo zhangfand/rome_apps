@@ -2,6 +2,7 @@ import type { ManagerConfig } from "./config.js";
 import { type NewFact, RUNTIME } from "./facts.js";
 import { isTerminal, type LedgerSnapshot, type TaskView, workerAgeMs } from "./fold.js";
 import type { Judge } from "./judge.js";
+import { REPLY_PROTOCOL } from "./worker-reply.js";
 import { buildWorkerPrompt } from "./prompt.js";
 
 /**
@@ -61,8 +62,7 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
   const start = (task: TaskView, reason?: string): boolean => {
     if (budget <= 0) return false;
     const workerId = newWorkerId();
-    const resume =
-      config.reuseSessions && !lostThisPass.has(task.id) ? task.resumableSession : undefined;
+    const resume = config.reuseSessions && !lostThisPass.has(task.id) ? task.resumableSession : undefined;
     const prompt = buildWorkerPrompt({ task, config, reason, resume });
     actions.push({
       type: "append",
@@ -71,8 +71,8 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
         kind: "Started",
         by: RUNTIME,
         payload: resume
-          ? { workerId, prompt, resumeSessionId: resume.sessionId }
-          : { workerId, prompt },
+          ? { workerId, prompt, resumeSessionId: resume.sessionId, replyProtocol: REPLY_PROTOCOL }
+          : { workerId, prompt, replyProtocol: REPLY_PROTOCOL },
       },
     });
     actions.push({ type: "launch", taskId: task.id, workerId });
@@ -96,11 +96,11 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
   /**
    * What to do about a worker that did not return: retry while the task is
    * under the start cap, and ask a person once it is over. The cap counts
-   * Started facts since the last fact a person wrote, so a reply resets it
-   * without anyone keeping a counter.
+   * Started facts since the last person fact or successful deferral. Normal
+   * waits therefore never spend the failure budget.
    */
   const afterFailure = (task: TaskView, why: string): void => {
-    if (task.startsSinceLastPersonFact < config.startCap) {
+    if (task.startsSinceLastProgress < config.startCap) {
       start(task, why);
       return;
     }
@@ -110,7 +110,7 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
         taskId: task.id,
         kind: "Question",
         by: RUNTIME,
-        payload: { why: `${why} (${task.startsSinceLastPersonFact} attempts)` },
+        payload: { why: `${why} (${task.startsSinceLastProgress} attempts)` },
       },
     });
   };
@@ -156,9 +156,49 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
 
     switch (task.latest.kind) {
       case "Returned": {
-        const { workerId, reply } = task.latest.payload;
+        const { workerId, reply, result } = task.latest.payload;
+        if (result?.outcome === "waiting") {
+          // Anchor to the durable return, not this tick: replay cannot slide the deadline.
+          actions.push({
+            type: "append",
+            fact: {
+              taskId: task.id,
+              kind: "Deferred",
+              by: RUNTIME,
+              payload: {
+                workerId,
+                reason: result.reason,
+                resumeAfter: new Date(
+                  task.latest.createdAt.getTime() + result.revisitAfterSeconds * 1000,
+                ).toISOString(),
+              },
+            },
+          });
+          break;
+        }
+        if (result?.outcome === "blocked") {
+          actions.push({
+            type: "append",
+            fact: { taskId: task.id, kind: "Question", by: RUNTIME, payload: { why: result.question } },
+          });
+          break;
+        }
+        const started = task.facts.find((f) => f.kind === "Started" && f.payload.workerId === workerId);
+        if (started?.kind === "Started" && started.payload.replyProtocol === REPLY_PROTOCOL && !result) {
+          actions.push({
+            type: "append",
+            fact: {
+              taskId: task.id,
+              kind: "Question",
+              by: RUNTIME,
+              payload: { why: "Worker returned without a validated protocol outcome." },
+            },
+          });
+          break;
+        }
+        const summary = result?.outcome === "ready" ? result.summary : reply;
         const evidence = `worker ${workerId}`;
-        const verdict = judge(task, reply, evidence);
+        const verdict = judge(task, summary, evidence);
         if (verdict.done) {
           actions.push({
             type: "append",
@@ -166,24 +206,41 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
               taskId: task.id,
               kind: "Report",
               by: RUNTIME,
-              payload: { what: reply, evidence },
+              payload: { what: summary, evidence },
             },
           });
         } else {
-          start(task, `the last result was not accepted: ${verdict.why ?? "not done"}`);
+          afterFailure(task, `the last result was not accepted: ${verdict.why ?? "not done"}`);
         }
         break;
       }
 
+      case "Deferred":
+        if (snapshot.now.getTime() >= Date.parse(task.latest.payload.resumeAfter)) {
+          start(task, `the recorded revisit time is due: ${task.latest.payload.reason}`);
+        }
+        break;
+
       case "Failed":
+        if (task.latest.payload.failureKind === "reply_protocol") {
+          // The runner already allowed one format repair. Do not start the same
+          // invalid-output loop again under a fresh retry budget.
+          actions.push({
+            type: "append",
+            fact: {
+              taskId: task.id,
+              kind: "Question",
+              by: RUNTIME,
+              payload: { why: task.latest.payload.error },
+            },
+          });
+          break;
+        }
         afterFailure(task, task.latest.payload.error);
         break;
 
       case "Lost":
-        afterFailure(
-          task,
-          `worker ${task.latest.payload.workerId} was lost: ${task.latest.payload.why}`,
-        );
+        afterFailure(task, `worker ${task.latest.payload.workerId} was lost: ${task.latest.payload.why}`);
         break;
 
       case "Reply":

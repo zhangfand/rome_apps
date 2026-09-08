@@ -263,6 +263,7 @@ function Tally({ view }: { view: DashboardView }) {
   const cells: { label: string; value: string | number; hint: string; tone?: "warning" }[] = [
     { label: "open", value: counts.tasks.created + counts.tasks.taken, hint: "Created + Taken" },
     { label: "working", value: counts.positions.working, hint: "Taken tasks with a worker on them" },
+    { label: "waiting", value: counts.positions.waiting, hint: "Unfinished tasks scheduled for an automatic revisit" },
     {
       label: needs === 1 ? "needs you" : "need you",
       value: needs,

@@ -4,7 +4,7 @@ export interface ManagerConfig {
   workingDir: string;
   /** Canonical id of the agent a worker runs. */
   workerAgent: string;
-  /** Started facts one task may collect since the last person fact before the runtime asks. */
+  /** Failed-run budget: starts since the last person fact or successful deferral before the runtime asks. */
   startCap: number;
   /** Workers allowed to be running at once, across every task. */
   maxWorkers: number;

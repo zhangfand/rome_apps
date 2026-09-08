@@ -8,6 +8,7 @@ import {
 import { createLedgerRepository, type LedgerRepository } from "../../db/repositories/ledger.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import type { ManagerConfig } from "../../lib/config.js";
+import { REPLY_PROTOCOL, validateWorkerRun, type ValidatedWorkerRun } from "../../lib/worker-reply.js";
 import type { StartedFact } from "../../lib/facts.js";
 
 /** What `system:summon` publishes the moment the summoned agent's Rome session exists. */
@@ -86,13 +87,26 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         resumeSessionId,
       });
 
-      const run = await summonWithFallback({
+      const initial = await summonWithFallback({
         appContext,
         ledger,
         managerConfig,
         started,
         source,
       });
+
+      // Old in-flight workers retain the prose contract they were launched with.
+      // Every new Started is explicitly versioned, including resumed sessions.
+      const run: SummonRun | ValidatedWorkerRun =
+        started.payload.replyProtocol === REPLY_PROTOCOL
+          ? await validateWorkerRun(initial, async (prompt, sessionId) => {
+              const task = foldTask(ledger.factsFor(taskId));
+              if (task.state !== "taken" || task.liveWorker?.workerId !== workerId) {
+                return { ok: false, error: "Worker was stopped before reply repair." };
+              }
+              return summon(appContext, managerConfig.workerAgent, prompt, sessionId);
+            })
+          : initial;
 
       let outcome: string;
       if (run.ok) {
@@ -101,7 +115,13 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
           kind: "Returned",
           by: workerId,
           source,
-          payload: { workerId, reply: run.reply, sessionId: run.sessionId },
+          payload: {
+            workerId,
+            reply: run.reply,
+            sessionId: run.sessionId,
+            ...("result" in run ? { result: run.result } : {}),
+            ...("repair" in run ? { repair: run.repair } : {}),
+          },
         });
         outcome = written ? "Returned" : "dropped (worker already closed)";
       } else {
@@ -110,7 +130,14 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
           kind: "Failed",
           by: workerId,
           source,
-          payload: { workerId, error: run.error, sessionId: run.sessionId },
+          payload: {
+            workerId,
+            error: run.error,
+            sessionId: run.sessionId,
+            ...("failureKind" in run ? { failureKind: run.failureKind } : {}),
+            ...("reply" in run ? { reply: run.reply } : {}),
+            ...("repair" in run ? { repair: run.repair } : {}),
+          },
         });
         outcome = written ? "Failed" : "dropped (worker already closed)";
       }
@@ -120,7 +147,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         workerId,
         outcome,
         sessionId: run.sessionId,
-        restarted: run.restarted,
+        restarted: initial.restarted,
       });
 
       // A new fact exists, so the runtime reconciles now rather than waiting
@@ -129,7 +156,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
 
       return {
         status: "ok",
-        data: { taskId, workerId, outcome, sessionId: run.sessionId, restarted: run.restarted },
+        data: { taskId, workerId, outcome, sessionId: run.sessionId, restarted: initial.restarted },
       };
     },
   };
@@ -169,7 +196,13 @@ async function summonWithFallback(input: {
     log.info("worker session opened", { taskId, workerId, romeSessionId: session.id });
   };
 
-  const first = await summon(appContext, managerConfig.workerAgent, started.payload.prompt, resumeSessionId, onSession);
+  const first = await summon(
+    appContext,
+    managerConfig.workerAgent,
+    started.payload.prompt,
+    resumeSessionId,
+    onSession,
+  );
   if (first.ok || !resumeSessionId || !isResumeRejection(first.error)) {
     return { ...first, restarted: false };
   }
@@ -207,15 +240,20 @@ async function summon(
   prompt: string,
   sessionId: string | undefined,
   onSession?: (session: { id: string; type: string }) => void,
-): Promise<{ ok: true; reply: string; sessionId?: string } | { ok: false; error: string; sessionId?: string }> {
+): Promise<
+  { ok: true; reply: string; sessionId?: string } | { ok: false; error: string; sessionId?: string }
+> {
   try {
     // invokeAction rather than runAction: summon publishes the Rome session as
     // an event long before it returns, and that is when a person wants the link.
-    const invocation = appContext.invokeAction<SummonSessionStartedEvent | { type: string }>("system:summon", {
-      agentName,
-      prompt,
-      ...(sessionId ? { sessionId } : {}),
-    });
+    const invocation = appContext.invokeAction<SummonSessionStartedEvent | { type: string }>(
+      "system:summon",
+      {
+        agentName,
+        prompt,
+        ...(sessionId ? { sessionId } : {}),
+      },
+    );
     const listen = (async () => {
       try {
         for await (const event of invocation.events) {
@@ -226,7 +264,9 @@ async function summon(
         }
       } catch (err) {
         // Losing the event stream must not lose the worker's result.
-        log.warn("summon event stream ended early", { error: err instanceof Error ? err.message : String(err) });
+        log.warn("summon event stream ended early", {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     })();
     const result = await invocation.result;

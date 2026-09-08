@@ -1,7 +1,7 @@
 import type { ManagerConfig } from "./config.js";
 import { describeFact } from "./facts.js";
 import type { TaskView } from "./fold.js";
-import { BLOCKED_PREFIX } from "./judge.js";
+import { replyInstructions } from "./worker-reply.js";
 
 /**
  * The brief a worker is launched with. A fresh worker gets the task's whole
@@ -29,19 +29,7 @@ export function buildWorkerPrompt(input: {
     lines.push("", `Why you were started: ${reason}`);
   }
 
-  lines.push(
-    "",
-    "When you finish, end your turn with a short summary of what you did and",
-    "where the result is — a branch, a pull request, a path. That summary is",
-    "recorded as the task's Returned fact and is what gets judged.",
-    "",
-    `If you cannot finish, say so on a line starting with "${BLOCKED_PREFIX}"`,
-    "followed by what is in the way. A blocked reply is not a failure; it is how",
-    "you hand the question back to a person.",
-    "",
-    "Do not wait for anything, do not poll, and do not ask a question you cannot",
-    "get an answer to inside this turn.",
-  );
+  lines.push("", replyInstructions());
 
   return lines.join("\n");
 }

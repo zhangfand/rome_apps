@@ -1,3 +1,4 @@
+import { replyText } from "./worker-reply.js";
 import type { ManagerConfig } from "./config.js";
 import { type Fact, type FactKind, describeFact } from "./facts.js";
 import { fold, type Position, type TaskState } from "./fold.js";
@@ -58,6 +59,7 @@ export interface TaskSummary {
   factCount: number;
   liveWorkerId?: string;
   startsSinceLastPersonFact: number;
+  waiting?: { reason: string; resumeAfter: string };
   /** The newest fact, rendered. */
   latest: FactSummary;
   /** Text a person needs to see: the open Question or the newest Report. */
@@ -133,7 +135,9 @@ export function workersOf(
       terminal === undefined
         ? undefined
         : terminal.kind === "Returned"
-          ? terminal.payload.reply
+          ? terminal.payload.result
+            ? replyText(terminal.payload.result)
+            : terminal.payload.reply
           : terminal.kind === "Failed"
             ? terminal.payload.error
             : terminal.kind === "Lost"
@@ -195,7 +199,7 @@ export function buildView(input: BuildViewInput): DashboardView {
     // person has not yet answered: a Question or a Report newer than the
     // newest person fact.
     let attention: TaskSummary["attention"];
-    if (task.state === "taken") {
+    if (task.state === "taken" && (task.position === "stuck" || task.position === "reported")) {
       for (let i = task.facts.length - 1; i >= 0; i -= 1) {
         const fact = task.facts[i];
         if (fact.seq <= task.lastPersonFactSeq) break;
@@ -219,6 +223,7 @@ export function buildView(input: BuildViewInput): DashboardView {
       brief: task.brief,
       state: task.state,
       position: task.position,
+      waiting: task.waiting,
       createdAt: created.createdAt.toISOString(),
       updatedAt: task.latest.createdAt.toISOString(),
       createdBy: created.by,
@@ -237,7 +242,7 @@ export function buildView(input: BuildViewInput): DashboardView {
 
   const counts: DashboardView["counts"] = {
     tasks: { created: 0, taken: 0, completed: 0, cancelled: 0 },
-    positions: { working: 0, stuck: 0, reported: 0 },
+    positions: { working: 0, waiting: 0, stuck: 0, reported: 0 },
     workers: { running: 0, returned: 0, failed: 0, lost: 0 },
     facts: facts.length,
   };

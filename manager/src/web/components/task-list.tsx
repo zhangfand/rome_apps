@@ -7,7 +7,7 @@ import { StateDot, stateLabel } from "./badges";
 import { TaskName } from "./refs";
 import { WorkerLink } from "./worker-link";
 import { type TaskHandle, type WorkerNames, briefText, plain } from "../lib/domain";
-import { formatRelative, truncate, useNow } from "../lib/format";
+import { formatStamp, formatRelative, truncate, useNow } from "../lib/format";
 import type { TaskSummary } from "../lib/types";
 
 type Scope = "open" | "attention" | "all";
@@ -131,6 +131,12 @@ function TaskRow({
         {handle?.isRef || !handle ? (
           <p className="font-serif text-body leading-snug text-foreground line-clamp-2">
             {truncate(handle ? briefText(task.brief, handle) : task.brief, 260)}
+          </p>
+        ) : null}
+
+        {task.waiting ? (
+          <p className="text-ui text-muted-foreground">
+            {truncate(plain(task.waiting.reason), 260)} — revisit after {formatStamp(task.waiting.resumeAfter)}
           </p>
         ) : null}
 

@@ -149,7 +149,10 @@ describe("briefFromIssue", () => {
     expect(brief).toContain("This task ends when issue #4 in acme/rome is closed");
     expect(brief).toContain("open a pull request against acme/rome");
     expect(brief).toContain("`Closes #4`");
-    expect(brief).toContain("Finish with the pull request URL");
+    expect(brief).toContain("Opening the PR is an intermediate result");
+    expect(brief).toContain("return waiting with the PR URL");
+    expect(brief).toContain("respond-to-review");
+    expect(brief).toContain("Return ready only when the expected reviews have completed");
     expect(brief).toContain("Do not merge the pull request or close the issue yourself");
   });
 

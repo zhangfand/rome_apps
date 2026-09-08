@@ -15,6 +15,7 @@ const TASK_STATE: Record<TaskState, { label: string; variant: "info" | "brand" |
 };
 
 const POSITION: Record<Position, { label: string; variant: "default" | "warning" | "info" }> = {
+  waiting: { label: "Waiting", variant: "default" },
   working: { label: "Working", variant: "default" },
   stuck: { label: "Stuck", variant: "warning" },
   reported: { label: "Reported", variant: "info" },
@@ -45,6 +46,7 @@ export const KIND: Record<FactKind, { tone: Tone; said: boolean }> = {
   Restarted: { tone: "warning", said: false },
   Returned: { tone: "success", said: false },
   Failed: { tone: "destructive", said: false },
+  Deferred: { tone: "muted", said: false },
   Lost: { tone: "muted", said: false },
   Question: { tone: "warning", said: true },
   Report: { tone: "info", said: true },
@@ -120,11 +122,13 @@ export function StateDot({ state, position }: { state: TaskState; position?: Pos
         ? "muted"
         : state === "created"
           ? "info"
-          : position === "stuck"
-            ? "warning"
-            : position === "reported"
-              ? "info"
-              : "brand";
+          : position === "waiting"
+            ? "muted"
+            : position === "stuck"
+              ? "warning"
+              : position === "reported"
+                ? "info"
+                : "brand";
   const said = position === "stuck" || position === "reported";
   return (
     <span

@@ -149,8 +149,12 @@ function bodyOf(fact: FactSummary, names: WorkerNames): string {
       return `${workerLabel(names, String(p.workerId ?? ""))} is running in session ${shortSession(String(p.romeSessionId ?? ""))}`;
     case "Restarted":
       return `${workerLabel(names, String(p.workerId ?? ""))} could not resume session ${shortSession(String(p.rejectedSessionId ?? ""))} (${humanize(String(p.error ?? ""), names)}) — started a fresh session`;
-    case "Returned":
-      return String(p.reply ?? "");
+    case "Returned": {
+      const result = p.result as { summary?: string; reason?: string; question?: string } | undefined;
+      return String(result?.summary ?? result?.reason ?? result?.question ?? p.reply ?? "");
+    }
+    case "Deferred":
+      return `Revisit after ${String(p.resumeAfter)}: ${String(p.reason ?? "")}`;
     case "Failed":
       return humanize(String(p.error ?? ""), names);
     case "Lost":

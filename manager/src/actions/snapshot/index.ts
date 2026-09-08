@@ -48,6 +48,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
           brief: task.brief,
           state: task.state,
           position: task.position,
+          waiting: task.waiting,
           workerRunning: task.liveWorker?.workerId,
           history: task.facts.slice(-HISTORY_LINES).map(describeFact),
         }));

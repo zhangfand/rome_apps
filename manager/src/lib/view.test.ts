@@ -55,7 +55,7 @@ describe("buildView", () => {
     expect(view.configured).toBe(false);
     expect(view.lock.held).toBe(true);
     expect(view.counts.tasks).toEqual({ created: 0, taken: 2, completed: 1, cancelled: 0 });
-    expect(view.counts.positions).toEqual({ working: 1, stuck: 1, reported: 0 });
+    expect(view.counts.positions).toEqual({ working: 1, waiting: 0, stuck: 1, reported: 0 });
     expect(view.counts.workers).toEqual({ running: 1, returned: 1, failed: 1, lost: 0 });
     expect(view.counts.facts).toBe(b.facts.length);
 

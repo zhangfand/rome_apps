@@ -1,7 +1,7 @@
 /** Mirrors src/lib/view.ts across the API boundary. Keep the two in step. */
 
 export type TaskState = "created" | "taken" | "completed" | "cancelled";
-export type Position = "working" | "stuck" | "reported";
+export type Position = "working" | "waiting" | "stuck" | "reported";
 export type WorkerStatus = "running" | "returned" | "failed" | "lost";
 export type FactKind =
   | "Created"
@@ -14,6 +14,7 @@ export type FactKind =
   | "Returned"
   | "Failed"
   | "Lost"
+  | "Deferred"
   | "Question"
   | "Report"
   | "Reply";
@@ -29,6 +30,7 @@ export const FACT_KINDS: FactKind[] = [
   "Returned",
   "Failed",
   "Lost",
+  "Deferred",
   "Question",
   "Report",
   "Reply",
@@ -67,6 +69,7 @@ export interface TaskSummary {
   brief: string;
   state: TaskState;
   position?: Position;
+  waiting?: { reason: string; resumeAfter: string };
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -108,6 +111,7 @@ export interface TaskDetail {
   brief: string;
   state: TaskState;
   position?: Position;
+  waiting?: { reason: string; resumeAfter: string };
   liveWorkerId?: string;
   startsSinceLastPersonFact: number;
   facts: FactSummary[];
