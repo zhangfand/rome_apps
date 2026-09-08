@@ -89,8 +89,8 @@ export function AttentionPanel({
       <p className="mt-2 text-ui break-words">{summary}</p>
 
       <footer className="mt-3 flex flex-wrap items-center gap-2">
-        <Button size="sm" onClick={() => void chatAbout(taskId, handle, kind)}>
-          <MessageSquare className="size-4" aria-hidden />
+        <Button size={isQuestion ? "sm" : "xs"} onClick={() => void chatAbout(taskId, handle, kind)}>
+          <MessageSquare className={isQuestion ? "size-4" : "size-3"} aria-hidden />
           {isQuestion ? "Answer in chat" : "Review in chat"}
         </Button>
         {primaryRef && primaryRef.url !== handle.issue?.url ? <RefLink r={primaryRef} className="mx-1" /> : null}

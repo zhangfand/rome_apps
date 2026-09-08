@@ -21,6 +21,7 @@ describe("AttentionPanel collapsed", () => {
     expect(html).toContain("Report ready");
     expect(html).toContain("Is this task done, or does it need more work?");
     expect(html).toContain("Review in chat");
+    expect(html).toContain('data-size="xs"');
     expect(html).toContain('href="https://github.com/example/repo/pull/42"');
     expect(html).toContain("Details");
     expect(html).not.toContain("I moved the changes");
