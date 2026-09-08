@@ -1,9 +1,10 @@
 import { Badge } from "@rome-os/ui/badge";
+import { cn } from "@rome-os/ui/cn";
 import type { FactKind, Position, TaskState, WorkerStatus } from "../lib/types";
 
 /**
  * Every categorical status in the app, mapped once onto the kit's semantic
- * badge variants so the same state reads the same everywhere.
+ * vocabulary so the same state reads the same everywhere.
  */
 
 const TASK_STATE: Record<TaskState, { label: string; variant: "info" | "brand" | "success" | "muted" }> = {
@@ -15,7 +16,7 @@ const TASK_STATE: Record<TaskState, { label: string; variant: "info" | "brand" |
 
 const POSITION: Record<Position, { label: string; variant: "default" | "warning" | "info" }> = {
   working: { label: "Working", variant: "default" },
-  stuck: { label: "Stuck — needs you", variant: "warning" },
+  stuck: { label: "Stuck", variant: "warning" },
   reported: { label: "Reported", variant: "info" },
 };
 
@@ -26,18 +27,46 @@ const WORKER: Record<WorkerStatus, { label: string; variant: "brand" | "success"
   lost: { label: "Lost", variant: "warning" },
 };
 
-const KIND: Record<FactKind, "default" | "info" | "success" | "warning" | "brand" | "destructive" | "muted" | "outline"> = {
-  Created: "info",
-  Taken: "brand",
-  Completed: "success",
-  Cancelled: "muted",
-  Started: "default",
-  Returned: "success",
-  Failed: "destructive",
-  Lost: "warning",
-  Question: "warning",
-  Report: "info",
-  Reply: "outline",
+export type Tone = "neutral" | "brand" | "info" | "success" | "warning" | "destructive" | "muted";
+
+/**
+ * The ledger's own grammar, from the README: a participle is something that
+ * happened, a noun is something somebody said. The journal draws the first as
+ * a filled dot and the second as a ring, so the shape alone tells you whether
+ * a row is an event or a message. Colour carries the outcome.
+ */
+export const KIND: Record<FactKind, { tone: Tone; said: boolean }> = {
+  Created: { tone: "neutral", said: false },
+  Taken: { tone: "brand", said: false },
+  Completed: { tone: "success", said: false },
+  Cancelled: { tone: "muted", said: false },
+  Started: { tone: "brand", said: false },
+  Returned: { tone: "success", said: false },
+  Failed: { tone: "destructive", said: false },
+  Lost: { tone: "muted", said: false },
+  Question: { tone: "warning", said: true },
+  Report: { tone: "info", said: true },
+  Reply: { tone: "neutral", said: true },
+};
+
+export const TONE_TEXT: Record<Tone, string> = {
+  neutral: "text-foreground",
+  brand: "text-brand",
+  info: "text-info-fg",
+  success: "text-success-fg",
+  warning: "text-warning-fg",
+  destructive: "text-destructive-fg",
+  muted: "text-muted-foreground",
+};
+
+export const TONE_DOT: Record<Tone, string> = {
+  neutral: "bg-foreground border-foreground",
+  brand: "bg-brand border-brand",
+  info: "bg-info border-info",
+  success: "bg-success border-success",
+  warning: "bg-warning border-warning",
+  destructive: "bg-destructive border-destructive",
+  muted: "bg-muted-foreground border-muted-foreground",
 };
 
 export function TaskStateBadge({ state }: { state: TaskState }) {
@@ -55,10 +84,55 @@ export function WorkerStatusBadge({ status }: { status: WorkerStatus }) {
   return <Badge variant={spec.variant}>{spec.label}</Badge>;
 }
 
-export function KindBadge({ kind }: { kind: FactKind }) {
+/** A fact's kind as a quiet mono word in its tone — no chip. */
+export function KindWord({ kind, className }: { kind: FactKind; className?: string }) {
   return (
-    <Badge variant={KIND[kind]} shape="square" className="font-mono text-[11px]">
+    <span className={cn("font-mono text-aux font-medium", TONE_TEXT[KIND[kind].tone], className)}>
       {kind}
-    </Badge>
+    </span>
   );
+}
+
+/** The journal's marker: filled for something that happened, a ring for something said. */
+export function KindDot({ kind, className }: { kind: FactKind; className?: string }) {
+  const spec = KIND[kind];
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "block size-2.5 rounded-full border-2",
+        TONE_DOT[spec.tone],
+        spec.said && "bg-background!",
+        className,
+      )}
+    />
+  );
+}
+
+/** A task's position, as a dot for list rows where a pill would shout. */
+export function StateDot({ state, position }: { state: TaskState; position?: Position }) {
+  const tone: Tone =
+    state === "completed"
+      ? "success"
+      : state === "cancelled"
+        ? "muted"
+        : state === "created"
+          ? "info"
+          : position === "stuck"
+            ? "warning"
+            : position === "reported"
+              ? "info"
+              : "brand";
+  const said = position === "stuck" || position === "reported";
+  return (
+    <span
+      aria-hidden
+      className={cn("block size-2.5 shrink-0 rounded-full border-2", TONE_DOT[tone], said && "bg-background!")}
+    />
+  );
+}
+
+export function stateLabel(state: TaskState, position?: Position): string {
+  if (state === "taken" && position) return POSITION[position].label;
+  return TASK_STATE[state].label;
 }

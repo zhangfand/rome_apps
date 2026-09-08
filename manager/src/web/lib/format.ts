@@ -63,3 +63,35 @@ export function truncate(text: string, max = 160): string {
   const oneLine = text.replace(/\s+/g, " ").trim();
   return oneLine.length > max ? `${oneLine.slice(0, max - 1)}…` : oneLine;
 }
+
+/** "09:58:28 PM" — the time alone, for rows that sit under a day heading. */
+export function formatTime(iso: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return iso;
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+/** "Today" / "Yesterday" / "Sep 7" / "Sep 7, 2025" (year only when it is not this one). */
+export function formatDay(iso: string, now = Date.now()): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return iso;
+  const today = new Date(now);
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  if (sameDay(d, today)) return "Today";
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (sameDay(d, yesterday)) return "Yesterday";
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: d.getFullYear() === today.getFullYear() ? undefined : "numeric",
+  });
+}
+
+/** Local calendar-day key for grouping. */
+export function dayKey(iso: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return iso;
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}

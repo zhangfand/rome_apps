@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { navigateToApp } from "@rome-os/app-web-sdk";
-import { Card, CardContent } from "@rome-os/ui/card";
+import { cn } from "@rome-os/ui/cn";
 import { EmptyState, EmptyStateDescription, EmptyStateTitle } from "@rome-os/ui/empty-state";
 import { SegmentedControl } from "@rome-os/ui/segmented-control";
-import { ChevronRight, Cpu, MessageCircleQuestion, FileCheck } from "lucide-react";
-import { PositionBadge, TaskStateBadge } from "./badges";
-import { formatRelative, shortId, truncate, useNow } from "../lib/format";
+import { StateDot, stateLabel } from "./badges";
+import { TaskName } from "./refs";
+import { type TaskHandle, type WorkerNames, briefText, plain, workerLabel } from "../lib/domain";
+import { formatRelative, truncate, useNow } from "../lib/format";
 import type { TaskSummary } from "../lib/types";
 
 type Scope = "open" | "attention" | "all";
@@ -20,7 +21,15 @@ export function isOpen(task: TaskSummary): boolean {
   return task.state === "created" || task.state === "taken";
 }
 
-export function TaskList({ tasks }: { tasks: TaskSummary[] }) {
+export function TaskList({
+  tasks,
+  handles,
+  names,
+}: {
+  tasks: TaskSummary[];
+  handles: ReadonlyMap<string, TaskHandle>;
+  names: WorkerNames;
+}) {
   const [scope, setScope] = useState<Scope>("open");
   const now = useNow();
 
@@ -49,25 +58,25 @@ export function TaskList({ tasks }: { tasks: TaskSummary[] }) {
           onValueChange={setScope}
           options={SCOPES}
         />
-        <span className="text-xs text-muted-foreground tabular-nums">
+        <span className="text-aux text-muted-foreground tabular-nums">
           {visible.length} of {tasks.length}
         </span>
       </div>
 
       {visible.length === 0 ? (
         <EmptyState className="py-10">
-          <EmptyStateTitle>No tasks here</EmptyStateTitle>
+          <EmptyStateTitle>{tasks.length === 0 ? "No tasks yet" : "Nothing here"}</EmptyStateTitle>
           <EmptyStateDescription>
             {tasks.length === 0
               ? "Tell the manager agent what you want in chat and it will open one."
-              : "Nothing matches this scope."}
+              : "Nothing matches this scope. Try “All”."}
           </EmptyStateDescription>
         </EmptyState>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="divide-y divide-border rounded-12 border border-border bg-surface">
           {visible.map((task) => (
             <li key={task.id}>
-              <TaskRow task={task} now={now} />
+              <TaskRow task={task} handle={handles.get(task.id)} names={names} now={now} />
             </li>
           ))}
         </ul>
@@ -76,9 +85,21 @@ export function TaskList({ tasks }: { tasks: TaskSummary[] }) {
   );
 }
 
-function TaskRow({ task, now }: { task: TaskSummary; now: number }) {
+function TaskRow({
+  task,
+  handle,
+  names,
+  now,
+}: {
+  task: TaskSummary;
+  handle?: TaskHandle;
+  names: WorkerNames;
+  now: number;
+}) {
+  const closed = !isOpen(task);
+  const attention = task.attention;
   return (
-    <Card
+    <div
       role="link"
       tabIndex={0}
       onClick={() => navigateToApp(task.id)}
@@ -88,54 +109,58 @@ function TaskRow({ task, now }: { task: TaskSummary; now: number }) {
           navigateToApp(task.id);
         }
       }}
-      className="cursor-pointer py-3 transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className={cn(
+        "task-row grid cursor-pointer grid-cols-[1rem_minmax(0,1fr)] gap-x-3 px-4 py-3 transition-colors first:rounded-t-12 last:rounded-b-12 hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset",
+        closed && "opacity-70",
+      )}
     >
-      <CardContent className="flex flex-col gap-2 px-4">
-        <div className="flex items-start gap-3">
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <TaskStateBadge state={task.state} />
-              {task.position ? <PositionBadge position={task.position} /> : null}
-              <span className="font-mono text-[11px] text-muted-foreground">{shortId(task.id)}</span>
-            </div>
-            <p className="text-sm leading-snug text-foreground">{truncate(task.brief, 220)}</p>
-          </div>
-          <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden />
+      <div className="flex justify-center pt-[7px]">
+        <StateDot state={task.state} position={task.position} />
+      </div>
+
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          {handle ? <TaskName handle={handle} rawId={task.id} /> : <span className="font-mono">{task.id}</span>}
+          <span className="text-aux text-muted-foreground">{stateLabel(task.state, task.position)}</span>
+          <span className="ml-auto text-aux text-muted-foreground tabular-nums" title={task.updatedAt}>
+            {task.latest.kind} · {formatRelative(task.updatedAt, now)}
+          </span>
         </div>
 
-        {task.attention ? (
-          <div className="flex items-start gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
-            {task.attention.kind === "Question" ? (
-              <MessageCircleQuestion className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-            ) : (
-              <FileCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-            )}
-            <div className="min-w-0">
-              <span className="font-medium">{task.attention.kind === "Question" ? "Asks: " : "Reports: "}</span>
-              <span className="text-foreground/90">{truncate(task.attention.text, 240)}</span>
-            </div>
-          </div>
+        {handle?.isRef || !handle ? (
+          <p className="font-serif text-body leading-snug text-foreground line-clamp-2">
+            {truncate(handle ? briefText(task.brief, handle) : task.brief, 260)}
+          </p>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        {attention ? (
+          <p
+            className={cn(
+              "border-l-2 pl-3 text-ui line-clamp-2",
+              attention.kind === "Question" ? "border-warning" : "border-info",
+            )}
+          >
+            <span className="font-medium">{attention.kind === "Question" ? "Asks" : "Reports"}</span>{" "}
+            <span className="text-foreground/85">{truncate(plain(attention.text), 320)}</span>
+          </p>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-x-3 text-aux text-muted-foreground">
           {task.liveWorkerId ? (
-            <span className="inline-flex items-center gap-1">
-              <Cpu className="size-3.5" aria-hidden />
-              worker <span className="font-mono">{shortId(task.liveWorkerId)}</span>
-            </span>
+            <span className="text-foreground/80">{workerLabel(names, task.liveWorkerId)} running</span>
           ) : null}
           <span>
             {task.workers.length} {task.workers.length === 1 ? "worker" : "workers"}
           </span>
           <span>{task.factCount} facts</span>
-          <span>
-            starts since last reply: <span className="tabular-nums">{task.startsSinceLastPersonFact}</span>
-          </span>
-          <span className="ml-auto">
-            {task.latest.kind} {formatRelative(task.updatedAt, now)}
-          </span>
+          {task.startsSinceLastPersonFact > 0 && isOpen(task) ? (
+            <span>
+              {task.startsSinceLastPersonFact} {task.startsSinceLastPersonFact === 1 ? "start" : "starts"} since your last
+              word
+            </span>
+          ) : null}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

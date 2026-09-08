@@ -1,5 +1,5 @@
 import "./styles.css";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchAppApi,
   getCurrentAppPath,
@@ -9,14 +9,16 @@ import {
 } from "@rome-os/app-web-sdk";
 import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
 import { Button } from "@rome-os/ui/button";
-import { Card, CardContent } from "@rome-os/ui/card";
+import { cn } from "@rome-os/ui/cn";
 import { Spinner } from "@rome-os/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@rome-os/ui/tabs";
-import { Lock, RefreshCw } from "lucide-react";
+import { Check, RefreshCw } from "lucide-react";
+import { AttentionPanel } from "./components/attention";
 import { Ledger } from "./components/ledger";
 import { TaskDetail } from "./components/task-detail";
 import { TaskList } from "./components/task-list";
 import { WorkerTable } from "./components/worker-table";
+import { type TaskHandle, handleOf, nameWorkers, shortPath } from "./lib/domain";
 import { formatRelative, useNow } from "./lib/format";
 import type { DashboardView } from "./lib/types";
 
@@ -42,7 +44,7 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
   const taskId = segment && !(TABS as string[]).includes(segment) ? segment : null;
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 md:p-6">
+    <main className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 md:p-6 md:pt-5">
       {taskId ? <TaskDetail taskId={taskId} /> : <Dashboard tab={tab} />}
     </main>
   );
@@ -85,45 +87,64 @@ function Dashboard({ tab }: { tab: Tab }) {
     };
   }, [load]);
 
+  // The guardian's names for things, derived once per snapshot.
+  const handles = useMemo(() => {
+    const map = new Map<string, TaskHandle>();
+    for (const task of view?.tasks ?? []) map.set(task.id, handleOf(task));
+    return map;
+  }, [view]);
+  const names = useMemo(() => nameWorkers(view?.tasks ?? []), [view]);
+
+  const attention = useMemo(
+    () =>
+      (view?.tasks ?? [])
+        .filter((t) => t.attention !== undefined)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    [view],
+  );
+
   const tabHref = (t: Tab) => (t === "tasks" ? "" : t);
 
   return (
     <>
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold">Manager</h1>
-          <p className="text-sm text-muted-foreground">
-            Tasks, the workers on them, and the ledger they are folded from.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {view?.lock.held ? (
-            <span
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground"
-              title={`Reconcile lock held until ${view.lock.heldUntil}`}
+      <header className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h1 className="text-title">Manager</h1>
+          <div className="flex items-center gap-3">
+            {view?.lock.held ? (
+              <span
+                className="inline-flex items-center gap-1.5 text-aux text-muted-foreground"
+                title={`Reconcile lock held until ${view.lock.heldUntil}`}
+              >
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand opacity-60 motion-reduce:animate-none" />
+                  <span className="relative inline-flex size-2 rounded-full bg-brand" />
+                </span>
+                reconciling
+              </span>
+            ) : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void load()}
+              disabled={loading}
+              className="-mr-2 px-2 font-normal text-muted-foreground hover:text-foreground"
+              title="Refreshes every 15 seconds and when you come back — click to refresh now"
             >
-              <Lock className="size-3.5" aria-hidden /> reconciling
-            </span>
-          ) : null}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => void load()}
-            disabled={loading}
-            className="px-2 font-normal text-muted-foreground hover:text-foreground"
-            title="Auto-refreshes every 15 seconds and on focus — click to refresh now"
-          >
-            <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} aria-hidden />
-            <span className="tabular-nums">
-              {loading ? "Refreshing…" : fetchedAt ? formatRelative(fetchedAt, now) : "Not loaded"}
-            </span>
-          </Button>
+              <RefreshCw className={cn("size-3.5", loading && "animate-spin")} aria-hidden />
+              <span className="tabular-nums">
+                {loading ? "Refreshing…" : fetchedAt ? formatRelative(fetchedAt, now) : "Not loaded"}
+              </span>
+            </Button>
+          </div>
         </div>
+        {view ? <Tally view={view} /> : null}
+        {view?.config ? <ConfigLine view={view} /> : null}
       </header>
 
       {error ? (
         <Alert variant="destructive">
-          <AlertTitle>Could not load the ledger</AlertTitle>
+          <AlertTitle>Could not read the ledger</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
@@ -139,14 +160,42 @@ function Dashboard({ tab }: { tab: Tab }) {
       ) : null}
 
       {!view && !error ? (
-        <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 py-10 text-ui text-muted-foreground">
           <Spinner className="size-4" /> Loading…
         </div>
       ) : null}
 
       {view ? (
         <>
-          <SummaryStrip view={view} />
+          <section aria-labelledby="needs-you" className="flex flex-col gap-3">
+            <h2 id="needs-you" className="flex items-baseline gap-2 text-section">
+              Needs you
+              {attention.length > 0 ? (
+                <span className="text-aux font-normal text-warning-fg tabular-nums">{attention.length}</span>
+              ) : null}
+            </h2>
+            {attention.length === 0 ? (
+              <p className="flex items-center gap-2 text-ui text-muted-foreground">
+                <Check className="size-4 text-success" aria-hidden />
+                {quietLine(view)}
+              </p>
+            ) : (
+              attention.map((task) => (
+                <AttentionPanel
+                  key={task.id}
+                  taskId={task.id}
+                  handle={handles.get(task.id) ?? handleOf(task)}
+                  brief={task.brief}
+                  kind={task.attention!.kind}
+                  text={task.attention!.text}
+                  evidence={task.attention!.evidence}
+                  updatedAt={task.updatedAt}
+                  names={names}
+                  clamp
+                />
+              ))
+            )}
+          </section>
 
           <Tabs value={tab} onValueChange={(v) => navigateTab(tabHref(v as Tab))}>
             <TabsList>
@@ -164,19 +213,18 @@ function Dashboard({ tab }: { tab: Tab }) {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="tasks" className="mt-3">
-              <TaskList tasks={view.tasks} />
+              <TaskList tasks={view.tasks} handles={handles} names={names} />
             </TabsContent>
             <TabsContent value="workers" className="mt-3">
-              <WorkerTable workers={view.workers} />
+              <WorkerTable workers={view.workers} names={names} handles={handles} />
             </TabsContent>
             <TabsContent value="ledger" className="mt-3">
               {view.counts.facts > view.ledger.length ? (
-                <p className="mb-2 text-xs text-muted-foreground">
-                  Showing the newest {view.ledger.length} of {view.counts.facts} facts. Open a task
-                  for its full history.
+                <p className="mb-2 text-aux text-muted-foreground">
+                  The newest {view.ledger.length} of {view.counts.facts} facts. Open a task for its full history.
                 </p>
               ) : null}
-              <Ledger facts={view.ledger} />
+              <Ledger facts={view.ledger} names={names} taskNames={handles} />
             </TabsContent>
           </Tabs>
         </>
@@ -190,49 +238,72 @@ function navigateTab(path: string) {
 }
 
 function Count({ n }: { n: number }) {
-  return <span className="ml-1.5 rounded-sm bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground">{n}</span>;
+  return (
+    <span className="ml-1.5 rounded-4 bg-surface-muted px-1.5 text-[11px] text-muted-foreground tabular-nums">
+      {n}
+    </span>
+  );
 }
 
-function SummaryStrip({ view }: { view: DashboardView }) {
+/** What to say when nothing is waiting on the guardian. Emptiness as direction. */
+function quietLine(view: DashboardView): string {
+  const running = view.counts.workers.running;
+  const open = view.counts.tasks.created + view.counts.tasks.taken;
+  if (open === 0) return "Nothing is waiting on you, and nothing is open. Tell the manager what you want in chat.";
+  if (running === 0) return `Nothing is waiting on you. ${open} ${open === 1 ? "task is" : "tasks are"} open; the runtime will pick them up on its next pass.`;
+  return `Nothing is waiting on you. ${running} ${running === 1 ? "worker is" : "workers are"} running across ${open} open ${open === 1 ? "task" : "tasks"}.`;
+}
+
+/**
+ * The numbers as one line of prose-like tallies: value in the foreground,
+ * label muted, and only the count that asks for the guardian gets a colour.
+ */
+function Tally({ view }: { view: DashboardView }) {
   const { counts, config } = view;
-  const cells: { label: string; value: string | number; hint?: string }[] = [
-    { label: "Open", value: counts.tasks.created + counts.tasks.taken, hint: "Created + Taken" },
-    { label: "Working", value: counts.positions.working, hint: "Taken tasks with a worker on them" },
-    { label: "Needs you", value: counts.positions.stuck + counts.positions.reported, hint: "Stuck on a question or holding a report" },
+  const needs = counts.positions.stuck + counts.positions.reported;
+  const cells: { label: string; value: string | number; hint: string; tone?: "warning" }[] = [
+    { label: "open", value: counts.tasks.created + counts.tasks.taken, hint: "Created + Taken" },
+    { label: "working", value: counts.positions.working, hint: "Taken tasks with a worker on them" },
     {
-      label: "Running workers",
-      value: config ? `${counts.workers.running} / ${config.maxWorkers}` : counts.workers.running,
+      label: needs === 1 ? "needs you" : "need you",
+      value: needs,
+      hint: "Stuck on a question or holding a report",
+      tone: needs > 0 ? "warning" : undefined,
+    },
+    {
+      label: "running",
+      value: config ? `${counts.workers.running} of ${config.maxWorkers}` : counts.workers.running,
       hint: "Live workers over the configured cap",
     },
-    { label: "Closed", value: counts.tasks.completed + counts.tasks.cancelled, hint: "Completed + Cancelled" },
-    { label: "Facts", value: counts.facts, hint: "Rows in the append-only ledger" },
+    { label: "closed", value: counts.tasks.completed + counts.tasks.cancelled, hint: "Completed + Cancelled" },
+    { label: "facts", value: counts.facts, hint: "Rows in the append-only ledger" },
   ];
 
   return (
-    <Card className="py-3">
-      <CardContent className="flex flex-col gap-3 px-4">
-        <dl className="grid grid-cols-3 gap-x-4 gap-y-2 md:grid-cols-6">
-          {cells.map((cell) => (
-            <div key={cell.label} title={cell.hint}>
-              <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{cell.label}</dt>
-              <dd className="text-lg font-semibold tabular-nums">{cell.value}</dd>
-            </div>
-          ))}
-        </dl>
-        {config ? (
-          <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border pt-2 text-xs text-muted-foreground">
-            <span>
-              workingDir <span className="font-mono text-foreground/80">{config.workingDir}</span>
-            </span>
-            <span>
-              worker <span className="font-mono text-foreground/80">{config.workerAgent}</span>
-            </span>
-            <span>start cap {config.startCap}</span>
-            <span>age cap {config.ageCapHours}h</span>
-            <span>reconcile every {config.intervalMinutes}m</span>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+    <dl className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-ui">
+      {cells.map((cell, i) => (
+        <div key={cell.label} className="flex items-baseline gap-1.5" title={cell.hint}>
+          {i > 0 ? <span className="mr-2.5 text-subtle-foreground select-none" aria-hidden>·</span> : null}
+          <dd className={cn("font-medium tabular-nums", cell.tone === "warning" ? "text-warning-fg" : "text-foreground")}>
+            {cell.value}
+          </dd>
+          <dt className={cn(cell.tone === "warning" ? "text-warning-fg" : "text-muted-foreground")}>{cell.label}</dt>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function ConfigLine({ view }: { view: DashboardView }) {
+  const c = view.config!;
+  return (
+    <p className="text-aux text-subtle-foreground">
+      Working in{" "}
+      <span className="font-mono text-muted-foreground" title={c.workingDir}>
+        {shortPath(c.workingDir)}
+      </span>{" "}
+      with <span className="font-mono text-muted-foreground">{c.workerAgent}</span> · up to {c.maxWorkers} workers ·{" "}
+      {c.startCap} starts per reply · lost after {c.ageCapHours}h of silence · reconciles every {c.intervalMinutes}m
+    </p>
   );
 }
