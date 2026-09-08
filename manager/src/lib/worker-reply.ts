@@ -8,7 +8,7 @@ export type WorkerReply =
   | { outcome: "waiting"; reason: string; revisitAfterSeconds: number }
   | { outcome: "blocked"; question: string };
 
-const textField = { type: "string", minLength: 1, maxLength: 32_000 } as const;
+const textField = { type: "string", minLength: 1, maxLength: 32_000, pattern: "\\S" } as const;
 
 /** Both the validator and the prompt use this definition, so they cannot drift. */
 export const WORKER_REPLY_SCHEMA = {
@@ -64,7 +64,12 @@ export function parseWorkerReply(reply: string): ParseReplyResult {
     const item = row[name];
     if ("const" in field) continue;
     if (field.type === "string") {
-      if (typeof item !== "string" || item.trim().length < field.minLength || item.length > field.maxLength) {
+      if (
+        typeof item !== "string" ||
+        item.length < field.minLength ||
+        item.length > field.maxLength ||
+        !new RegExp(field.pattern).test(item)
+      ) {
         return {
           ok: false,
           error: `${name} must be nonblank text of at most ${field.maxLength} characters.`,

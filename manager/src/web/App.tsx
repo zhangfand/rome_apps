@@ -249,7 +249,7 @@ function quietLine(view: DashboardView): string {
   const running = view.counts.workers.running;
   const open = view.counts.tasks.created + view.counts.tasks.taken;
   if (open === 0) return "Nothing is waiting on you, and nothing is open. Tell the manager what you want in chat.";
-  if (running === 0) return `Nothing is waiting on you. ${open} ${open === 1 ? "task is" : "tasks are"} open; the runtime will pick them up on its next pass.`;
+  if (running === 0) return `Nothing is waiting on you. ${open} ${open === 1 ? "task is" : "tasks are"} open; the runtime will continue eligible work automatically.`;
   return `Nothing is waiting on you. ${running} ${running === 1 ? "worker is" : "workers are"} running across ${open} open ${open === 1 ? "task" : "tasks"}.`;
 }
 
@@ -303,7 +303,7 @@ function ConfigLine({ view }: { view: DashboardView }) {
         {shortPath(c.workingDir)}
       </span>{" "}
       with <span className="font-mono text-muted-foreground">{c.workerAgent}</span> · up to {c.maxWorkers} workers ·{" "}
-      {c.startCap} starts per reply · lost after {c.ageCapHours}h of silence · reconciles every {c.intervalMinutes}m
+      {c.startCap} attempt retry limit · lost after {c.ageCapHours}h of silence · reconciles every {c.intervalMinutes}m
     </p>
   );
 }
