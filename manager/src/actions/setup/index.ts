@@ -11,6 +11,7 @@ import {
   DEFAULT_AGE_CAP_HOURS,
   DEFAULT_INTERVAL_MINUTES,
   DEFAULT_MAX_WORKERS,
+  DEFAULT_REUSE_SESSIONS,
   DEFAULT_START_CAP,
   DEFAULT_WORKER_AGENT,
   type ManagerConfig,
@@ -56,6 +57,10 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         intervalMinutes: {
           type: "number",
           description: `How often the reconcile routine fires. Defaults to ${DEFAULT_INTERVAL_MINUTES}.`,
+        },
+        reuseSessions: {
+          type: "boolean",
+          description: `Whether a follow-up worker continues the previous worker's session (keeps context and prompt cache warm) instead of starting cold. Defaults to ${DEFAULT_REUSE_SESSIONS}.`,
         },
       },
       required: ["workingDir"],

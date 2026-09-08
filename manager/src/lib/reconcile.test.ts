@@ -15,6 +15,7 @@ const CONFIG: ManagerConfig = {
   maxWorkers: 3,
   ageCapHours: 3,
   intervalMinutes: 5,
+  reuseSessions: true,
 };
 
 const ALWAYS_DONE: Judge = () => ({ done: true });

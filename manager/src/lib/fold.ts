@@ -26,6 +26,12 @@ export interface WorkerRef {
   startedSeq: number;
 }
 
+/** A session a follow-up worker may continue, and the worker that left it. */
+export interface ResumableSession {
+  workerId: string;
+  sessionId: string;
+}
+
 export interface TaskView {
   id: string;
   /** What the person asked for, from the Created fact. */
@@ -38,6 +44,14 @@ export interface TaskView {
   /** Every fact on the task, oldest first. */
   facts: readonly Fact[];
   liveWorker?: WorkerRef;
+  /**
+   * The newest session on the task that ended cleanly enough to resume: left
+   * by a Returned or Failed worker, and not since rejected by a Restarted or
+   * superseded by a Lost. Lost clears it because a "stopped" worker may still
+   * be running in that session; resuming it would race. Absent means the next
+   * worker starts fresh.
+   */
+  resumableSession?: ResumableSession;
   /** Order of the newest fact a person wrote. The start cap counts from here. */
   lastPersonFactSeq: number;
   /** Started facts newer than {@link lastPersonFactSeq}. This is the cap's counter. */
@@ -72,6 +86,7 @@ export function foldTask(facts: readonly Fact[]): TaskView {
   let state: TaskState = "created";
   let position: Position | undefined;
   let liveWorker: WorkerRef | undefined;
+  let resumableSession: ResumableSession | undefined;
   let lastPersonFactSeq = created.seq;
 
   for (const fact of ordered) {
@@ -91,6 +106,21 @@ export function foldTask(facts: readonly Fact[]): TaskView {
           startedAt: fact.createdAt,
           startedSeq: fact.seq,
         };
+        break;
+      case "Restarted":
+        // The runner refused this session; nobody should ask for it again.
+        if (resumableSession?.sessionId === fact.payload.rejectedSessionId) {
+          resumableSession = undefined;
+        }
+        break;
+      case "Returned":
+      case "Failed":
+        if (fact.payload.sessionId) {
+          resumableSession = { workerId: fact.payload.workerId, sessionId: fact.payload.sessionId };
+        }
+        break;
+      case "Lost":
+        resumableSession = undefined;
         break;
       default:
         break;
@@ -124,6 +154,7 @@ export function foldTask(facts: readonly Fact[]): TaskView {
     latest: ordered[ordered.length - 1],
     facts: ordered,
     liveWorker,
+    resumableSession,
     lastPersonFactSeq,
     startsSinceLastPersonFact,
   };

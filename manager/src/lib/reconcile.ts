@@ -45,14 +45,35 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
   let budget = config.maxWorkers - running;
   const actions: ReconcileAction[] = [];
 
-  /** Write Started and launch a worker, unless the cap says not yet. */
+  /**
+   * Tasks this pass wrote a Lost on. The snapshot was read before that Lost,
+   * so its `resumableSession` may still name the session the lost worker is
+   * running in; a start on the same pass must not ask for it. The next pass
+   * folds the Lost and reaches the same answer on its own.
+   */
+  const lostThisPass = new Set<string>();
+
+  /**
+   * Write Started and launch a worker, unless the cap says not yet. The worker
+   * continues the task's resumable session when there is one, reuse is on,
+   * and nothing this pass made it unsafe.
+   */
   const start = (task: TaskView, reason?: string): boolean => {
     if (budget <= 0) return false;
     const workerId = newWorkerId();
-    const prompt = buildWorkerPrompt({ task, config, reason });
+    const resume =
+      config.reuseSessions && !lostThisPass.has(task.id) ? task.resumableSession : undefined;
+    const prompt = buildWorkerPrompt({ task, config, reason, resume });
     actions.push({
       type: "append",
-      fact: { taskId: task.id, kind: "Started", by: RUNTIME, payload: { workerId, prompt } },
+      fact: {
+        taskId: task.id,
+        kind: "Started",
+        by: RUNTIME,
+        payload: resume
+          ? { workerId, prompt, resumeSessionId: resume.sessionId }
+          : { workerId, prompt },
+      },
     });
     actions.push({ type: "launch", taskId: task.id, workerId });
     budget -= 1;
@@ -68,6 +89,7 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
       workerId: task.liveWorker.workerId,
       why,
     });
+    lostThisPass.add(task.id);
     budget += 1;
   };
 
@@ -126,6 +148,7 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
           payload: { workerId: worker.workerId, why: LOST_SILENT },
         },
       });
+      lostThisPass.add(task.id);
       budget += 1;
       afterFailure(task, `worker ${worker.workerId} was ${LOST_SILENT}`);
       continue;

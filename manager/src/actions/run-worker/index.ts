@@ -5,8 +5,12 @@ import {
   type ActionResult,
   type AppActionRuntimeDeps,
 } from "@rome-os/app-runtime";
-import { createLedgerRepository } from "../../db/repositories/ledger.js";
+import { createLedgerRepository, type LedgerRepository } from "../../db/repositories/ledger.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
+import type { ManagerConfig } from "../../lib/config.js";
+import type { StartedFact } from "../../lib/facts.js";
+import { foldTask } from "../../lib/fold.js";
+import { buildWorkerPrompt } from "../../lib/prompt.js";
 
 const log = createAppLogger("manager:run_worker");
 
@@ -20,8 +24,8 @@ const log = createAppLogger("manager:run_worker");
  * runtime does not wait for, which is what the model asks for, even though the
  * summon inside it is ordinary and synchronous.
  *
- * The action writes the worker's own fact — Returned or Failed — because the
- * coding agent has no tools on this ledger and should not need any.
+ * The action writes the worker's own facts — Restarted, Returned, Failed —
+ * because the coding agent has no tools on this ledger and should not need any.
  */
 export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): Action {
   const { appContext } = deps;
@@ -66,65 +70,168 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         };
       }
 
-      log.info("worker starting", { taskId, workerId, agent: managerConfig.workerAgent });
+      const source = "manager:run_worker, on the worker's behalf";
+      const resumeSessionId = started.payload.resumeSessionId;
+      log.info("worker starting", {
+        taskId,
+        workerId,
+        agent: managerConfig.workerAgent,
+        resumeSessionId,
+      });
+
+      const run = await summonWithFallback({
+        appContext,
+        ledger,
+        managerConfig,
+        started,
+        source,
+      });
 
       let outcome: string;
-      try {
-        const result = await appContext.runAction("system:summon", {
-          agentName: managerConfig.workerAgent,
-          prompt: started.payload.prompt,
+      if (run.ok) {
+        const written = ledger.appendWorkerOutcome({
+          taskId,
+          kind: "Returned",
+          by: workerId,
+          source,
+          payload: { workerId, reply: run.reply, sessionId: run.sessionId },
         });
-
-        if (result.status === "ok") {
-          const reply = readSummonReply(result.data);
-          const written = ledger.appendWorkerOutcome({
-            taskId,
-            kind: "Returned",
-            by: workerId,
-            source: "manager:run_worker, on the worker's behalf",
-            payload: { workerId, reply },
-          });
-          outcome = written ? "Returned" : "dropped (worker already closed)";
-        } else {
-          const error =
-            result.status === "error" ? result.error : `summon returned ${result.status}`;
-          const written = ledger.appendWorkerOutcome({
-            taskId,
-            kind: "Failed",
-            by: workerId,
-            source: "manager:run_worker, on the worker's behalf",
-            payload: { workerId, error },
-          });
-          outcome = written ? "Failed" : "dropped (worker already closed)";
-        }
-      } catch (err) {
-        const error = err instanceof Error ? err.message : String(err);
+        outcome = written ? "Returned" : "dropped (worker already closed)";
+      } else {
         const written = ledger.appendWorkerOutcome({
           taskId,
           kind: "Failed",
           by: workerId,
-          source: "manager:run_worker, on the worker's behalf",
-          payload: { workerId, error },
+          source,
+          payload: { workerId, error: run.error, sessionId: run.sessionId },
         });
         outcome = written ? "Failed" : "dropped (worker already closed)";
       }
 
-      log.info("worker finished", { taskId, workerId, outcome });
+      log.info("worker finished", {
+        taskId,
+        workerId,
+        outcome,
+        sessionId: run.sessionId,
+        restarted: run.restarted,
+      });
 
       // A new fact exists, so the runtime reconciles now rather than waiting
       // for the next tick.
       await appContext.runAction("manager:reconcile", {});
 
-      return { status: "ok", data: { taskId, workerId, outcome } };
+      return {
+        status: "ok",
+        data: { taskId, workerId, outcome, sessionId: run.sessionId, restarted: run.restarted },
+      };
     },
   };
 }
 
-/** `system:summon` returns `{ result, sessionId, romeSession }`. */
-function readSummonReply(data: unknown): string {
-  if (typeof data === "object" && data !== null) {
-    const result = (data as { result?: unknown }).result;
-    if (typeof result === "string") return result;
+type SummonRun =
+  | { ok: true; reply: string; sessionId?: string; restarted: boolean }
+  | { ok: false; error: string; sessionId?: string; restarted: boolean };
+
+/**
+ * Summon the worker, resuming when its Started asks to. If the runner refuses
+ * the resume, fall back once — explicitly: a Restarted fact records the
+ * rejected session, the error, and the full brief the fresh session gets, so
+ * the ledger says what happened the moment it happens rather than when the
+ * worker returns hours later. A second failure, or any error that is not a
+ * resume rejection, is the worker's real outcome.
+ */
+async function summonWithFallback(input: {
+  appContext: AppActionRuntimeDeps["appContext"];
+  ledger: LedgerRepository;
+  managerConfig: ManagerConfig;
+  started: StartedFact;
+  source: string;
+}): Promise<SummonRun> {
+  const { appContext, ledger, managerConfig, started, source } = input;
+  const { taskId } = started;
+  const { workerId, resumeSessionId } = started.payload;
+
+  const first = await summon(appContext, managerConfig.workerAgent, started.payload.prompt, resumeSessionId);
+  if (first.ok || !resumeSessionId || !isResumeRejection(first.error)) {
+    return { ...first, restarted: false };
   }
-  return "";
+
+  // The delta brief on the Started assumed a session that holds the history.
+  // The fresh session holds nothing, so it gets the full brief instead.
+  const task = foldTask(ledger.factsFor(taskId));
+  const prompt = buildWorkerPrompt({
+    task,
+    config: managerConfig,
+    reason: `resuming session ${resumeSessionId} was rejected: ${first.error}`,
+  });
+
+  ledger.append({
+    taskId,
+    kind: "Restarted",
+    by: workerId,
+    source,
+    payload: { workerId, rejectedSessionId: resumeSessionId, error: first.error, prompt },
+  });
+  log.warn("resume rejected; worker restarted in a fresh session", {
+    taskId,
+    workerId,
+    rejectedSessionId: resumeSessionId,
+    error: first.error,
+  });
+
+  const second = await summon(appContext, managerConfig.workerAgent, prompt, undefined);
+  return { ...second, restarted: true };
+}
+
+async function summon(
+  appContext: AppActionRuntimeDeps["appContext"],
+  agentName: string,
+  prompt: string,
+  sessionId: string | undefined,
+): Promise<{ ok: true; reply: string; sessionId?: string } | { ok: false; error: string; sessionId?: string }> {
+  try {
+    const result = await appContext.runAction("system:summon", {
+      agentName,
+      prompt,
+      ...(sessionId ? { sessionId } : {}),
+    });
+    if (result.status === "ok") {
+      const { reply, sessionId: ran } = readSummonOutput(result.data);
+      return { ok: true, reply, sessionId: ran };
+    }
+    const error = result.status === "error" ? result.error : `summon returned ${result.status}`;
+    return { ok: false, error, sessionId };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err), sessionId };
+  }
+}
+
+/**
+ * Whether an error says the runner would not open the session at all, as
+ * opposed to an agent that ran in it and then failed. The first three are the
+ * session manager's own phrasings. The last is what `system:summon` actually
+ * surfaces for a bad session id today — the manager's error is swallowed and
+ * the summon ends without a session_init, so summon reports that no durable
+ * session was provided. It is only consulted when a resume was asked for, so
+ * it cannot mistake a fresh worker's failure for a rejection.
+ */
+export function isResumeRejection(error: string): boolean {
+  return (
+    /was not found or cannot be resumed/i.test(error) ||
+    /does not match this session key/i.test(error) ||
+    /cannot resume by (explicit )?session id/i.test(error) ||
+    /did not provide a durable Rome session/i.test(error)
+  );
+}
+
+/** `system:summon` returns `{ result, sessionId, romeSession }`. */
+function readSummonOutput(data: unknown): { reply: string; sessionId?: string } {
+  if (typeof data === "object" && data !== null) {
+    const { result, sessionId } = data as { result?: unknown; sessionId?: unknown };
+    return {
+      reply: typeof result === "string" ? result : "",
+      sessionId: typeof sessionId === "string" && sessionId ? sessionId : undefined,
+    };
+  }
+  return { reply: "" };
 }

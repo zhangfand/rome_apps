@@ -36,6 +36,12 @@ export interface WorkerSummary {
   /** Trailing text of the terminal fact: the reply, the error, or the why. */
   outcome?: string;
   startedSeq: number;
+  /** Session the worker was told to continue, if it did not start fresh. */
+  resumedSessionId?: string;
+  /** Set when the resume was rejected and the worker ran in a fresh session instead. */
+  restarted?: { rejectedSessionId: string; error: string };
+  /** Session the worker ran in, once it has reported back. */
+  sessionId?: string;
 }
 
 export interface TaskSummary {
@@ -132,6 +138,12 @@ export function workersOf(
               ? terminal.payload.why
               : undefined;
     const end = terminal?.createdAt ?? now;
+    const restarted = facts.find(
+      (candidate) =>
+        candidate.seq > fact.seq &&
+        candidate.kind === "Restarted" &&
+        candidate.payload.workerId === fact.payload.workerId,
+    );
     workers.push({
       workerId: fact.payload.workerId,
       taskId,
@@ -142,6 +154,15 @@ export function workersOf(
       ageMs: Math.max(0, end.getTime() - fact.createdAt.getTime()),
       outcome,
       startedSeq: fact.seq,
+      resumedSessionId: fact.payload.resumeSessionId,
+      restarted:
+        restarted?.kind === "Restarted"
+          ? { rejectedSessionId: restarted.payload.rejectedSessionId, error: restarted.payload.error }
+          : undefined,
+      sessionId:
+        terminal && (terminal.kind === "Returned" || terminal.kind === "Failed")
+          ? terminal.payload.sessionId
+          : undefined,
     });
   }
   return workers;

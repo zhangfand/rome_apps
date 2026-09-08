@@ -12,6 +12,12 @@ export interface ManagerConfig {
   ageCapHours: number;
   /** How often the reconcile routine fires. */
   intervalMinutes: number;
+  /**
+   * Whether a follow-up worker continues the last worker's session instead of
+   * starting cold. Keeps the prior context and the provider's prompt cache
+   * warm; off restores a fresh session for every start.
+   */
+  reuseSessions: boolean;
 }
 
 export const DEFAULT_WORKER_AGENT = "coding:coding";
@@ -19,6 +25,7 @@ export const DEFAULT_START_CAP = 2;
 export const DEFAULT_MAX_WORKERS = 3;
 export const DEFAULT_AGE_CAP_HOURS = 3;
 export const DEFAULT_INTERVAL_MINUTES = 5;
+export const DEFAULT_REUSE_SESSIONS = true;
 
 /** Key the single config row lives under. */
 export const CONFIG_KEY = "manager_config";
@@ -65,6 +72,7 @@ export function parseConfig(raw: unknown): ParseConfigResult {
       maxWorkers: positiveInt(args.maxWorkers, DEFAULT_MAX_WORKERS, 20),
       ageCapHours: positiveInt(args.ageCapHours, DEFAULT_AGE_CAP_HOURS, 168),
       intervalMinutes: normalizeIntervalMinutes(args.intervalMinutes),
+      reuseSessions: typeof args.reuseSessions === "boolean" ? args.reuseSessions : DEFAULT_REUSE_SESSIONS,
     },
   };
 }

@@ -10,8 +10,8 @@
 /** Task state facts. Only a person writes the three that end a task. */
 export const TASK_STATE_KINDS = ["Created", "Taken", "Completed", "Cancelled"] as const;
 
-/** Execution facts. A worker writes two of them; the runtime writes the rest. */
-export const EXECUTION_KINDS = ["Started", "Returned", "Failed", "Lost"] as const;
+/** Execution facts. A worker writes three of them; the runtime writes the rest. */
+export const EXECUTION_KINDS = ["Started", "Restarted", "Returned", "Failed", "Lost"] as const;
 
 /** Dialogue facts. The runtime asks and reports; a person replies. */
 export const DIALOGUE_KINDS = ["Question", "Report", "Reply"] as const;
@@ -75,9 +75,43 @@ export type CreatedFact = FactOf<"Created", { brief: string }>;
 export type TakenFact = FactOf<"Taken", Record<string, never>>;
 export type CompletedFact = FactOf<"Completed", { reason?: string }>;
 export type CancelledFact = FactOf<"Cancelled", { reason?: string }>;
-export type StartedFact = FactOf<"Started", { workerId: string; prompt: string }>;
-export type ReturnedFact = FactOf<"Returned", { workerId: string; reply: string }>;
-export type FailedFact = FactOf<"Failed", { workerId: string; error: string }>;
+export type StartedFact = FactOf<
+  "Started",
+  {
+    workerId: string;
+    prompt: string;
+    /** Session this worker continues. Absent means it starts fresh. */
+    resumeSessionId?: string;
+  }
+>;
+/**
+ * A worker was told to resume a session and the runner refused. The worker
+ * started a fresh session with `prompt` instead — a full brief, since the new
+ * session holds none of the history the delta on its Started assumed. Written
+ * between a Started and that worker's outcome; it ends nothing.
+ */
+export type RestartedFact = FactOf<
+  "Restarted",
+  { workerId: string; rejectedSessionId: string; error: string; prompt: string }
+>;
+export type ReturnedFact = FactOf<
+  "Returned",
+  {
+    workerId: string;
+    reply: string;
+    /** Session the worker ran in, as summon reported it. */
+    sessionId?: string;
+  }
+>;
+export type FailedFact = FactOf<
+  "Failed",
+  {
+    workerId: string;
+    error: string;
+    /** Session the worker ran in; absent if it failed before one existed. */
+    sessionId?: string;
+  }
+>;
 export type LostFact = FactOf<"Lost", { workerId: string; why: string }>;
 export type QuestionFact = FactOf<"Question", { why: string }>;
 export type ReportFact = FactOf<"Report", { what: string; evidence: string }>;
@@ -89,6 +123,7 @@ export type Fact =
   | CompletedFact
   | CancelledFact
   | StartedFact
+  | RestartedFact
   | ReturnedFact
   | FailedFact
   | LostFact
@@ -103,6 +138,7 @@ export type NewFact = Omit<Fact, "seq" | "id" | "createdAt">;
 export function workerIdOf(fact: Fact): string | undefined {
   switch (fact.kind) {
     case "Started":
+    case "Restarted":
     case "Returned":
     case "Failed":
     case "Lost":
@@ -126,7 +162,11 @@ export function describeFact(fact: Fact): string {
       case "Cancelled":
         return fact.payload.reason ?? "";
       case "Started":
-        return `worker ${fact.payload.workerId}`;
+        return fact.payload.resumeSessionId
+          ? `worker ${fact.payload.workerId}, resuming session ${fact.payload.resumeSessionId}`
+          : `worker ${fact.payload.workerId}`;
+      case "Restarted":
+        return `worker ${fact.payload.workerId}: resume of session ${fact.payload.rejectedSessionId} rejected (${fact.payload.error}); started a fresh session`;
       case "Returned":
         return `worker ${fact.payload.workerId}: ${fact.payload.reply}`;
       case "Failed":

@@ -126,6 +126,11 @@ export function Ledger({
   );
 }
 
+/** A session id is a UUID; eight characters is enough to tell two apart. */
+function shortSession(id: string): string {
+  return id.length > 8 ? id.slice(0, 8) : id;
+}
+
 /** The payload field that carries a fact's substance, in the guardian's words. */
 function bodyOf(fact: FactSummary, names: WorkerNames): string {
   const p = fact.payload;
@@ -136,7 +141,11 @@ function bodyOf(fact: FactSummary, names: WorkerNames): string {
     case "Cancelled":
       return String(p.reason ?? "");
     case "Started":
-      return `${workerLabel(names, String(p.workerId ?? ""))} started`;
+      return p.resumeSessionId
+        ? `${workerLabel(names, String(p.workerId ?? ""))} started, resuming session ${shortSession(String(p.resumeSessionId))}`
+        : `${workerLabel(names, String(p.workerId ?? ""))} started`;
+    case "Restarted":
+      return `${workerLabel(names, String(p.workerId ?? ""))} could not resume session ${shortSession(String(p.rejectedSessionId ?? ""))} (${humanize(String(p.error ?? ""), names)}) — started a fresh session`;
     case "Returned":
       return String(p.reply ?? "");
     case "Failed":
@@ -172,6 +181,7 @@ function FactRow({
     body.length > 140 ||
     fact.source !== undefined ||
     fact.kind === "Started" ||
+    fact.kind === "Restarted" ||
     fact.kind === "Report" ||
     body.includes("\n");
 

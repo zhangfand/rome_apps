@@ -45,9 +45,10 @@ something somebody said.
 | `Taken` | the runtime | — |
 | `Completed` | a person | `reason?` |
 | `Cancelled` | a person | `reason?` |
-| `Started` | the runtime | `workerId`, `prompt` |
-| `Returned` | the worker | `workerId`, `reply` |
-| `Failed` | the worker | `workerId`, `error` |
+| `Started` | the runtime | `workerId`, `prompt`, `resumeSessionId?` |
+| `Restarted` | the worker | `workerId`, `rejectedSessionId`, `error`, `prompt` |
+| `Returned` | the worker | `workerId`, `reply`, `sessionId?` |
+| `Failed` | the worker | `workerId`, `error`, `sessionId?` |
 | `Lost` | the runtime | `workerId`, `why` |
 | `Question` | the runtime | `why` |
 | `Report` | the runtime | `what`, `evidence` |
@@ -55,6 +56,14 @@ something somebody said.
 
 Every fact a person writes carries `by` (who) and `source` (their words or the
 action, verbatim).
+
+A follow-up worker on a task resumes the session the last Returned or Failed
+worker left, so it keeps that context (and the provider's prompt cache) rather
+than re-reading the repository cold; a Lost worker's session is never resumed,
+because a "stopped" worker may still be in it. When the runner refuses a
+resume, the worker writes `Restarted` and runs fresh with a full brief. See
+[docs/session-reuse.md](docs/session-reuse.md); `reuseSessions: false` in
+`manager:setup` turns it off.
 
 **States** are about ownership: Created, Taken, Completed, Cancelled. Only a
 person ends a task, from Created or Taken. **Positions** live inside Taken and

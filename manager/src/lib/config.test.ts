@@ -20,6 +20,13 @@ describe("parseConfig", () => {
     expect(parsed.config.workerAgent).toBe(DEFAULT_WORKER_AGENT);
     expect(parsed.config.maxWorkers).toBe(DEFAULT_MAX_WORKERS);
     expect(parsed.config.intervalMinutes).toBe(DEFAULT_INTERVAL_MINUTES);
+    expect(parsed.config.reuseSessions).toBe(true);
+  });
+
+  it("lets session reuse be switched off", () => {
+    const parsed = parseConfig({ workingDir: "/srv/project", reuseSessions: false });
+    if (!parsed.ok) throw new Error(parsed.error);
+    expect(parsed.config.reuseSessions).toBe(false);
   });
 
   it("degrades a nonsense cap to its default rather than failing", () => {
