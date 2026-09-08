@@ -4,6 +4,7 @@ import { GITHUB, RUNTIME } from "./facts.js";
 import { fold } from "./fold.js";
 import {
   briefFromIssue,
+  deliveryTerms,
   intakeApiPath,
   intakeFacts,
   type IntakeIssue,
@@ -11,6 +12,7 @@ import {
   toIntakeIssue,
   trackedIssueUrls,
 } from "./intake.js";
+import { issueRefsIn } from "./github-refs.js";
 import { issuesToWatch } from "./observe.js";
 import { reconcile } from "./reconcile.js";
 import { judge } from "./judge.js";
@@ -123,14 +125,16 @@ describe("intakeFacts", () => {
 });
 
 describe("briefFromIssue", () => {
-  it("puts the title first and the issue URL on its own last line", () => {
+  it("puts the title first, the delivery terms after the body, and the issue URL on its own last line", () => {
     const brief = briefFromIssue(issue(4, { title: "Add rate limiting", body: "On /upload." }));
-    expect(brief).toBe("Add rate limiting\n\nOn /upload.\n\nGitHub issue: https://github.com/acme/rome/issues/4");
+    expect(brief).toBe(
+      `Add rate limiting\n\nOn /upload.\n\n${deliveryTerms({ repo: REPO, number: 4 })}\n\nGitHub issue: https://github.com/acme/rome/issues/4`,
+    );
   });
 
   it("omits an empty body and falls back to repo#N for an empty title", () => {
     expect(briefFromIssue(issue(4, { title: "  ", body: "" }))).toBe(
-      "acme/rome#4\n\nGitHub issue: https://github.com/acme/rome/issues/4",
+      `acme/rome#4\n\n${deliveryTerms({ repo: REPO, number: 4 })}\n\nGitHub issue: https://github.com/acme/rome/issues/4`,
     );
   });
 
@@ -138,6 +142,20 @@ describe("briefFromIssue", () => {
     const brief = briefFromIssue(issue(4, { body: "x".repeat(MAX_BODY_CHARS + 50) }));
     expect(brief).toContain(`cut at ${MAX_BODY_CHARS}`);
     expect(brief.endsWith("GitHub issue: https://github.com/acme/rome/issues/4")).toBe(true);
+  });
+
+  it("is self-contained: the brief itself says the task ends on issue close and is delivered as a PR", () => {
+    const brief = briefFromIssue(issue(4));
+    expect(brief).toContain("This task ends when issue #4 in acme/rome is closed");
+    expect(brief).toContain("open a pull request against acme/rome");
+    expect(brief).toContain("`Closes #4`");
+    expect(brief).toContain("Finish with the pull request URL");
+    expect(brief).toContain("Do not merge the pull request or close the issue yourself");
+  });
+
+  it("names only the intake issue, so the close watch and the dedupe see one ref", () => {
+    const brief = briefFromIssue(issue(4));
+    expect(issueRefsIn(brief).map((ref) => ref.url)).toEqual(["https://github.com/acme/rome/issues/4"]);
   });
 });
 

@@ -95,9 +95,19 @@ export function intakeFacts(input: {
 }
 
 /**
- * The brief a worker reads. The issue URL is on its own line at the end so
- * `issueRefsIn` finds it whatever the body says, and so a worker knows where
- * the ask lives.
+ * The brief a worker reads. It is self-contained: the issue says what to
+ * build, and the brief says how the work is delivered and when the task ends,
+ * because the issue does not — an issue describes a change, not a workflow.
+ * The runtime's own instructions to a worker (`prompt.ts`) stay about being a
+ * worker; nothing there knows this task came from GitHub.
+ *
+ * The delivery terms mirror how the task ends (`observe.ts`): the task is
+ * over when the issue closes, and the way a worker closes it is a merged pull
+ * request that says `Closes #N`. A worker that stops at a local branch has
+ * not delivered.
+ *
+ * The issue URL is on its own line at the end so `issueRefsIn` finds it
+ * whatever the body says, and so a worker knows where the ask lives.
  */
 export function briefFromIssue(issue: IntakeIssue): string {
   const title = issue.title.trim() || `${issue.repo}#${issue.number}`;
@@ -108,8 +118,31 @@ export function briefFromIssue(issue: IntakeIssue): string {
       : body;
   const lines = [title];
   if (cut) lines.push("", cut);
+  lines.push("", deliveryTerms(issue));
   lines.push("", `GitHub issue: ${issue.url}`);
   return lines.join("\n");
+}
+
+/**
+ * How work on an issue is handed in. Part of every intake brief, verbatim,
+ * so the worker learns the finish line from the same text as the ask.
+ */
+export function deliveryTerms(issue: Pick<IntakeIssue, "repo" | "number">): string {
+  return [
+    "## Delivery",
+    "",
+    `This task ends when issue #${issue.number} in ${issue.repo} is closed. It closes`,
+    "through a pull request, so the work is not done until one exists:",
+    "",
+    `- Work on a clean branch off the default branch of ${issue.repo}; do not`,
+    "  build on another task's branch or leave the change uncommitted.",
+    `- Push the branch and open a pull request against ${issue.repo} whose`,
+    `  description says \`Closes #${issue.number}\`, so merging it closes the issue.`,
+    "- Finish with the pull request URL. A local branch or an unpushed commit is",
+    "  not a result.",
+    "- Do not merge the pull request or close the issue yourself; a person does",
+    "  that after review.",
+  ].join("\n");
 }
 
 /** The REST path `connector_proxy` lists one page of labeled open issues from. */
