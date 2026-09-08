@@ -10,6 +10,7 @@ import { createSettingsRepository } from "../../db/repositories/settings.js";
 import {
   DEFAULT_AGE_CAP_HOURS,
   DEFAULT_CLOSE_ON_ISSUE_CLOSED,
+  DEFAULT_INTAKE_LABEL,
   DEFAULT_INTERVAL_MINUTES,
   DEFAULT_MAX_WORKERS,
   DEFAULT_REUSE_SESSIONS,
@@ -17,6 +18,7 @@ import {
   DEFAULT_WORKER_AGENT,
   type ManagerConfig,
   parseConfig,
+  parseRepoList,
   RECONCILE_ROUTINE_KEY,
   RECONCILE_ROUTINE_NAME,
   reconcileTrigger,
@@ -67,12 +69,30 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
           type: "boolean",
           description: `Whether an open task ends once the GitHub issue(s) named in its brief are closed — Completed if closed as done, Cancelled if closed as not planned (polled via connector_proxy each pass). Defaults to ${DEFAULT_CLOSE_ON_ISSUE_CLOSED}.`,
         },
+        intakeRepos: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Repositories, as owner/name, whose open issues carrying `intakeLabel` become tasks (polled via connector_proxy each pass). Defaults to none — no GitHub intake.",
+        },
+        intakeLabel: {
+          type: "string",
+          description: `The label an issue must carry to be taken in as a task. Defaults to "${DEFAULT_INTAKE_LABEL}".`,
+        },
       },
       required: ["workingDir"],
       additionalProperties: true,
     },
 
     async execute(args): Promise<ActionResult> {
+      const repos = parseRepoList(args.intakeRepos);
+      if (repos.invalid.length > 0) {
+        return {
+          status: "error",
+          error: `intakeRepos must be owner/name entries; got ${repos.invalid.map((r) => JSON.stringify(r)).join(", ")}`,
+        };
+      }
+
       const parsed = parseConfig(args);
       if (!parsed.ok) return { status: "error", error: parsed.error };
 

@@ -28,6 +28,8 @@ const CONFIG: ManagerConfig = {
   intervalMinutes: 5,
   reuseSessions: true,
   closeOnIssueClosed: true,
+  intakeRepos: [],
+  intakeLabel: "ready-for-agent",
 };
 
 const NEVER_DONE: Judge = () => ({ done: false, why: "no pull request" });

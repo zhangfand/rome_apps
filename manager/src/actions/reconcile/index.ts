@@ -12,6 +12,13 @@ import type { ManagerConfig } from "../../lib/config.js";
 import { RUNTIME } from "../../lib/facts.js";
 import { fold } from "../../lib/fold.js";
 import { issueApiPath } from "../../lib/github-refs.js";
+import {
+  intakeApiPath,
+  intakeFacts,
+  type IntakeIssue,
+  MAX_INTAKE_PAGES,
+  toIntakeIssue,
+} from "../../lib/intake.js";
 import { judge } from "../../lib/judge.js";
 import { endedByIssues, type IssueStatus, issuesToWatch } from "../../lib/observe.js";
 import { LOST_STOPPED, reconcile, type ReconcileAction } from "../../lib/reconcile.js";
@@ -56,10 +63,14 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       }
 
       try {
-        // Ask GitHub first, so a task whose issue closed since the last pass
-        // is ended before the rules below look at it — the rules then see a
-        // terminal task and stop its worker, the same as after a person's
-        // Completed or Cancelled. A poll that cannot reach GitHub writes nothing.
+        // Ask GitHub first. Intake before observe, so an issue labeled and
+        // closed between two passes is opened and then ended in the same one,
+        // leaving a complete record rather than no task at all. Both run
+        // before the rules below, so a task taken in here is started this
+        // pass, and a task whose issue closed is seen as terminal and has its
+        // worker stopped — the same as after a person's Completed or
+        // Cancelled. A poll that cannot reach GitHub writes nothing.
+        const taken = await intakeIssues(ledger, managerConfig, appContext);
         const observed = await observeIssues(ledger, managerConfig, appContext);
 
         const snapshot = fold(new Date(), ledger.all());
@@ -70,7 +81,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
           newWorkerId: () => `w-${crypto.randomUUID().slice(0, 8)}`,
         });
 
-        const applied: string[] = [...observed];
+        const applied: string[] = [...taken, ...observed];
         for (const action of actions) {
           applied.push(await apply(action, ledger, appContext));
         }
@@ -82,6 +93,68 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       }
     },
   };
+}
+
+/**
+ * List each watched repo's open issues carrying the intake label and open a
+ * task for every one that has none yet. One GET per page of 100, through
+ * `connector_proxy` so the app never holds a GitHub token. A repo whose list
+ * cannot be read — GitHub not connected, a 404, a network error — is logged
+ * and skipped until the next pass; the loop must never stall on the poll.
+ */
+async function intakeIssues(
+  ledger: LedgerRepository,
+  config: ManagerConfig,
+  appContext: AppActionRuntimeDeps["appContext"],
+): Promise<string[]> {
+  if (config.intakeRepos.length === 0) return [];
+
+  const issues: IntakeIssue[] = [];
+  for (const repo of config.intakeRepos) {
+    for (let page = 1; page <= MAX_INTAKE_PAGES; page += 1) {
+      const result = await appContext.runAction("connector:connector_proxy", {
+        toolkit: "github",
+        path: intakeApiPath(repo, config.intakeLabel, page),
+        method: "GET",
+      });
+      if (result.status !== "ok") {
+        const reason = result.status === "error" ? result.error : `returned ${result.status}`;
+        log.warn("issue intake failed; skipping repo this pass", { repo, page, reason });
+        break;
+      }
+      const rows = (result.data as { data?: unknown } | undefined)?.data;
+      if (!Array.isArray(rows)) {
+        log.warn("issue intake returned no list; skipping repo this pass", { repo, page });
+        break;
+      }
+      for (const row of rows) {
+        const issue = toIntakeIssue(repo, (row ?? {}) as Record<string, unknown>);
+        if (issue) issues.push(issue);
+      }
+      if (rows.length < 100) break;
+      if (page === MAX_INTAKE_PAGES) {
+        log.warn("issue intake stopped at the page cap; the rest waits for the next pass", { repo });
+      }
+    }
+  }
+  if (issues.length === 0) return [];
+
+  const snapshot = fold(new Date(), ledger.all());
+  const facts = intakeFacts({
+    snapshot,
+    issues,
+    label: config.intakeLabel,
+    newTaskId: () => `t-${crypto.randomUUID().slice(0, 8)}`,
+  });
+
+  const applied: string[] = [];
+  for (const fact of facts) {
+    const written = ledger.append(fact);
+    const issue = (fact.payload as { issue?: { url: string } }).issue;
+    log.info("task taken in from GitHub", { taskId: written.taskId, by: fact.by, issue: issue?.url });
+    applied.push(`Created(${written.taskId}) by ${fact.by}`);
+  }
+  return applied;
 }
 
 /**

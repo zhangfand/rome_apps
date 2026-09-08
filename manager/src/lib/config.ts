@@ -25,6 +25,14 @@ export interface ManagerConfig {
    * a person ends a task.
    */
   closeOnIssueClosed: boolean;
+  /**
+   * Repositories (`owner/name`) whose issues become tasks. Every reconcile
+   * pass lists each repo's open issues carrying {@link intakeLabel} and opens
+   * a task for any that has none yet. Empty means no GitHub intake.
+   */
+  intakeRepos: string[];
+  /** The label an issue must carry to be taken in. */
+  intakeLabel: string;
 }
 
 export const DEFAULT_WORKER_AGENT = "coding:coding";
@@ -34,6 +42,35 @@ export const DEFAULT_AGE_CAP_HOURS = 3;
 export const DEFAULT_INTERVAL_MINUTES = 5;
 export const DEFAULT_REUSE_SESSIONS = true;
 export const DEFAULT_CLOSE_ON_ISSUE_CLOSED = true;
+export const DEFAULT_INTAKE_LABEL = "ready-for-agent";
+
+const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
+
+/**
+ * Split a repo list — an array, or one comma/whitespace-separated string —
+ * into the `owner/name` entries it names and the ones it does not. `setup`
+ * refuses the whole call on any invalid entry, so a typo is caught by the
+ * person who made it; the stored config only ever holds valid ones.
+ */
+export function parseRepoList(raw: unknown): { repos: string[]; invalid: string[] } {
+  const items = Array.isArray(raw)
+    ? raw.map(String)
+    : typeof raw === "string"
+      ? raw.split(/[\s,]+/)
+      : [];
+  const repos: string[] = [];
+  const invalid: string[] = [];
+  for (const item of items) {
+    const repo = item.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/+$/, "");
+    if (!repo) continue;
+    if (!REPO_RE.test(repo)) {
+      invalid.push(item);
+      continue;
+    }
+    if (!repos.includes(repo)) repos.push(repo);
+  }
+  return { repos, invalid };
+}
 
 /** Key the single config row lives under. */
 export const CONFIG_KEY = "manager_config";
@@ -85,6 +122,11 @@ export function parseConfig(raw: unknown): ParseConfigResult {
         typeof args.closeOnIssueClosed === "boolean"
           ? args.closeOnIssueClosed
           : DEFAULT_CLOSE_ON_ISSUE_CLOSED,
+      intakeRepos: parseRepoList(args.intakeRepos).repos,
+      intakeLabel:
+        typeof args.intakeLabel === "string" && args.intakeLabel.trim()
+          ? args.intakeLabel.trim()
+          : DEFAULT_INTAKE_LABEL,
     },
   };
 }

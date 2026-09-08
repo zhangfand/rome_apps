@@ -17,6 +17,8 @@ const CONFIG: ManagerConfig = {
   intervalMinutes: 5,
   reuseSessions: true,
   closeOnIssueClosed: true,
+  intakeRepos: [],
+  intakeLabel: "ready-for-agent",
 };
 
 const ALWAYS_DONE: Judge = () => ({ done: true });

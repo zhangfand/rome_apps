@@ -20,6 +20,8 @@ const CONFIG: ManagerConfig = {
   intervalMinutes: 5,
   reuseSessions: true,
   closeOnIssueClosed: true,
+  intakeRepos: [],
+  intakeLabel: "ready-for-agent",
 };
 
 const DONE: IssueStatus = { state: "closed", closedAt: "2026-09-08T10:00:00Z", stateReason: "completed" };

@@ -150,6 +150,10 @@ export type Author = { kind: "person" | "runtime" | "worker" | "github"; label: 
 export function authorOf(fact: FactSummary, names: WorkerNames): Author {
   if (fact.by === "runtime") return { kind: "runtime", label: "runtime", raw: fact.by };
   if (fact.by === "github") return { kind: "github", label: "GitHub", raw: fact.by };
+  // A task taken in from an issue is by the issue's author, `github:<login>`.
+  if (fact.by.startsWith("github:")) {
+    return { kind: "person", label: `@${fact.by.slice("github:".length)}`, raw: fact.by };
+  }
   const named = names.get(fact.by);
   if (named) return { kind: "worker", label: named.label, raw: fact.by };
   if (/^w-[0-9a-f]+$/i.test(fact.by)) return { kind: "worker", label: "a worker", raw: fact.by };

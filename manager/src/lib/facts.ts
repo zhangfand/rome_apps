@@ -36,6 +36,18 @@ export const RUNTIME = "runtime";
 export const GITHUB = "github";
 
 /**
+ * The `by` on a Created the runtime transcribed from a GitHub issue: the
+ * person who opened the issue, as `github:<login>`. Distinct from
+ * {@link GITHUB}, which names GitHub itself reporting a close; an issue is a
+ * person's ask, so its author is the fact's author, the same as a chat
+ * message is its sender's. The `github:` prefix keeps a GitHub login from
+ * colliding with a channel user id of the same spelling.
+ */
+export function githubPerson(login: string): string {
+  return `github:${login}`;
+}
+
+/**
  * Kinds a person writes. `reconcile` has no path to any of them; the one other
  * writer of a Completed or Cancelled is the issue poll, which stamps
  * {@link GITHUB} and only ever transcribes a closed issue. That keeps "the
@@ -86,7 +98,27 @@ export interface FactHeader {
 
 type FactOf<K extends FactKind, P> = FactHeader & { kind: K; payload: P };
 
-export type CreatedFact = FactOf<"Created", { brief: string }>;
+export type CreatedFact = FactOf<
+  "Created",
+  {
+    brief: string;
+    /** Set when the task was taken in from a GitHub issue rather than a chat. */
+    issue?: IssueOrigin;
+  }
+>;
+
+/** The issue a task was opened from, as the intake poll saw it. */
+export interface IssueOrigin {
+  /** Canonical `https://github.com/owner/repo/issues/N`. */
+  url: string;
+  repo: string;
+  number: number;
+  title: string;
+  /** GitHub login of whoever opened the issue. */
+  author: string;
+  /** The label that made it a task. */
+  label: string;
+}
 export type TakenFact = FactOf<"Taken", Record<string, never>>;
 export type CompletedFact = FactOf<
   "Completed",

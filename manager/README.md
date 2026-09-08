@@ -3,11 +3,11 @@
 A long-running agent: it keeps working on your tasks across sessions, and its
 correctness never depends on a session continuing.
 
-Tell it what you want in chat. It records the task in an append-only ledger,
-puts a coding session on it, retries what fails, asks you when it is stuck, and
-reports when there is something to look at. A task ends when you say so, or
-when the GitHub issue you named in the brief is closed — as completed, or as
-not planned.
+Tell it what you want in chat, or label an issue in a repository it watches.
+It records the task in an append-only ledger, puts a coding session on it,
+retries what fails, asks you when it is stuck, and reports when there is
+something to look at. A task ends when you say so, or when its GitHub issue is
+closed — as completed, or as not planned.
 
 This is a prototype of the "long-running agent, revision 3" model. Almost all of
 it is plain TypeScript; a model runs at exactly two points.
@@ -43,7 +43,7 @@ something somebody said.
 
 | Kind | Written by | Payload |
 | --- | --- | --- |
-| `Created` | a person | `brief` |
+| `Created` | a person, or `github:<login>` | `brief`, `issue?` — the issue it was taken in from |
 | `Taken` | the runtime | — |
 | `Completed` | a person, or `github` | `reason?`, `issues?` — the closed issues, when `github` wrote it |
 | `Cancelled` | a person, or `github` | `reason?`, `issues?` — the issues closed as not planned, when `github` wrote it |
@@ -74,6 +74,34 @@ ends from Created or Taken on a person's word, or when its issue closes
 **Positions** live inside Taken and are never stored: `working` (the runtime's
 last word is a Started), `stuck` (a Question), `reported` (a Report). The
 runtime never leaves Taken on its own.
+
+## Taking in from GitHub
+
+A chat is not the only way to ask. An open issue carrying the intake label
+(`ready-for-agent` by default) in a watched repository is the same ask,
+written where the code lives. Every reconcile pass lists each repo in
+`intakeRepos` for open issues with that label and appends a `Created` for any
+that has no task yet:
+
+- `by` is the issue's author, as `github:<login>` — the issue is a person's
+  words, so its author is the fact's author, the way a chat message's is.
+- `brief` is the issue's title and body, ending in a `GitHub issue: <url>` line,
+  so the close watch below picks it up with nothing more said. Bodies past
+  6000 characters are cut with a pointer back to the issue.
+- `source` cites the issue, the way a chat fact cites the message.
+- `payload.issue` records the URL, number, title, author, and label.
+
+One task per issue, ever. An issue that already has a task — opened from it
+here, or opened in chat by a person who named it in the brief — is never taken
+in again, even after that task ends; re-labeling does not reopen work. Pull
+requests, which answer on the same endpoint, are not asks and are skipped.
+Steering stays in chat: issue comments are not read, and nothing is posted
+back to the issue.
+
+The poll goes through `connector:connector_proxy` (toolkit `github`), up to
+five pages of 100 per repo per pass. A repo that cannot be read is logged and
+skipped until the next tick. An empty `intakeRepos` — the default — turns
+intake off.
 
 ## Ending from GitHub
 
@@ -115,7 +143,9 @@ false` in `manager:setup` turns the poll off.
   "ageCapHours": 3,                // silence before a worker is declared lost
   "intervalMinutes": 5,            // how often reconcile runs
   "reuseSessions": true,           // follow-up workers continue the last session
-  "closeOnIssueClosed": true       // end a task when the issue in its brief closes
+  "closeOnIssueClosed": true,      // end a task when the issue in its brief closes
+  "intakeRepos": ["owner/name"],   // repos whose labeled issues become tasks; default none
+  "intakeLabel": "ready-for-agent" // the label an issue must carry to be taken in
 }
 ```
 
@@ -201,6 +231,8 @@ src/
 │   ├── view.ts                fold -> the dashboard's read model
 │   ├── reconcile.ts           snapshot -> the list of writes and launches
 │   ├── judge.ts               the other model call site
+│   ├── intake.ts              labeled issues -> Created facts
+│   ├── observe.ts             closed issues -> Completed / Cancelled facts
 │   ├── prompt.ts              the worker's brief
 │   ├── config.ts              settings and the routine's trigger
 │   ├── identity.ts            who a person's fact is stamped with
@@ -217,6 +249,6 @@ src/
 ```
 
 The pure logic is unit-tested next to it — `fold.test.ts`, `reconcile.test.ts`,
-`judge.test.ts`, `config.test.ts`. None of them touches a database: `reconcile`
+`judge.test.ts`, `config.test.ts`, `observe.test.ts`, `intake.test.ts`. None of them touches a database: `reconcile`
 takes a snapshot value and returns actions, and the action layer applies them.
 Run them with `pnpm test`.
