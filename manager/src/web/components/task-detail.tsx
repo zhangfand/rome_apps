@@ -7,6 +7,7 @@ import { Spinner } from "@rome-os/ui/spinner";
 import { ArrowLeft, MessageSquare } from "lucide-react";
 import { PositionBadge, TaskStateBadge } from "./badges";
 import { Ledger } from "./ledger";
+import { LightMarkdown } from "./light-markdown";
 import { WorkerTable } from "./worker-table";
 import { formatStamp } from "../lib/format";
 import type { TaskDetail as TaskDetailData } from "../lib/types";
@@ -122,10 +123,13 @@ export function TaskDetail({ taskId }: { taskId: string }) {
               <AlertTitle>
                 {openQuestion.kind === "Question" ? "The runtime is asking" : "The runtime reports"}
               </AlertTitle>
-              <AlertDescription className="whitespace-pre-wrap">
-                {String(openQuestion.payload.why ?? openQuestion.payload.what ?? "")}
+              <AlertDescription className="block max-w-none">
+                <LightMarkdown
+                  className="text-sm"
+                  markdown={String(openQuestion.payload.why ?? openQuestion.payload.what ?? "")}
+                />
                 {openQuestion.kind === "Report" && openQuestion.payload.evidence ? (
-                  <div className="mt-1 text-xs opacity-80">
+                  <div className="mt-2 text-xs opacity-80">
                     evidence: {String(openQuestion.payload.evidence)}
                   </div>
                 ) : null}

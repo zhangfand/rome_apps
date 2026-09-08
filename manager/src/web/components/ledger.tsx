@@ -5,6 +5,7 @@ import { EmptyState, EmptyStateDescription, EmptyStateTitle } from "@rome-os/ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@rome-os/ui/select";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { KindBadge } from "./badges";
+import { LightMarkdown } from "./light-markdown";
 import { formatStamp, shortId, truncate } from "../lib/format";
 import { FACT_KINDS, type FactSummary } from "../lib/types";
 
@@ -163,9 +164,11 @@ function FactRow({ fact, showTask }: { fact: FactSummary; showTask: boolean }) {
             <span className="ml-auto tabular-nums">{formatStamp(fact.createdAt)}</span>
           </div>
           {body ? (
-            <p className={`mt-1 text-sm ${open ? "whitespace-pre-wrap break-words" : ""}`}>
-              {open ? body : truncate(body, 140)}
-            </p>
+            open ? (
+              <LightMarkdown className="mt-1 text-sm" markdown={body} />
+            ) : (
+              <p className="mt-1 text-sm">{truncate(body, 140)}</p>
+            )
           ) : null}
           {open ? (
             <div className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground">

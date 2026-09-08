@@ -51,15 +51,15 @@ export function WorkerTable({
           </EmptyStateDescription>
         </EmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-md border border-border">
-          <Table>
+        <div className="rounded-md border border-border">
+          <Table className="w-full table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[110px]">Worker</TableHead>
-                <TableHead className="w-[100px]">Status</TableHead>
-                {showTask ? <TableHead>Task</TableHead> : null}
-                <TableHead className="w-[160px]">Started</TableHead>
-                <TableHead className="w-[90px] text-right">Duration</TableHead>
+                <TableHead className="w-[104px]">Worker</TableHead>
+                <TableHead className="w-[96px]">Status</TableHead>
+                {showTask ? <TableHead className="w-[26%]">Task</TableHead> : null}
+                <TableHead className="w-[150px]">Started</TableHead>
+                <TableHead className="w-[80px] text-right">Duration</TableHead>
                 <TableHead>Outcome</TableHead>
               </TableRow>
             </TableHeader>
@@ -73,15 +73,15 @@ export function WorkerTable({
                     <WorkerStatusBadge status={w.status} />
                   </TableCell>
                   {showTask ? (
-                    <TableCell className="max-w-[320px]">
+                    <TableCell className="truncate">
                       <Button
                         variant="link"
                         size="sm"
-                        className="h-auto max-w-full justify-start truncate px-0 font-normal"
+                        className="h-auto max-w-full justify-start px-0 font-normal"
                         onClick={() => navigateToApp(w.taskId)}
                         title={w.taskBrief}
                       >
-                        {truncate(w.taskBrief, 80)}
+                        <span className="truncate">{truncate(w.taskBrief, 80)}</span>
                       </Button>
                     </TableCell>
                   ) : null}
@@ -93,7 +93,7 @@ export function WorkerTable({
                       w.status === "running" ? now - new Date(w.startedAt).getTime() : w.ageMs,
                     )}
                   </TableCell>
-                  <TableCell className="max-w-[420px] text-xs text-muted-foreground" title={w.outcome}>
+                  <TableCell className="truncate text-xs text-muted-foreground" title={w.outcome}>
                     {w.outcome ? truncate(w.outcome, 140) : w.status === "running" ? "—" : ""}
                   </TableCell>
                 </TableRow>
