@@ -186,6 +186,42 @@ app never holds a token. If GitHub is not connected or a call fails, the pass
 logs it and leaves the task open until the next tick. `closeOnIssueClosed:
 false` in `manager:setup` turns the poll off.
 
+## Board
+
+The **Board** tab joins the latest successful GitHub snapshot to the Manager
+ledger. Pick a repository and one of its linked Projects v2 (an epic), or the
+synthetic **No project** bucket for untriaged repository issues. Project items
+may come from other repositories. Cards include native `blockedBy` and
+`## Blocked by` dependencies, closing/linked pull requests, and GitHub state.
+
+The four columns are derived, never stored:
+
+- **Ready** — open and every known blocker is closed.
+- **In Progress** — open and named by a non-terminal Manager task's Created
+  brief. The card shows the task's folded working/stuck/reported position and
+  live worker.
+- **Blocked** — open with a known open blocker.
+- **Done** — closed on GitHub.
+
+Ready cards have **Implement**. It calls `manager:create` with the same
+`briefFromIssue` helper as labeled intake (title, body, URL, and delivery
+terms), then follows the existing `manager:create → reconcile → run_worker`
+flow. The Board API never appends a fact and refuses a second open task for the
+same issue with `409`.
+
+Snapshots live outside task state in `manager__snapshots`, one latest
+successful JSON value per repository. A failed refresh leaves the last good
+row visible and returns a useful error; missing GitHub Projects access asks the
+guardian to reconnect with `read:project`. `manager__preferences` holds only
+the selected repository. After intake, each reconcile best-effort refreshes the
+selected repository and configured `intakeRepos`; refresh failure is logged and
+never blocks observation or workers.
+
+For GitHub planning and dispatch this Board supersedes Dev Desk. Manager does
+not port Dev Desk's Linear provider, chats, claims/leases, claim ledger, or
+agent-turn hook: the ledger and detached Manager worker remain the only task
+execution model.
+
 ## Setting it up
 
 ```jsonc
@@ -272,17 +308,21 @@ The app ships a read-only web UI at `/apps/manager`. It is the same fold as
   closed it (Returned / Failed / Lost), its duration, and its outcome.
 - **Ledger** — the raw fact stream, newest first, filterable by kind and author.
   Expand a row for its `source`, evidence, or the worker brief.
+- **Board** — GitHub Projects and untriaged issues, joined to open ledger tasks,
+  with Ready / In Progress / Blocked / Done columns and Implement on Ready.
 
-The API behind it is two GET routes, `state` and `tasks/:id`
-(`src/api/index.ts`), both computed from `src/lib/view.ts`. Nothing in the UI
-writes: the four person verbs and the runtime remain the only writers.
+The task dashboard API keeps its two GET routes, `state` and `tasks/:id`.
+Board adds `GET board/repositories`, `GET board/state?repo=`, `POST board/sync`,
+`POST board/selection`, and `POST board/implement`. The first four manage only
+the read model and preference; Implement invokes `manager:create`. The four
+person verbs and the runtime remain the only ledger writers.
 
 ## Layout
 
 ```
 src/
 ├── agents/manager.yaml        the language boundary, one of two model call sites
-├── api/index.ts               the dashboard's read routes
+├── api/index.ts               dashboard + Board routes
 ├── web/                       the dashboard (React, @rome-os/ui)
 ├── lib/
 │   ├── facts.ts               the ledger's vocabulary
@@ -291,6 +331,10 @@ src/
 │   ├── reconcile.ts           snapshot -> the list of writes and launches
 │   ├── judge.ts               the other model call site
 │   ├── intake.ts              labeled issues -> Created facts
+│   ├── board.ts               pure snapshot + ledger readiness join
+│   ├── board-sync.ts          GitHub Projects/issues/PR snapshot sync
+│   ├── board-snapshot.ts      persisted GitHub read-model shape
+│   ├── github-board.ts        dependency and closing-reference parsing
 │   ├── observe.ts             closed issues -> Completed / Cancelled facts
 │   ├── worktree.ts            isolated Git checkout creation and validation
 │   ├── worker-start.ts        prepare workspace and persist the exact brief
@@ -300,7 +344,7 @@ src/
 │   ├── identity.ts            who a person's fact is stamped with
 │   └── person-fact.ts         stamp, append, reconcile
 ├── db/
-│   ├── schema.ts              facts, config, locks
+│   ├── schema.ts              facts/config/locks + Board read-model tables
 │   └── repositories/          the only way into those tables
 └── actions/
     ├── setup                  config + the reconcile routine

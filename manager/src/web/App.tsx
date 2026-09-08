@@ -18,6 +18,7 @@ import { Ledger } from "./components/ledger";
 import { TaskDetail } from "./components/task-detail";
 import { TaskList } from "./components/task-list";
 import { WorkerTable } from "./components/worker-table";
+import { Board } from "./components/board";
 import { type TaskHandle, handleOf, nameWorkers, shortPath } from "./lib/domain";
 import { formatRelative, useNow } from "./lib/format";
 import type { DashboardView } from "./lib/types";
@@ -25,14 +26,15 @@ import type { DashboardView } from "./lib/types";
 const POLL_MS = 15_000;
 const LEDGER_LIMIT = 300;
 
-type Tab = "tasks" | "workers" | "ledger";
-const TABS: Tab[] = ["tasks", "workers", "ledger"];
+type Tab = "tasks" | "board" | "workers" | "ledger";
+const TABS: Tab[] = ["tasks", "board", "workers", "ledger"];
 
 /**
  * Routes:
  *   ""            the dashboard, Tasks tab
  *   "workers"     the dashboard, Workers tab
  *   "ledger"      the dashboard, Ledger tab
+ *   "board"       GitHub epics joined to Manager tasks
  *   "<taskId>"    one task
  */
 export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBootstrap }) {
@@ -214,6 +216,7 @@ function Dashboard({ tab }: { tab: Tab }) {
                 Tasks
                 <Count n={view.counts.tasks.created + view.counts.tasks.taken} />
               </TabsTrigger>
+              <TabsTrigger value="board">Board</TabsTrigger>
               <TabsTrigger value="workers">
                 Workers
                 <Count n={view.counts.workers.running} />
@@ -225,6 +228,9 @@ function Dashboard({ tab }: { tab: Tab }) {
             </TabsList>
             <TabsContent value="tasks" className="mt-3">
               <TaskList tasks={view.tasks} handles={handles} names={names} />
+            </TabsContent>
+            <TabsContent value="board" className="mt-3">
+              <Board />
             </TabsContent>
             <TabsContent value="workers" className="mt-3">
               <WorkerTable workers={view.workers} names={names} handles={handles} />

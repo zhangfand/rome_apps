@@ -42,7 +42,21 @@ export function createAppDbSchema(tablePrefix: string = "manager") {
     heldUntil: integer("held_until").notNull(),
   });
 
-  return { facts, config, locks };
+  /** Dashboard-only preference. Task state never lives here. */
+  const preferences = sqliteTable(`${tablePrefix}__preferences`, {
+    id: text("id").primaryKey(),
+    selectedRepo: text("selected_repo"),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  });
+
+  /** Latest successful GitHub board read for a repository. */
+  const snapshots = sqliteTable(`${tablePrefix}__snapshots`, {
+    repo: text("repo").primaryKey(),
+    data: text("data").notNull(),
+    syncedAt: integer("synced_at", { mode: "timestamp_ms" }).notNull(),
+  });
+
+  return { facts, config, locks, preferences, snapshots };
 }
 
 const defaultSchema = createAppDbSchema();
@@ -50,3 +64,5 @@ const defaultSchema = createAppDbSchema();
 export const facts = defaultSchema.facts;
 export const config = defaultSchema.config;
 export const locks = defaultSchema.locks;
+export const preferences = defaultSchema.preferences;
+export const snapshots = defaultSchema.snapshots;
