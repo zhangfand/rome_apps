@@ -119,6 +119,7 @@ export function workspaceInstructions(workspace: WorkerWorkspace): string {
     "Keep branch changes inside this worktree; never force-checkout a branch used by another worktree.",
     "Install dependencies here if needed; do not share node_modules or copy ignored/private files from the source.",
     "Do not remove this worktree: follow-up workers need its branch and uncommitted work.",
+    "Do not reinstall or upgrade the running Manager controller unless the task explicitly authorizes deployment.",
   ].join("\n");
 }
 

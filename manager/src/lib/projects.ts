@@ -36,7 +36,7 @@ export function resolveHumanProject(config: ManagerConfig, input: {
   const projects = configuredProjects(config);
   const entries = Object.entries(projects);
   if (input.projectPath) {
-    const matches = entries.filter(([, p]) => path.normalize(p.workingDir) === path.normalize(input.projectPath!));
+    const matches = entries.filter(([, p]) => path.normalize(p.workingDir).replace(/\/+$/, "") === path.normalize(input.projectPath!).replace(/\/+$/, ""));
     if (matches.length === 1) return bindProject(config, matches[0][0]);
     if (matches.length > 1) throw new Error("Selected chat directory maps to multiple projects; pass projectId explicitly.");
     // A selected but unmapped directory must not silently fall through to a different repo.
@@ -64,6 +64,20 @@ export function routeIssue(routes: readonly IntakeRoute[], repo: string, labels:
     r.labels.every((label) => have.has(label.toLowerCase())));
   // Both no match and multiple matches are fail-closed. Re-labeling can resolve either next tick.
   return matches.length === 1 ? matches[0] : undefined;
+}
+
+/** A Board click is a human ask: no intake label needed, but repo/project routing still applies. */
+export function resolveBoardProject(config: ManagerConfig, repo: string, labels: readonly string[]): ProjectBinding {
+  if (!config.projects) {
+    if (config.intakeRepos.some((r) => r.toLowerCase() === repo.toLowerCase())) return bindProject(config, "default");
+    throw new Error(`No project maps to ${repo}. Configure its project before implementing from the Board.`);
+  }
+  const routes = Object.entries(config.projects).flatMap(([id, p]) => p.repo ? [{
+    ...bindProject(config, id), repo: p.repo, labels: p.projectLabel ? [p.projectLabel] : [],
+  }] : []);
+  const match = routeIssue(routes, repo, labels);
+  if (!match) throw new Error(`Project routing for ${repo} is missing or ambiguous. Set its project label or create the task in chat with an explicit projectId.`);
+  return { projectId: match.projectId, project: match.project };
 }
 
 /** Called under the reconcile lock, before changing settings or taking in work. */

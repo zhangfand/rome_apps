@@ -174,6 +174,7 @@ describe("toIntakeIssue", () => {
       pull_request: { url: "…" },
     });
     expect(got).toEqual({
+      labels: [],
       url: "https://github.com/acme/rome/issues/12",
       repo: REPO,
       number: 12,

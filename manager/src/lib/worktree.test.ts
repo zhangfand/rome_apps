@@ -14,6 +14,7 @@ import { foldTask } from "./fold.js";
 import type { NewFact, StartedFact } from "./facts.js";
 import { buildWorkerPrompt } from "./prompt.js";
 import { summonWithFallback } from "../actions/run-worker/index.js";
+import { bindProject } from "./projects.js";
 
 const cleanup: string[] = [];
 afterEach(async () => { for (const p of cleanup.splice(0)) await rm(p, { recursive: true, force: true }); });
@@ -54,6 +55,66 @@ async function start(l: ReturnType<typeof ledger>, config: Awaited<ReturnType<ty
 }
 
 describe("real Git worktree isolation", () => {
+  it("routes simultaneous tasks into two real repositories, preserving subdirectories", async () => {
+    const one = await fixture(); const two = await fixture();
+    const config = { ...one.config, projects: {
+      rome: { workingDir: one.workingDir }, manager: { workingDir: two.workingDir },
+    }, defaultProject: "rome" };
+    const a = ledger(); const b = ledger();
+    a.append({ taskId: "t1", kind: "Bound", by: "runtime", payload: bindProject(config, "rome") });
+    b.append({ taskId: "t1", kind: "Bound", by: "runtime", payload: bindProject(config, "manager") });
+    const [first, second] = await Promise.all([start(a, config), start(b, config)]);
+    expect(first.payload.workspace!.commonDir).toBe(path.join(one.source, ".git"));
+    expect(second.payload.workspace!.commonDir).toBe(path.join(two.source, ".git"));
+    expect(second.payload.projectId).toBe("manager");
+    expect(second.payload.workspace!.workingDir).toBe(path.join(second.payload.workspace!.root, "packages/app"));
+    expect(second.payload.prompt).not.toContain(`Working directory: ${config.workingDir}\n`);
+    await writeFile(path.join(second.payload.workspace!.workingDir, "code.txt"), "manager only\n");
+    expect(await readFile(path.join(first.payload.workspace!.workingDir, "code.txt"), "utf8")).toBe("base\n");
+    expect(await readFile(path.join(two.workingDir, "code.txt"), "utf8")).toBe("base\n");
+  });
+
+  it("keeps the original repository, dirty tree and session after project removal/default changes, including fallback", async () => {
+    const one = await fixture(); const two = await fixture();
+    const config = { ...one.config, projects: { manager: { workingDir: two.workingDir } }, defaultProject: "manager" };
+    const l = ledger();
+    l.append({ taskId: "t1", kind: "Bound", by: "runtime", payload: bindProject(config, "manager") });
+    const first = await start(l, config);
+    await writeFile(path.join(first.payload.workspace!.workingDir, "code.txt"), "unfinished\n");
+    l.append({ taskId: "t1", kind: "Returned", by: "w1", payload: { workerId: "w1", reply: "wait", sessionId: "s1" } });
+    const changed = { ...one.config, projects: { rome: { workingDir: one.workingDir } }, defaultProject: "rome" };
+    const next = await start(l, changed, "w2", "s1");
+    expect(next.payload.workspace).toEqual(first.payload.workspace);
+    expect(next.payload.resumeSessionId).toBe("s1");
+    expect(await readFile(path.join(next.payload.workspace!.workingDir, "code.txt"), "utf8")).toBe("unfinished\n");
+    const calls: Record<string, unknown>[] = [];
+    await summonWithFallback({ ledger: l, managerConfig: changed, started: next, source: "test", appContext: {
+      invokeAction: (_name: string, args: Record<string, unknown>) => {
+        calls.push(args);
+        return { events: (async function* () {})(), result: Promise.resolve(calls.length === 1
+          ? { status: "error", error: "session was not found or cannot be resumed" }
+          : { status: "ok", data: { result: "done", sessionId: "s2" } }) };
+      },
+    } as never });
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      expect(call.prompt).toContain(`Working directory: ${first.payload.workspace!.workingDir}`);
+      expect(call.prompt).not.toContain(`Working directory: ${one.workingDir}\n`);
+      expect(call.prompt).not.toContain(`Working directory: ${two.workingDir}\n`);
+    }
+  });
+
+  it("never reuses a session/worktree from a different repository even with corrupt previous metadata", async () => {
+    const one = await fixture(); const two = await fixture(); const l = ledger();
+    const first = await start(l, one.config);
+    l.append({ taskId: "t1", kind: "Returned", by: "w1", payload: { workerId: "w1", reply: "ready", sessionId: "s1" } });
+    l.append({ taskId: "t1", kind: "Bound", by: "runtime", payload: { projectId: "manager", project: { workingDir: two.workingDir } } });
+    await start(l, two.config, "w2", "s1");
+    expect(l.b.facts.at(-1)).toMatchObject({ kind: "Failed" });
+    expect((l.b.facts.at(-1)!.payload as { error: string }).error).toContain("Configured repository changed");
+    expect(lastStart(l).payload.workspace).toEqual(first.payload.workspace);
+  });
+
   it("resumes a due waiting task in the same dirty worktree with its protocol intact", async () => {
     const { config } = await fixture();
     const l = ledger();

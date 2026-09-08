@@ -9,6 +9,10 @@ import { getCurrentActionContext } from "@rome-os/app-runtime";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import { createLockRepository, RECONCILE_LOCK } from "../../db/repositories/lock.js";
 import { resolveHumanProject } from "../../lib/projects.js";
+import { createLedgerRepository } from "../../db/repositories/ledger.js";
+import { trackedIssueUrls } from "../../lib/intake.js";
+import { issueRefsIn } from "../../lib/github-refs.js";
+import { fold } from "../../lib/fold.js";
 
 /** Opens a task with a Created fact. The only way a task comes into being. */
 export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): Action {
@@ -52,6 +56,9 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         const settings = createSettingsRepository(appContext.db).get();
         if (!settings) return { status: "error", error: "Run manager:setup before creating a task." };
         const context = getCurrentActionContext()?.channelContext;
+        const tracked = trackedIssueUrls(fold(new Date(), createLedgerRepository(appContext.db).all()));
+        const duplicate = issueRefsIn(brief).find((ref) => tracked.has(ref.url.toLowerCase()));
+        if (duplicate) return { status: "error", error: `An existing task already names ${duplicate.url}; use reply on that task instead of creating a duplicate.` };
         const binding = resolveHumanProject(settings, {
           projectId: typeof args.projectId === "string" ? args.projectId.trim() : undefined,
           projectPath: context?.projectPath, projectName: context?.projectName,

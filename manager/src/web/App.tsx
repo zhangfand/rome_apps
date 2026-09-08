@@ -1,5 +1,5 @@
 import "./styles.css";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchAppApi,
   getCurrentAppPath,
@@ -54,6 +54,7 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
 
 function Dashboard({ tab }: { tab: Tab }) {
   const [projectId, setProjectId] = useState("");
+  const requestId = useRef(0);
   const [view, setView] = useState<DashboardView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -61,21 +62,26 @@ function Dashboard({ tab }: { tab: Tab }) {
   const now = useNow();
 
   const load = useCallback(async () => {
+    const request = ++requestId.current;
     setLoading(true);
     try {
       const res = await fetchAppApi(`state?ledgerLimit=${LEDGER_LIMIT}&projectId=${encodeURIComponent(projectId)}`);
+      if (request !== requestId.current) return;
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         setError(body.error ?? `HTTP ${res.status}`);
         return;
       }
-      setView((await res.json()) as DashboardView);
+      const next = (await res.json()) as DashboardView;
+      if (request !== requestId.current) return;
+      setView(next);
       setFetchedAt(new Date().toISOString());
       setError(null);
     } catch (e) {
+      if (request !== requestId.current) return;
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (request === requestId.current) setLoading(false);
     }
   }, [projectId]);
 
@@ -85,6 +91,7 @@ function Dashboard({ tab }: { tab: Tab }) {
     const onFocus = () => void load();
     window.addEventListener("focus", onFocus);
     return () => {
+      requestId.current++;
       window.clearInterval(timer);
       window.removeEventListener("focus", onFocus);
     };
@@ -143,7 +150,7 @@ function Dashboard({ tab }: { tab: Tab }) {
         </div>
         {view ? <Tally view={view} /> : null}
         {view?.config ? <ConfigLine view={view} /> : null}
-        {view?.projects?.length ? (
+        {view?.projects?.length && tab !== "board" ? (
           <label className="flex items-center gap-2 text-aux text-muted-foreground">
             Project
             <select aria-label="Filter by project" value={projectId} onChange={(e) => setProjectId(e.target.value)}

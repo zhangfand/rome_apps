@@ -51,8 +51,8 @@ export function trackedIssueUrls(snapshot: LedgerSnapshot): Set<string> {
   const urls = new Set<string>();
   for (const task of snapshot.tasks) {
     const created = task.facts.find((fact): fact is CreatedFact => fact.kind === "Created");
-    if (created?.payload.issue) urls.add(created.payload.issue.url);
-    for (const ref of issueRefsIn(task.brief)) urls.add(ref.url);
+    if (created?.payload.issue) urls.add(created.payload.issue.url.toLowerCase());
+    for (const ref of issueRefsIn(task.brief)) urls.add(ref.url.toLowerCase());
   }
   return urls;
 }
@@ -74,10 +74,10 @@ export function intakeFacts(input: {
   const out: NewFact[] = [];
   for (const issue of issues) {
     if (issue.isPullRequest || issue.state !== "open") continue;
-    if (tracked.has(issue.url)) continue;
+    if (tracked.has(issue.url.toLowerCase())) continue;
     const route = input.routes ? routeIssue(input.routes, issue.repo, issue.labels ?? []) : undefined;
     if (input.routes && !route) continue;
-    tracked.add(issue.url);
+    tracked.add(issue.url.toLowerCase());
     out.push({
       taskId: newTaskId(),
       kind: "Created",

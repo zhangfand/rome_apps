@@ -5,6 +5,7 @@ import { createLockRepository, RECONCILE_LOCK } from "../db/repositories/lock.js
 import { createSettingsRepository } from "../db/repositories/settings.js";
 import { buildView, summarizeFact, workersOf } from "../lib/view.js";
 import { fold, foldTask } from "../lib/fold.js";
+import { resolveBoardProject } from "../lib/projects.js";
 import { buildBoardState, openTaskForIssue } from "../lib/board.js";
 import { GithubError, listRepositories, syncRepository, type SyncDeps } from "../lib/board-sync.js";
 import { briefFromIssue, type IntakeIssue } from "../lib/intake.js";
@@ -127,7 +128,13 @@ class ManagerApiHandler implements RomeAppApiHandler {
           state: "open",
           isPullRequest: false,
         };
+        const config = settings.get();
+        if (!config) return json({ error: "manager_not_configured" }, 409);
+        let projectId: string;
+        try { projectId = resolveBoardProject(config, issue.repo, issue.labels.map((l) => l.name)).projectId; }
+        catch (error) { return json({ error: "project_routing_required", message: error instanceof Error ? error.message : String(error) }, 409); }
         const result = await this.ctx.runAction("manager:create", {
+          projectId,
           brief: briefFromIssue(intakeIssue),
           source: `Implement pressed on the board: ${issue.url}`,
         });

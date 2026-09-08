@@ -224,6 +224,12 @@ execution model.
 
 ## Setting it up
 
+**Multiple repositories:** configure named `projects` with per-project GitHub
+repo and working directory. Chat, GitHub intake and Board Implement bind each
+task to one project; workers use its isolated worktree, not a global checkout.
+See [multi-project setup, routing and migration](docs/multi-project.md).
+The single-project configuration below remains supported.
+
 ```jsonc
 // manager:setup — the only required field is the source project directory.
 {

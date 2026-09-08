@@ -107,7 +107,7 @@ async function refreshBoardSnapshots(
   appContext: AppActionRuntimeDeps["appContext"],
 ): Promise<string[]> {
   const board = createBoardRepository(appContext.db);
-  const repos = [...new Set([board.getSelectedRepo(), ...config.intakeRepos].filter((repo): repo is string => Boolean(repo)))];
+  const repos = [...new Set([board.getSelectedRepo(), ...intakeRoutes(config).map((r) => r.repo)].filter((repo): repo is string => Boolean(repo)))];
   const refreshed: string[] = [];
   for (const repo of repos) {
     try {
@@ -131,8 +131,8 @@ async function refreshBoardSnapshots(
  * cannot be read — GitHub not connected, a 404, a network error — is logged
  * and skipped until the next pass; the loop must never stall on the poll.
  */
-async function intakeIssues(
-  ledger: LedgerRepository,
+export async function intakeIssues(
+  ledger: Pick<LedgerRepository, "all" | "append">,
   config: ManagerConfig,
   appContext: AppActionRuntimeDeps["appContext"],
 ): Promise<string[]> {
@@ -147,7 +147,7 @@ async function intakeIssues(
         toolkit: "github",
         path: intakeApiPath(repo, labels.join(","), page),
         method: "GET",
-      });
+      }).catch((error: unknown) => ({ status: "error" as const, error: error instanceof Error ? error.message : String(error) }));
       if (result.status !== "ok") {
         const reason = result.status === "error" ? result.error : `returned ${result.status}`;
         log.warn("issue intake failed; skipping repo this pass", { repo, page, reason });
