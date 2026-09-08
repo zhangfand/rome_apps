@@ -1,0 +1,6 @@
+/* Rome's design-token layer: Tailwind + tw-animate-css from the web SDK, then
+   the component kit's token vocabulary, base resets, and source scan. */
+@import "@rome-os/app-web-sdk/styles";
+@import "@rome-os/ui/styles.css";
+
+/* App-specific rules go below. Paint only with the registered tokens. */
