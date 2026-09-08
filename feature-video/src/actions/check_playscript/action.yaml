@@ -1,0 +1,11 @@
+name: check_playscript
+type: custom
+description: >-
+  Check a Feature Video playscript for problems — unknown targets, cue phrases
+  that do not occur in their beat's line, malformed target specs — and return
+  the script as readable text. Takes a stored playscript id or a playscript
+  document.
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: read-only

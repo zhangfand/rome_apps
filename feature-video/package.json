@@ -1,0 +1,32 @@
+{
+  "name": "@rome/app-feature-video",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.6.0",
+  "type": "module",
+  "scripts": {
+    "dev": "rome dev",
+    "build": "rm -rf dist && rome build",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "test": "rstest"
+  },
+  "dependencies": {
+    "@rome-os/app-runtime": "^0.6.0",
+    "@rome-os/app-web-sdk": "^0.3.0",
+    "@rome-os/ui": "^0.2.2",
+    "drizzle-orm": "^0.45.1",
+    "lucide-react": "^0.468.0",
+    "playwright-core": "^1.62.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@rstest/core": "^0.11.12",
+    "@types/node": "^25.2.3",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "drizzle-kit": "^0.31.9",
+    "typescript": "^5.9.3"
+  }
+}
