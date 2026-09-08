@@ -159,4 +159,12 @@ describe("durable binding and scheduling", () => {
     expect(view.counts.facts).toBe(1);
     expect(view.ledger[0].taskId).toBe("t2");
   });
+  it("legacy tasks are visible in their project filter before the first migration tick without fabricating ledger facts", () => {
+    const b = created(new LedgerBuilder(), "old");
+    const view = buildView({ now: b.now(), facts: b.facts, config: config({ workingDir: "/old" }), lock: undefined, projectId: "default" });
+    expect(view.tasks).toHaveLength(1);
+    expect(view.tasks[0]).toMatchObject({ projectId: "default", project: { workingDir: "/old" } });
+    expect(view.counts.facts).toBe(1);
+    expect(b.facts).toHaveLength(1);
+  });
 });

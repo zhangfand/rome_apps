@@ -28,6 +28,13 @@ export function bindProject(config: ManagerConfig, projectId: string): ProjectBi
   return { projectId, project: { workingDir, ...(repo ? { repo } : {}) } };
 }
 
+/** Read-only compatibility until the next reconcile persists Bound. Setup migrates before changes. */
+export function readProjectBinding(task: Pick<TaskView, "projectId" | "project">, config?: ManagerConfig): Partial<ProjectBinding> {
+  if (task.projectId && task.project) return { projectId: task.projectId, project: task.project };
+  if (!config) return { projectId: task.projectId, project: task.project };
+  return bindProject(config, task.projectId ?? config.defaultProject ?? Object.keys(configuredProjects(config))[0]);
+}
+
 /** Explicit choice wins. A selected chat path must map exactly; never fuzzy-match a repo. */
 export function resolveHumanProject(config: ManagerConfig, input: {
   projectId?: string; projectPath?: string; projectName?: string;

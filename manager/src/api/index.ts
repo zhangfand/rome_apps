@@ -5,7 +5,7 @@ import { createLockRepository, RECONCILE_LOCK } from "../db/repositories/lock.js
 import { createSettingsRepository } from "../db/repositories/settings.js";
 import { buildView, summarizeFact, workersOf } from "../lib/view.js";
 import { fold, foldTask } from "../lib/fold.js";
-import { resolveBoardProject } from "../lib/projects.js";
+import { readProjectBinding, resolveBoardProject } from "../lib/projects.js";
 import { buildBoardState, openTaskForIssue } from "../lib/board.js";
 import { GithubError, listRepositories, syncRepository, type SyncDeps } from "../lib/board-sync.js";
 import { briefFromIssue, type IntakeIssue } from "../lib/intake.js";
@@ -165,10 +165,10 @@ class ManagerApiHandler implements RomeAppApiHandler {
         if (facts.length === 0) return json({ error: "task not found" }, 404);
         const now = new Date();
         const task = foldTask(facts);
+        const binding = readProjectBinding(task, settings.get());
         return json({
           id: task.id,
-          projectId: task.projectId,
-          project: task.project,
+          ...binding,
           brief: task.brief,
           state: task.state,
           position: task.position,
@@ -176,7 +176,7 @@ class ManagerApiHandler implements RomeAppApiHandler {
           liveWorkerId: task.liveWorker?.workerId,
           startsSinceLastPersonFact: task.startsSinceLastPersonFact,
           facts: task.facts.map(summarizeFact),
-          workers: workersOf(task.id, task.brief, task.facts, now),
+          workers: workersOf(task.id, task.brief, task.facts, now).map((w) => ({ ...w, projectId: binding.projectId })),
         });
       }
 

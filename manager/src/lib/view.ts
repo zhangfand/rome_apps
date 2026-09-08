@@ -3,7 +3,7 @@ import type { WorkerWorkspace } from "./worktree.js";
 import type { ManagerConfig } from "./config.js";
 import { type Fact, type FactKind, describeFact } from "./facts.js";
 import { fold, type Position, type TaskState } from "./fold.js";
-import { configuredProjects, type ProjectBinding } from "./projects.js";
+import { configuredProjects, readProjectBinding, type ProjectBinding } from "./projects.js";
 
 /**
  * The dashboard's read model. Like everything else in this app it is a fold
@@ -204,7 +204,7 @@ export function workersOf(
 
 export function buildView(input: BuildViewInput): DashboardView {
   const { now, config, lock } = input;
-  const allTasks = fold(now, input.facts).tasks;
+  const allTasks = fold(now, input.facts).tasks.map((task) => ({ ...task, ...readProjectBinding(task, config) }));
   const projects = [...new Set([
     ...Object.keys(config ? configuredProjects(config) : {}),
     ...allTasks.flatMap((task) => task.projectId ? [task.projectId] : []),
@@ -215,7 +215,8 @@ export function buildView(input: BuildViewInput): DashboardView {
 
   const tasks: TaskSummary[] = snapshot.tasks.map((task) => {
     const created = task.facts[0];
-    const workers = workersOf(task.id, task.brief, task.facts, now);
+    const binding = readProjectBinding(task, config);
+    const workers = workersOf(task.id, task.brief, task.facts, now).map((w) => ({ ...w, projectId: binding.projectId }));
 
     // The person's attention is owed to whatever the runtime last said and a
     // person has not yet answered: a Question or a Report newer than the
@@ -242,8 +243,7 @@ export function buildView(input: BuildViewInput): DashboardView {
 
     return {
       id: task.id,
-      projectId: task.projectId,
-      project: task.project,
+      ...binding,
       brief: task.brief,
       state: task.state,
       position: task.position,
