@@ -38,7 +38,8 @@ function freshHeader(task: TaskView, config: ManagerConfig): string[] {
   return [
     `You are working on task ${task.id}.`,
     "",
-    `Working directory: ${config.workingDir}`,
+    ...(task.projectId ? [`Project: ${task.projectId}`, ...(task.project?.repo ? [`Repository: ${task.project.repo}`] : [])] : []),
+    `Working directory: ${task.project?.workingDir ?? config.workingDir}`,
     "Start by moving there; every path below is relative to it.",
     "",
     "What was asked for:",

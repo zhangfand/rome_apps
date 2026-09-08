@@ -2,7 +2,8 @@ name: setup
 type: custom
 description: >-
   Configure the Manager and register its recurring reconcile. Takes the absolute
-  source project directory (inside a Git repo), plus optional caps. Workers get isolated worktrees. Safe to run again — it updates
+  source project directory (legacy) or a projects map with per-project repo and directory,
+  plus optional global caps. Workers get isolated worktrees. Safe to run again — it updates
   the config and re-registers the routine only when the cadence changed.
 entry: ./index.ts
 complexity: simple

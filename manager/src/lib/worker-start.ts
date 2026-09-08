@@ -4,6 +4,7 @@ import type { NewFact, StartedFact } from "./facts.js";
 import { foldTask } from "./fold.js";
 import { buildWorkerPrompt } from "./prompt.js";
 import { bindWorkspacePrompt, prepareWorkspace, reusableWorkspace } from "./worktree.js";
+import { configForTask } from "./projects.js";
 
 /** The I/O boundary: prepare -> record the exact workspace/brief -> launch. */
 export async function prepareWorkerStart(
@@ -13,9 +14,11 @@ export async function prepareWorkerStart(
 ): Promise<string> {
   const payload = fact.payload as StartedFact["payload"];
   const history = ledger.factsFor(fact.taskId);
+  const task = foldTask(history);
   const previous = reusableWorkspace(history);
   let prepared: NewFact;
   try {
+    config = configForTask(config, task);
     const workspace = await prepareWorkspace({
       workingDir: config.workingDir,
       taskId: fact.taskId,
@@ -34,6 +37,8 @@ export async function prepareWorkerStart(
     });
     prepared = { ...fact, payload: {
       ...payload,
+      projectId: task.projectId,
+      project: task.project,
       resumeSessionId: canResume ? payload.resumeSessionId : undefined,
       workspace,
       prompt: bindWorkspacePrompt(prompt, workspace, config.workingDir),

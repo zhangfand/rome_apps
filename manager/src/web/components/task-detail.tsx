@@ -93,6 +93,7 @@ export function TaskDetail({ taskId }: { taskId: string }) {
           <header className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <TaskName handle={handle} rawId={task.id} size="section" />
+              {task.projectId ? <span className="rounded-4 bg-surface-muted px-1.5 text-aux text-muted-foreground" title={task.project?.workingDir}>{task.projectId}</span> : null}
               <span className="inline-flex items-center gap-1.5">
                 <TaskStateBadge state={task.state} />
                 {task.position ? <PositionBadge position={task.position} /> : null}

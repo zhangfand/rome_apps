@@ -227,7 +227,7 @@ export async function summonWithFallback(input: {
     task,
     config: managerConfig,
     reason: `resuming session ${resumeSessionId} was rejected: ${first.error}`,
-  }), started.payload.workspace, managerConfig.workingDir);
+  }), started.payload.workspace, started.payload.project?.workingDir ?? task.project?.workingDir ?? managerConfig.workingDir);
 
   ledger.append({
     taskId,

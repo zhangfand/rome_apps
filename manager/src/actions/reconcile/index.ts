@@ -24,6 +24,7 @@ import { endedByIssues, type IssueStatus, issuesToWatch } from "../../lib/observ
 import { LOST_STOPPED, reconcile, type ReconcileAction } from "../../lib/reconcile.js";
 
 import { prepareWorkerStart } from "../../lib/worker-start.js";
+import { intakeRoutes, legacyBindingFacts } from "../../lib/projects.js";
 
 const log = createAppLogger("manager:reconcile");
 
@@ -53,11 +54,6 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         return { status: "ok", data: { skipped: "ledger unreachable" } };
       }
 
-      const managerConfig = settings.get();
-      if (!managerConfig) {
-        return { status: "error", error: "manager is not configured. Run manager:setup first." };
-      }
-
       // A second pass arriving while one runs returns immediately; the pass
       // that holds the lock, or the next tick, sees whatever it missed.
       if (!locks.tryAcquire(RECONCILE_LOCK, LOCK_LEASE_MS)) {
@@ -65,6 +61,9 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       }
 
       try {
+        const managerConfig = settings.get();
+        if (!managerConfig) return { status: "error", error: "manager is not configured. Run manager:setup first." };
+        for (const fact of legacyBindingFacts(ledger.all(), managerConfig)) ledger.append(fact);
         // Ask GitHub first. Intake before observe, so an issue labeled and
         // closed between two passes is opened and then ended in the same one,
         // leaving a complete record rather than no task at all. Both run
@@ -109,14 +108,16 @@ async function intakeIssues(
   config: ManagerConfig,
   appContext: AppActionRuntimeDeps["appContext"],
 ): Promise<string[]> {
-  if (config.intakeRepos.length === 0) return [];
+  const routes = intakeRoutes(config);
+  if (routes.length === 0) return [];
 
   const issues: IntakeIssue[] = [];
-  for (const repo of config.intakeRepos) {
+  const polls = [...new Map(routes.map((r) => [JSON.stringify([r.repo, r.labels]), r])).values()];
+  for (const { repo, labels } of polls) {
     for (let page = 1; page <= MAX_INTAKE_PAGES; page += 1) {
       const result = await appContext.runAction("connector:connector_proxy", {
         toolkit: "github",
-        path: intakeApiPath(repo, config.intakeLabel, page),
+        path: intakeApiPath(repo, labels.join(","), page),
         method: "GET",
       });
       if (result.status !== "ok") {
@@ -146,6 +147,7 @@ async function intakeIssues(
     snapshot,
     issues,
     label: config.intakeLabel,
+    routes,
     newTaskId: () => `t-${crypto.randomUUID().slice(0, 8)}`,
   });
 

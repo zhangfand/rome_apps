@@ -16,6 +16,7 @@ export type UnstampedFact = Omit<NewFact, "by"> & { source: string };
 export async function writePersonFact(
   appContext: RomeAppContext,
   unstamped: UnstampedFact,
+  reconcileNow = true,
 ): Promise<ActionResult> {
   const ledger = createLedgerRepository(appContext.db);
   if (!ledger.reachable()) {
@@ -24,7 +25,7 @@ export async function writePersonFact(
 
   const fact = ledger.append({ ...unstamped, by: personFromContext() } as NewFact);
 
-  await appContext.runAction("manager:reconcile", {});
+  if (reconcileNow) await appContext.runAction("manager:reconcile", {});
 
   return { status: "ok", data: summarize(fact, ledger.factsFor(unstamped.taskId)) };
 }

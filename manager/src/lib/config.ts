@@ -1,5 +1,10 @@
+import path from "node:path";
+import type { ProjectConfig } from "./projects.js";
+
 /** Everything `manager:setup` stores and every action reads back. */
 export interface ManagerConfig {
+  projects?: Record<string, ProjectConfig>;
+  defaultProject?: string;
   /** Absolute source directory; workers use the same relative path in isolated Git worktrees. */
   workingDir: string;
   /** Canonical id of the agent a worker runs. */
@@ -95,7 +100,43 @@ function positiveInt(value: unknown, fallback: number, max: number): number {
  */
 export function parseConfig(raw: unknown): ParseConfigResult {
   const args = (raw ?? {}) as Record<string, unknown>;
-  const workingDir = typeof args.workingDir === "string" ? args.workingDir.trim() : "";
+  let projects: Record<string, ProjectConfig> | undefined;
+  let defaultProject: string | undefined;
+  if (args.projects !== undefined) {
+    if (!args.projects || typeof args.projects !== "object" || Array.isArray(args.projects) || !Object.keys(args.projects).length) {
+      return { ok: false, error: "projects must be a nonempty map of project id to configuration" };
+    }
+    projects = {};
+    for (const [id, rawProject] of Object.entries(args.projects)) {
+      if (!/^[a-z][a-z0-9_-]*$/.test(id) || ["constructor", "prototype", "__proto__"].includes(id)) return { ok: false, error: `Invalid project id: ${id}` };
+      if (!rawProject || typeof rawProject !== "object" || Array.isArray(rawProject)) return { ok: false, error: `Invalid project: ${id}` };
+      const p = rawProject as Record<string, unknown>;
+      if (typeof p.workingDir !== "string" || !p.workingDir.trim().startsWith("/") || p.workingDir.includes("\0")) return { ok: false, error: `projects.${id}.workingDir must be an absolute path` };
+      const repo = p.repo === undefined ? undefined : parseRepoList([p.repo]);
+      if (repo && (repo.invalid.length || repo.repos.length !== 1)) return { ok: false, error: `projects.${id}.repo must be owner/name` };
+      for (const field of ["intakeLabel", "projectLabel"] as const) {
+        if (p[field] !== undefined && (typeof p[field] !== "string" || !p[field].trim() || p[field].includes(","))) return { ok: false, error: `projects.${id}.${field} must be one nonblank label (no commas)` };
+      }
+      if (p.intakeEnabled !== undefined && typeof p.intakeEnabled !== "boolean") return { ok: false, error: `projects.${id}.intakeEnabled must be boolean` };
+      projects[id] = { workingDir: path.normalize(p.workingDir.trim()),
+        ...(repo ? { repo: repo.repos[0].toLowerCase() } : {}),
+        ...(p.intakeEnabled !== undefined ? { intakeEnabled: p.intakeEnabled as boolean } : {}),
+        ...(p.intakeLabel ? { intakeLabel: (p.intakeLabel as string).trim() } : {}),
+        ...(p.projectLabel ? { projectLabel: (p.projectLabel as string).trim() } : {}),
+      };
+    }
+    defaultProject = typeof args.defaultProject === "string" ? args.defaultProject : Object.keys(projects)[0];
+    if (!Object.hasOwn(projects, defaultProject)) return { ok: false, error: `Unknown defaultProject: ${defaultProject}` };
+    if (parseRepoList(args.intakeRepos).repos.length) return { ok: false, error: "Use projects.<id>.repo for intake with projects; do not also set intakeRepos" };
+    const watched = Object.entries(projects).filter(([, p]) => p.repo && p.intakeEnabled !== false);
+    for (const [id, p] of watched) {
+      const siblings = watched.filter(([, other]) => other.repo === p.repo);
+      if (siblings.length > 1 && (!p.projectLabel || siblings.some(([otherId, other]) => otherId !== id && other.projectLabel?.toLowerCase() === p.projectLabel?.toLowerCase()))) {
+        return { ok: false, error: `Projects sharing ${p.repo} must each have a distinct projectLabel` };
+      }
+    }
+  }
+  const workingDir = projects ? projects[defaultProject!].workingDir : typeof args.workingDir === "string" ? args.workingDir.trim() : "";
   if (!workingDir.startsWith("/")) {
     return {
       ok: false,
@@ -112,6 +153,7 @@ export function parseConfig(raw: unknown): ParseConfigResult {
     ok: true,
     config: {
       workingDir,
+      ...(projects ? { projects, defaultProject } : {}),
       workerAgent,
       startCap: positiveInt(args.startCap, DEFAULT_START_CAP, 20),
       maxWorkers: positiveInt(args.maxWorkers, DEFAULT_MAX_WORKERS, 20),

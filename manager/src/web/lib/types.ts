@@ -4,6 +4,7 @@ export type TaskState = "created" | "taken" | "completed" | "cancelled";
 export type Position = "working" | "waiting" | "stuck" | "reported";
 export type WorkerStatus = "running" | "returned" | "failed" | "lost";
 export type FactKind =
+  | "Bound"
   | "Created"
   | "Taken"
   | "Completed"
@@ -20,6 +21,7 @@ export type FactKind =
   | "Reply";
 
 export const FACT_KINDS: FactKind[] = [
+  "Bound",
   "Created",
   "Taken",
   "Completed",
@@ -49,6 +51,7 @@ export interface FactSummary {
 }
 
 export interface WorkerSummary {
+  projectId?: string;
   workerId: string;
   taskId: string;
   taskBrief: string;
@@ -66,6 +69,8 @@ export interface WorkerSummary {
 }
 
 export interface TaskSummary {
+  projectId?: string;
+  project?: { workingDir: string; repo?: string };
   id: string;
   brief: string;
   state: TaskState;
@@ -83,6 +88,8 @@ export interface TaskSummary {
 }
 
 export interface ManagerConfig {
+  projects?: Record<string, { workingDir: string; repo?: string }>;
+  defaultProject?: string;
   workingDir: string;
   workerAgent: string;
   startCap: number;
@@ -92,6 +99,8 @@ export interface ManagerConfig {
 }
 
 export interface DashboardView {
+  projects?: string[];
+  projectId?: string;
   now: string;
   configured: boolean;
   config?: ManagerConfig;
@@ -108,6 +117,8 @@ export interface DashboardView {
 }
 
 export interface TaskDetail {
+  projectId?: string;
+  project?: { workingDir: string; repo?: string };
   id: string;
   brief: string;
   state: TaskState;

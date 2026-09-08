@@ -30,6 +30,7 @@ export function chatAbout(taskId: string, handle: TaskHandle, kind: "Question" |
 }
 
 export function AttentionPanel({
+  projectId,
   taskId,
   handle,
   brief,
@@ -40,6 +41,7 @@ export function AttentionPanel({
   showOpen = true,
   names,
 }: {
+  projectId?: string;
   taskId: string;
   handle: TaskHandle;
   /** Shown when the panel stands alone (the dashboard), not on the task page that already shows it. */
@@ -75,6 +77,7 @@ export function AttentionPanel({
     >
       <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <TaskName handle={titleHandle} rawId={taskId} />
+        {projectId ? <span className="rounded-4 bg-surface-muted px-1.5 text-aux text-muted-foreground">{projectId}</span> : null}
         <span className={cn("text-aux font-medium", isQuestion ? "text-warning-fg" : "text-info-fg")}>
           {isQuestion ? "Decision needed" : "Report ready"}
         </span>

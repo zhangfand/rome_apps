@@ -7,6 +7,9 @@ import type {
 import { createLedgerRepository } from "../../db/repositories/ledger.js";
 import { describeFact } from "../../lib/facts.js";
 import { fold } from "../../lib/fold.js";
+import { createSettingsRepository } from "../../db/repositories/settings.js";
+import { configuredProjects } from "../../lib/projects.js";
+import { getCurrentActionContext } from "@rome-os/app-runtime";
 
 /** How many recent facts each task carries into the summary. */
 const HISTORY_LINES = 6;
@@ -46,6 +49,8 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         .map((task) => ({
           id: task.id,
           brief: task.brief,
+          projectId: task.projectId,
+          project: task.project,
           state: task.state,
           position: task.position,
           waiting: task.waiting,
@@ -53,7 +58,10 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
           history: task.facts.slice(-HISTORY_LINES).map(describeFact),
         }));
 
-      return { status: "ok", data: { tasks } };
+      const settings = createSettingsRepository(appContext.db).get();
+      const context = getCurrentActionContext()?.channelContext;
+      return { status: "ok", data: { tasks, projects: settings ? configuredProjects(settings) : {},
+        selectedProject: { name: context?.projectName, path: context?.projectPath } } };
     },
   };
 }

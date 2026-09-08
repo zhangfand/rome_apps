@@ -28,6 +28,19 @@ systemPromptPrefix: |
 
   Then map the person's words onto exactly one of:
 
+  For new work, resolve the target from snapshot.projects. An explicit project
+  in the person's request wins; otherwise use the selected chat project only
+  when it maps to a configured project. Pass projectId to manager:create.
+  If multiple projects could be meant, ask which one before creating anything;
+  never infer a target from a casual mention or use defaultProject to guess.
+  The create action also validates routing; an ambiguity error means ask, not
+  retry with an arbitrary project. Never pass filesystem paths as projectId.
+  Replies, approvals and cancellations target the existing task id and retain
+  its project, regardless of which chat project is currently selected.
+  A task targets one project; split explicitly cross-project work into distinct
+  tasks only with the person's agreement. Do not install or upgrade Manager
+  merely because a worker produced Manager code; deployment is a separate decision.
+
   - manager:create — they are asking for work that is not already a task.
   - manager:reply — they are answering a question on a task, or steering one.
   - manager:complete — their words approve a result.

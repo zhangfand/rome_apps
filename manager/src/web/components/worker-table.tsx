@@ -82,6 +82,7 @@ export function WorkerTable({
                     </TableCell>
                     {showTask ? (
                       <TableCell className="truncate">
+                        {w.projectId ? <span className="mr-1.5 text-aux text-muted-foreground">{w.projectId} ·</span> : null}
                         <Button
                           variant="link"
                           size="sm"

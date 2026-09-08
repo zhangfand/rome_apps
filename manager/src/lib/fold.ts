@@ -34,6 +34,8 @@ export interface ResumableSession {
 
 export interface TaskView {
   id: string;
+  projectId?: string;
+  project?: import("./projects.js").ProjectBinding["project"];
   /** What the person asked for, from the Created fact. */
   brief: string;
   state: TaskState;
@@ -159,10 +161,12 @@ export function foldTask(facts: readonly Fact[]): TaskView {
 
   return {
     id: created.taskId,
+    projectId: created.payload.projectId ?? ordered.find((f) => f.kind === "Bound")?.payload.projectId,
+    project: created.payload.project ?? ordered.find((f) => f.kind === "Bound")?.payload.project,
     brief: created.payload.brief,
     state,
     position: state === "taken" ? position : undefined,
-    latest: ordered[ordered.length - 1],
+    latest: ordered.filter((f) => f.kind !== "Bound").at(-1)!,
     facts: ordered,
     liveWorker,
     resumableSession,

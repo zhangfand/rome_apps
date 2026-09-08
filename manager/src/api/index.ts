@@ -27,6 +27,7 @@ class ManagerApiHandler implements RomeAppApiHandler {
         if (!ledger.reachable()) return json({ error: "the ledger is unreachable" }, 503);
         const limit = clampInt(request.query.get("ledgerLimit"), 200, 1, 2000);
         const view = buildView({
+          projectId: request.query.get("projectId") || undefined,
           now: new Date(),
           facts: ledger.all(),
           config: settings.get(),
@@ -43,6 +44,8 @@ class ManagerApiHandler implements RomeAppApiHandler {
         const task = foldTask(facts);
         return json({
           id: task.id,
+          projectId: task.projectId,
+          project: task.project,
           brief: task.brief,
           state: task.state,
           position: task.position,

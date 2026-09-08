@@ -1,5 +1,6 @@
 import { replyText, type ReplyRepair, type WorkerReply } from "./worker-reply.js";
 import type { WorkerWorkspace } from "./worktree.js";
+import type { ProjectBinding } from "./projects.js";
 
 /**
  * The ledger's vocabulary. Every fact kind is named by one rule: a participle
@@ -23,7 +24,7 @@ export const EXECUTION_KINDS = ["Started", "Opened", "Restarted", "Returned", "F
 /** Dialogue facts. The runtime asks and reports; a person replies. */
 export const DIALOGUE_KINDS = ["Question", "Report", "Reply"] as const;
 
-export const FACT_KINDS = [...TASK_STATE_KINDS, ...EXECUTION_KINDS, ...DIALOGUE_KINDS] as const;
+export const FACT_KINDS = [...TASK_STATE_KINDS, ...EXECUTION_KINDS, ...DIALOGUE_KINDS, "Bound"] as const;
 
 export type FactKind = (typeof FACT_KINDS)[number];
 
@@ -106,6 +107,8 @@ export type CreatedFact = FactOf<
   "Created",
   {
     brief: string;
+    projectId?: string;
+    project?: ProjectBinding["project"];
     /** Set when the task was taken in from a GitHub issue rather than a chat. */
     issue?: IssueOrigin;
   }
@@ -124,6 +127,8 @@ export interface IssueOrigin {
   label: string;
 }
 export type TakenFact = FactOf<"Taken", Record<string, never>>;
+/** Legacy migration metadata. Does not change scheduling, position or retry budgets. */
+export type BoundFact = FactOf<"Bound", ProjectBinding>;
 export type CompletedFact = FactOf<
   "Completed",
   {
@@ -154,6 +159,8 @@ export type StartedFact = FactOf<
   {
     workerId: string;
     prompt: string;
+    projectId?: string;
+    project?: ProjectBinding["project"];
     /** Session this worker continues. Absent means it starts fresh. */
     resumeSessionId?: string;
     /** Absent on historical starts whose workers were taught the old prose protocol. */
@@ -218,6 +225,7 @@ export type ReplyFact = FactOf<"Reply", { text: string }>;
 
 export type Fact =
   | CreatedFact
+  | BoundFact
   | TakenFact
   | CompletedFact
   | CancelledFact
@@ -260,6 +268,8 @@ export function describeFact(fact: Fact): string {
         return fact.payload.brief;
       case "Taken":
         return "";
+      case "Bound":
+        return `project ${fact.payload.projectId}: ${fact.payload.project.workingDir}`;
       case "Completed":
       case "Cancelled":
         return fact.payload.reason ?? "";

@@ -51,6 +51,7 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
 }
 
 function Dashboard({ tab }: { tab: Tab }) {
+  const [projectId, setProjectId] = useState("");
   const [view, setView] = useState<DashboardView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,7 +61,7 @@ function Dashboard({ tab }: { tab: Tab }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetchAppApi(`state?ledgerLimit=${LEDGER_LIMIT}`);
+      const res = await fetchAppApi(`state?ledgerLimit=${LEDGER_LIMIT}&projectId=${encodeURIComponent(projectId)}`);
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         setError(body.error ?? `HTTP ${res.status}`);
@@ -74,7 +75,7 @@ function Dashboard({ tab }: { tab: Tab }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     void load();
@@ -140,6 +141,16 @@ function Dashboard({ tab }: { tab: Tab }) {
         </div>
         {view ? <Tally view={view} /> : null}
         {view?.config ? <ConfigLine view={view} /> : null}
+        {view?.projects?.length ? (
+          <label className="flex items-center gap-2 text-aux text-muted-foreground">
+            Project
+            <select aria-label="Filter by project" value={projectId} onChange={(e) => setProjectId(e.target.value)}
+              className="max-w-full rounded-6 border border-border bg-surface px-2 py-1 text-ui text-foreground focus-visible:outline-2 focus-visible:outline-ring">
+              <option value="">All projects</option>
+              {view.projects.map((id) => <option key={id} value={id}>{id}</option>)}
+            </select>
+          </label>
+        ) : null}
       </header>
 
       {error ? (
@@ -184,6 +195,7 @@ function Dashboard({ tab }: { tab: Tab }) {
                 <AttentionPanel
                   key={task.id}
                   taskId={task.id}
+                  projectId={task.projectId}
                   handle={handles.get(task.id) ?? handleOf(task)}
                   brief={task.brief}
                   kind={task.attention!.kind}
@@ -273,7 +285,7 @@ function Tally({ view }: { view: DashboardView }) {
     {
       label: "running",
       value: config ? `${counts.workers.running} of ${config.maxWorkers}` : counts.workers.running,
-      hint: "Live workers over the configured cap",
+      hint: "Workers in this view over the global cap across all projects",
     },
     { label: "closed", value: counts.tasks.completed + counts.tasks.cancelled, hint: "Completed + Cancelled" },
     { label: "facts", value: counts.facts, hint: "Rows in the append-only ledger" },
@@ -298,7 +310,7 @@ function ConfigLine({ view }: { view: DashboardView }) {
   const c = view.config!;
   return (
     <p className="text-aux text-subtle-foreground">
-      Working in{" "}
+      {c.projects ? `${Object.keys(c.projects).length} projects · default directory ` : "Working in "}
       <span className="font-mono text-muted-foreground" title={c.workingDir}>
         {shortPath(c.workingDir)}
       </span>{" "}

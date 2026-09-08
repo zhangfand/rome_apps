@@ -7,6 +7,9 @@ import {
   type RomeAppContext,
 } from "@rome-os/app-runtime";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
+import { createLedgerRepository } from "../../db/repositories/ledger.js";
+import { createLockRepository, RECONCILE_LOCK } from "../../db/repositories/lock.js";
+import { legacyBindingFacts } from "../../lib/projects.js";
 import {
   DEFAULT_AGE_CAP_HOURS,
   DEFAULT_CLOSE_ON_ISSUE_CLOSED,
@@ -37,6 +40,18 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
     inputSchema: {
       type: "object",
       properties: {
+        projects: {
+          type: "object",
+          description: "Named projects. Each has workingDir, optional repo (owner/name; enables intake), intakeEnabled, intakeLabel, and projectLabel. Projects sharing a repo require distinct projectLabels. Replaces legacy workingDir/intakeRepos configuration.",
+          additionalProperties: {
+            type: "object", required: ["workingDir"], additionalProperties: false,
+            properties: {
+              workingDir: { type: "string" }, repo: { type: "string" },
+              intakeEnabled: { type: "boolean" }, intakeLabel: { type: "string" }, projectLabel: { type: "string" },
+            },
+          },
+        },
+        defaultProject: { type: "string", description: "Default project id for configuration compatibility. Does not silently route ambiguous human requests. Existing tasks retain their recorded binding." },
         workingDir: {
           type: "string",
           description: "Absolute source project directory inside a Git repository. Workers run in isolated worktrees, preserving this repo-relative path.",
@@ -80,7 +95,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
           description: `The label an issue must carry to be taken in as a task. Defaults to "${DEFAULT_INTAKE_LABEL}".`,
         },
       },
-      required: ["workingDir"],
+      anyOf: [{ required: ["workingDir"] }, { required: ["projects"] }],
       additionalProperties: true,
     },
 
@@ -96,9 +111,18 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       const parsed = parseConfig(args);
       if (!parsed.ok) return { status: "error", error: parsed.error };
 
-      createSettingsRepository(appContext.db).put(parsed.config);
-
-      const routine = await ensureRoutine(appContext, parsed.config);
+      const locks = createLockRepository(appContext.db);
+      if (!locks.tryAcquire(RECONCILE_LOCK, 5 * 60_000)) return { status: "error", error: "Manager is reconciling; retry setup shortly. Configuration was not changed." };
+      let routine: Awaited<ReturnType<typeof ensureRoutine>>;
+      try {
+        const settings = createSettingsRepository(appContext.db);
+        const ledger = createLedgerRepository(appContext.db);
+        if (!ledger.reachable()) return { status: "error", error: "Ledger unavailable; configuration was not changed." };
+        // Bind from OLD settings before replacing them. A crash midway is safe to retry.
+        for (const fact of legacyBindingFacts(ledger.all(), settings.get() ?? parsed.config)) ledger.append(fact);
+        settings.put(parsed.config);
+        routine = await ensureRoutine(appContext, parsed.config);
+      } finally { locks.release(RECONCILE_LOCK); }
       if (!routine.ok) return { status: "error", error: routine.error };
 
       log.info("setup finished", { config: parsed.config, routine: routine.outcome });

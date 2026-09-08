@@ -122,6 +122,7 @@ function TaskRow({
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           {handle ? <TaskName handle={handle} rawId={task.id} /> : <span className="font-mono">{task.id}</span>}
+          {task.projectId ? <span className="rounded-4 bg-surface-muted px-1.5 text-aux text-muted-foreground" title={task.project?.workingDir}>{task.projectId}</span> : null}
           <span className="text-aux text-muted-foreground">{stateLabel(task.state, task.position)}</span>
           <span className="ml-auto text-aux text-muted-foreground tabular-nums" title={task.updatedAt}>
             {task.latest.kind} · {formatRelative(task.updatedAt, now)}

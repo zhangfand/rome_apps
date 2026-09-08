@@ -1,6 +1,7 @@
 import { type CreatedFact, githubPerson, type NewFact } from "./facts.js";
 import type { LedgerSnapshot } from "./fold.js";
 import { issueRefsIn } from "./github-refs.js";
+import { routeIssue, type IntakeRoute } from "./projects.js";
 
 /**
  * Taking a task in from GitHub. A chat is not the only place a person asks
@@ -35,6 +36,7 @@ export interface IntakeIssue {
   author: string;
   state: "open" | "closed";
   isPullRequest: boolean;
+  labels?: string[];
 }
 
 /**
@@ -64,6 +66,7 @@ export function intakeFacts(input: {
   snapshot: LedgerSnapshot;
   issues: readonly IntakeIssue[];
   label: string;
+  routes?: readonly IntakeRoute[];
   newTaskId: () => string;
 }): NewFact[] {
   const { snapshot, issues, label, newTaskId } = input;
@@ -72,21 +75,24 @@ export function intakeFacts(input: {
   for (const issue of issues) {
     if (issue.isPullRequest || issue.state !== "open") continue;
     if (tracked.has(issue.url)) continue;
+    const route = input.routes ? routeIssue(input.routes, issue.repo, issue.labels ?? []) : undefined;
+    if (input.routes && !route) continue;
     tracked.add(issue.url);
     out.push({
       taskId: newTaskId(),
       kind: "Created",
       by: githubPerson(issue.author),
-      source: `issue labeled "${label}" on GitHub: ${issue.url}`,
+      source: `issue labeled "${route?.labels.join(", ") ?? label}" on GitHub: ${issue.url}`,
       payload: {
         brief: briefFromIssue(issue),
+        ...(route ? { projectId: route.projectId, project: route.project } : {}),
         issue: {
           url: issue.url,
           repo: issue.repo,
           number: issue.number,
           title: issue.title,
           author: issue.author,
-          label,
+          label: route?.labels.join(", ") ?? label,
         },
       },
     });
@@ -193,5 +199,9 @@ export function toIntakeIssue(repo: string, raw: Record<string, unknown>): Intak
     author: typeof user?.login === "string" ? user.login : "unknown",
     state: raw.state === "closed" ? "closed" : "open",
     isPullRequest: Boolean(raw.pull_request),
+    labels: Array.isArray(raw.labels) ? raw.labels.flatMap((label) => {
+      const name = typeof label === "string" ? label : label && typeof label === "object" ? (label as { name?: unknown }).name : undefined;
+      return typeof name === "string" ? [name] : [];
+    }) : [],
   };
 }

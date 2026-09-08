@@ -3,6 +3,7 @@ import type { WorkerWorkspace } from "./worktree.js";
 import type { ManagerConfig } from "./config.js";
 import { type Fact, type FactKind, describeFact } from "./facts.js";
 import { fold, type Position, type TaskState } from "./fold.js";
+import { configuredProjects, type ProjectBinding } from "./projects.js";
 
 /**
  * The dashboard's read model. Like everything else in this app it is a fold
@@ -27,6 +28,7 @@ export interface FactSummary {
 }
 
 export interface WorkerSummary {
+  projectId?: string;
   workerId: string;
   taskId: string;
   taskBrief: string;
@@ -51,6 +53,8 @@ export interface WorkerSummary {
 }
 
 export interface TaskSummary {
+  projectId?: string;
+  project?: ProjectBinding["project"];
   id: string;
   brief: string;
   state: TaskState;
@@ -71,6 +75,8 @@ export interface TaskSummary {
 }
 
 export interface DashboardView {
+  projects?: string[];
+  projectId?: string;
   now: string;
   configured: boolean;
   config?: ManagerConfig;
@@ -88,6 +94,7 @@ export interface DashboardView {
 }
 
 export interface BuildViewInput {
+  projectId?: string;
   now: Date;
   facts: readonly Fact[];
   config?: ManagerConfig;
@@ -116,6 +123,9 @@ export function workersOf(
   now: Date,
 ): WorkerSummary[] {
   const workers: WorkerSummary[] = [];
+  const created = facts.find((f) => f.kind === "Created");
+  const bound = facts.find((f) => f.kind === "Bound");
+  const projectId = created?.payload.projectId ?? bound?.payload.projectId;
   for (const fact of facts) {
     if (fact.kind !== "Started") continue;
     const terminal = facts.find(
@@ -163,6 +173,7 @@ export function workersOf(
           candidate.payload.workerId === fact.payload.workerId,
       );
     workers.push({
+      projectId,
       workerId: fact.payload.workerId,
       taskId,
       taskBrief: brief,
@@ -192,7 +203,14 @@ export function workersOf(
 }
 
 export function buildView(input: BuildViewInput): DashboardView {
-  const { now, facts, config, lock } = input;
+  const { now, config, lock } = input;
+  const allTasks = fold(now, input.facts).tasks;
+  const projects = [...new Set([
+    ...Object.keys(config ? configuredProjects(config) : {}),
+    ...allTasks.flatMap((task) => task.projectId ? [task.projectId] : []),
+  ])].sort();
+  const wanted = new Set(allTasks.filter((task) => task.projectId === input.projectId).map((task) => task.id));
+  const facts = input.projectId ? input.facts.filter((fact) => wanted.has(fact.taskId)) : input.facts;
   const snapshot = fold(now, facts);
 
   const tasks: TaskSummary[] = snapshot.tasks.map((task) => {
@@ -224,6 +242,8 @@ export function buildView(input: BuildViewInput): DashboardView {
 
     return {
       id: task.id,
+      projectId: task.projectId,
+      project: task.project,
       brief: task.brief,
       state: task.state,
       position: task.position,
@@ -263,6 +283,8 @@ export function buildView(input: BuildViewInput): DashboardView {
   const held = lock !== undefined && lock.heldUntil > now.getTime();
 
   return {
+    projects,
+    projectId: input.projectId,
     now: now.toISOString(),
     configured: config !== undefined,
     config,
