@@ -1,6 +1,6 @@
 /** Everything `manager:setup` stores and every action reads back. */
 export interface ManagerConfig {
-  /** Absolute directory every worker is told to work in. */
+  /** Absolute source directory; workers use the same relative path in isolated Git worktrees. */
   workingDir: string;
   /** Canonical id of the agent a worker runs. */
   workerAgent: string;

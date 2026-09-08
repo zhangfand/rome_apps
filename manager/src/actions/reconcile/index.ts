@@ -9,7 +9,7 @@ import { createLedgerRepository, type LedgerRepository } from "../../db/reposito
 import { createLockRepository, RECONCILE_LOCK } from "../../db/repositories/lock.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import type { ManagerConfig } from "../../lib/config.js";
-import { RUNTIME } from "../../lib/facts.js";
+import { RUNTIME, isWorkerTerminalKind } from "../../lib/facts.js";
 import { fold } from "../../lib/fold.js";
 import { issueApiPath } from "../../lib/github-refs.js";
 import {
@@ -22,6 +22,8 @@ import {
 import { judge } from "../../lib/judge.js";
 import { endedByIssues, type IssueStatus, issuesToWatch } from "../../lib/observe.js";
 import { LOST_STOPPED, reconcile, type ReconcileAction } from "../../lib/reconcile.js";
+
+import { prepareWorkerStart } from "../../lib/worker-start.js";
 
 const log = createAppLogger("manager:reconcile");
 
@@ -83,7 +85,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
 
         const applied: string[] = [...taken, ...observed];
         for (const action of actions) {
-          applied.push(await apply(action, ledger, appContext));
+          applied.push(await apply(action, ledger, appContext, managerConfig));
         }
 
         log.info("reconcile finished", { tasks: snapshot.tasks.length, applied: applied.length });
@@ -223,14 +225,22 @@ async function apply(
   action: ReconcileAction,
   ledger: LedgerRepository,
   appContext: AppActionRuntimeDeps["appContext"],
+  managerConfig: ManagerConfig,
 ): Promise<string> {
   switch (action.type) {
     case "append": {
+      if (action.fact.kind === "Started") {
+        return prepareWorkerStart(action.fact, ledger, managerConfig);
+      }
       const fact = ledger.append(action.fact);
       return `${fact.kind}(${fact.taskId})`;
     }
 
     case "launch": {
+      if (ledger.factsFor(action.taskId).some((fact) => isWorkerTerminalKind(fact.kind) &&
+          (fact.payload as { workerId?: string }).workerId === action.workerId)) {
+        return `skip launch(${action.workerId}): worker already closed`;
+      }
       // Detached, so the worker's run is a root execution with its own
       // lifetime: this pass returns as soon as main accepts it.
       const receipt = await appContext.runAction(

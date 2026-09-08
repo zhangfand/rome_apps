@@ -1,3 +1,4 @@
+import type { WorkerWorkspace } from "./worktree.js";
 import type { ManagerConfig } from "./config.js";
 import { type Fact, type FactKind, describeFact } from "./facts.js";
 import { fold, type Position, type TaskState } from "./fold.js";
@@ -38,6 +39,8 @@ export interface WorkerSummary {
   startedSeq: number;
   /** Session the worker was told to continue, if it did not start fresh. */
   resumedSessionId?: string;
+  /** Isolated checkout recorded before the worker launches. */
+  workspace?: WorkerWorkspace;
   /** Set when the resume was rejected and the worker ran in a fresh session instead. */
   restarted?: { rejectedSessionId: string; error: string };
   /** Session the worker ran in, once it has reported back. */
@@ -166,6 +169,7 @@ export function workersOf(
       outcome,
       startedSeq: fact.seq,
       resumedSessionId: fact.payload.resumeSessionId,
+      workspace: fact.payload.workspace,
       romeSession:
         opened?.kind === "Opened"
           ? { id: opened.payload.romeSessionId, type: opened.payload.sessionType }

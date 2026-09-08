@@ -1,0 +1,5 @@
+/* Rome's design-token layer: Tailwind + tw-animate-css + the host theme
+   vocabulary. The host mounts this bundle in a Shadow DOM and the tokens are
+   inherited from the live host theme, so a UI built only from the registered
+   utilities follows light/dark and the active theme with no `dark:` variants. */
+@import "@rome-os/app-web-sdk/styles";

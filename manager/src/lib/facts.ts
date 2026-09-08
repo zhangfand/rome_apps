@@ -1,3 +1,5 @@
+import type { WorkerWorkspace } from "./worktree.js";
+
 /**
  * The ledger's vocabulary. Every fact kind is named by one rule: a participle
  * is something that happened, a noun is something somebody said.
@@ -152,6 +154,8 @@ export type StartedFact = FactOf<
     prompt: string;
     /** Session this worker continues. Absent means it starts fresh. */
     resumeSessionId?: string;
+    /** Isolated checkout prepared before launch; absent on legacy facts. */
+    workspace?: WorkerWorkspace;
   }
 >;
 /**
@@ -243,10 +247,11 @@ export function describeFact(fact: Fact): string {
       case "Completed":
       case "Cancelled":
         return fact.payload.reason ?? "";
-      case "Started":
-        return fact.payload.resumeSessionId
-          ? `worker ${fact.payload.workerId}, resuming session ${fact.payload.resumeSessionId}`
-          : `worker ${fact.payload.workerId}`;
+      case "Started": {
+        const session = fact.payload.resumeSessionId ? `, resuming session ${fact.payload.resumeSessionId}` : "";
+        const workspace = fact.payload.workspace ? ` in ${fact.payload.workspace.workingDir}` : "";
+        return `worker ${fact.payload.workerId}${session}${workspace}`;
+      }
       case "Opened":
         return `worker ${fact.payload.workerId} runs in session ${fact.payload.romeSessionId}`;
       case "Restarted":
