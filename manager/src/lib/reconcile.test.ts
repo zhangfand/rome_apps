@@ -16,6 +16,7 @@ const CONFIG: ManagerConfig = {
   ageCapHours: 3,
   intervalMinutes: 5,
   reuseSessions: true,
+  closeOnIssueClosed: true,
 };
 
 const ALWAYS_DONE: Judge = () => ({ done: true });

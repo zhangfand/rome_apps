@@ -5,7 +5,9 @@ correctness never depends on a session continuing.
 
 Tell it what you want in chat. It records the task in an append-only ledger,
 puts a coding session on it, retries what fails, asks you when it is stuck, and
-reports when there is something to look at. Only you close a task.
+reports when there is something to look at. A task ends when you say so, or
+when the GitHub issue you named in the brief is closed — as completed, or as
+not planned.
 
 This is a prototype of the "long-running agent, revision 3" model. Almost all of
 it is plain TypeScript; a model runs at exactly two points.
@@ -43,8 +45,8 @@ something somebody said.
 | --- | --- | --- |
 | `Created` | a person | `brief` |
 | `Taken` | the runtime | — |
-| `Completed` | a person | `reason?` |
-| `Cancelled` | a person | `reason?` |
+| `Completed` | a person, or `github` | `reason?`, `issues?` — the closed issues, when `github` wrote it |
+| `Cancelled` | a person, or `github` | `reason?`, `issues?` — the issues closed as not planned, when `github` wrote it |
 | `Started` | the runtime | `workerId`, `prompt`, `resumeSessionId?` |
 | `Opened` | the worker | `workerId`, `romeSessionId`, `sessionType` — the worker's Rome session, recorded the moment it exists so the dashboard can open a live worker |
 | `Restarted` | the worker | `workerId`, `rejectedSessionId`, `error`, `prompt` |
@@ -66,11 +68,40 @@ resume, the worker writes `Restarted` and runs fresh with a full brief. See
 [docs/session-reuse.md](docs/session-reuse.md); `reuseSessions: false` in
 `manager:setup` turns it off.
 
-**States** are about ownership: Created, Taken, Completed, Cancelled. Only a
-person ends a task, from Created or Taken. **Positions** live inside Taken and
-are never stored: `working` (the runtime's last word is a Started),
-`stuck` (a Question), `reported` (a Report). The runtime never leaves Taken on
-its own.
+**States** are about ownership: Created, Taken, Completed, Cancelled. A task
+ends from Created or Taken on a person's word, or when its issue closes
+(below); the runtime never ends one on its own reading of a worker's result.
+**Positions** live inside Taken and are never stored: `working` (the runtime's
+last word is a Started), `stuck` (a Question), `reported` (a Report). The
+runtime never leaves Taken on its own.
+
+## Ending from GitHub
+
+The issue a person names in the brief — `https://github.com/owner/repo/issues/N`
+or `owner/repo#N` — is the source of truth for whether the work is wanted and
+whether it is done. Every reconcile pass polls GitHub for each open task's
+issues and, once every one is closed, appends the ending GitHub reported:
+
+| GitHub says | Ledger gets |
+| --- | --- |
+| closed, `state_reason: completed` (or none, on older closes) | `Completed` by `github` |
+| closed, `state_reason: not_planned` or `duplicate` | `Cancelled` by `github` |
+
+The fact cites the issues as `source`, the way a person's fact cites their
+message, and lists them in `payload.issues`. A brief naming several issues
+ends when all are closed: Cancelled if every one was dropped, Completed if any
+was done.
+
+Only the brief counts — an issue a worker mentions is the worker's claim, not
+the person's ask. The task ends whatever its position; a worker still running
+on it is stopped by the usual terminal-task rule (recorded as `Lost`, since
+Rome cannot yet cancel a run — see Known gaps). Merging a pull request does
+nothing by itself; close the issue, or let a `Closes #N` in the PR do it.
+
+The poll goes through `connector:connector_proxy` (toolkit `github`), so the
+app never holds a token. If GitHub is not connected or a call fails, the pass
+logs it and leaves the task open until the next tick. `closeOnIssueClosed:
+false` in `manager:setup` turns the poll off.
 
 ## Setting it up
 
@@ -82,7 +113,9 @@ its own.
   "startCap": 2,                   // starts per task since the last person fact
   "maxWorkers": 3,                 // workers running at once, across tasks
   "ageCapHours": 3,                // silence before a worker is declared lost
-  "intervalMinutes": 5             // how often reconcile runs
+  "intervalMinutes": 5,            // how often reconcile runs
+  "reuseSessions": true,           // follow-up workers continue the last session
+  "closeOnIssueClosed": true       // end a task when the issue in its brief closes
 }
 ```
 

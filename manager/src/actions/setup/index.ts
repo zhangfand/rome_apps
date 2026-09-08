@@ -9,6 +9,7 @@ import {
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import {
   DEFAULT_AGE_CAP_HOURS,
+  DEFAULT_CLOSE_ON_ISSUE_CLOSED,
   DEFAULT_INTERVAL_MINUTES,
   DEFAULT_MAX_WORKERS,
   DEFAULT_REUSE_SESSIONS,
@@ -61,6 +62,10 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         reuseSessions: {
           type: "boolean",
           description: `Whether a follow-up worker continues the previous worker's session (keeps context and prompt cache warm) instead of starting cold. Defaults to ${DEFAULT_REUSE_SESSIONS}.`,
+        },
+        closeOnIssueClosed: {
+          type: "boolean",
+          description: `Whether an open task ends once the GitHub issue(s) named in its brief are closed — Completed if closed as done, Cancelled if closed as not planned (polled via connector_proxy each pass). Defaults to ${DEFAULT_CLOSE_ON_ISSUE_CLOSED}.`,
         },
       },
       required: ["workingDir"],

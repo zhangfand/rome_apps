@@ -18,6 +18,13 @@ export interface ManagerConfig {
    * warm; off restores a fresh session for every start.
    */
   reuseSessions: boolean;
+  /**
+   * Whether an open task ends when the GitHub issue(s) named in its brief
+   * close — Completed if closed as done, Cancelled if closed as not planned.
+   * Polled on every reconcile pass through `connector_proxy`; off means only
+   * a person ends a task.
+   */
+  closeOnIssueClosed: boolean;
 }
 
 export const DEFAULT_WORKER_AGENT = "coding:coding";
@@ -26,6 +33,7 @@ export const DEFAULT_MAX_WORKERS = 3;
 export const DEFAULT_AGE_CAP_HOURS = 3;
 export const DEFAULT_INTERVAL_MINUTES = 5;
 export const DEFAULT_REUSE_SESSIONS = true;
+export const DEFAULT_CLOSE_ON_ISSUE_CLOSED = true;
 
 /** Key the single config row lives under. */
 export const CONFIG_KEY = "manager_config";
@@ -73,6 +81,10 @@ export function parseConfig(raw: unknown): ParseConfigResult {
       ageCapHours: positiveInt(args.ageCapHours, DEFAULT_AGE_CAP_HOURS, 168),
       intervalMinutes: normalizeIntervalMinutes(args.intervalMinutes),
       reuseSessions: typeof args.reuseSessions === "boolean" ? args.reuseSessions : DEFAULT_REUSE_SESSIONS,
+      closeOnIssueClosed:
+        typeof args.closeOnIssueClosed === "boolean"
+          ? args.closeOnIssueClosed
+          : DEFAULT_CLOSE_ON_ISSUE_CLOSED,
     },
   };
 }

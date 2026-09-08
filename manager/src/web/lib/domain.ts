@@ -144,11 +144,12 @@ export function workerLabel(names: WorkerNames, workerId: string): string {
   return names.get(workerId)?.label ?? workerId;
 }
 
-export type Author = { kind: "person" | "runtime" | "worker"; label: string; raw: string };
+export type Author = { kind: "person" | "runtime" | "worker" | "github"; label: string; raw: string };
 
 /** Who wrote a fact, in words: a person by name, the runtime, or "worker 3". */
 export function authorOf(fact: FactSummary, names: WorkerNames): Author {
   if (fact.by === "runtime") return { kind: "runtime", label: "runtime", raw: fact.by };
+  if (fact.by === "github") return { kind: "github", label: "GitHub", raw: fact.by };
   const named = names.get(fact.by);
   if (named) return { kind: "worker", label: named.label, raw: fact.by };
   if (/^w-[0-9a-f]+$/i.test(fact.by)) return { kind: "worker", label: "a worker", raw: fact.by };

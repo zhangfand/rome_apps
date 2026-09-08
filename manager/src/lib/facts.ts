@@ -7,7 +7,11 @@
  * column somebody has to keep true.
  */
 
-/** Task state facts. Only a person writes the three that end a task. */
+/**
+ * Task state facts. A task ends on a person's word, or when the GitHub issue
+ * the person named in the brief is closed — never on the runtime's own reading
+ * of a worker's result.
+ */
 export const TASK_STATE_KINDS = ["Created", "Taken", "Completed", "Cancelled"] as const;
 
 /** Execution facts. A worker writes three of them; the runtime writes the rest. */
@@ -24,8 +28,19 @@ export type FactKind = (typeof FACT_KINDS)[number];
 export const RUNTIME = "runtime";
 
 /**
- * Kinds only a person may write. `reconcile` has no path to any of them, which
- * is what makes "only a person ends a task" mechanical rather than a promise.
+ * The `by` on a Completed or Cancelled the runtime transcribed from GitHub:
+ * the issue the person named in the brief was closed. The runtime decides
+ * nothing here — it copies down what GitHub reported (closed as completed, or
+ * closed as not planned), and cites the issue as `source`.
+ */
+export const GITHUB = "github";
+
+/**
+ * Kinds a person writes. `reconcile` has no path to any of them; the one other
+ * writer of a Completed or Cancelled is the issue poll, which stamps
+ * {@link GITHUB} and only ever transcribes a closed issue. That keeps "the
+ * runtime never ends a task on its own judgement" mechanical rather than a
+ * promise.
  */
 export const PERSON_KINDS: readonly FactKind[] = ["Created", "Completed", "Cancelled", "Reply"];
 
@@ -73,8 +88,31 @@ type FactOf<K extends FactKind, P> = FactHeader & { kind: K; payload: P };
 
 export type CreatedFact = FactOf<"Created", { brief: string }>;
 export type TakenFact = FactOf<"Taken", Record<string, never>>;
-export type CompletedFact = FactOf<"Completed", { reason?: string }>;
-export type CancelledFact = FactOf<"Cancelled", { reason?: string }>;
+export type CompletedFact = FactOf<
+  "Completed",
+  {
+    reason?: string;
+    /** Set when {@link GITHUB} wrote it: the closed issues that ended the task. */
+    issues?: ClosedIssue[];
+  }
+>;
+
+/** One closed issue, as the poll saw it. */
+export interface ClosedIssue {
+  url: string;
+  /** GitHub's `closed_at`, ISO-8601. */
+  closedAt: string;
+  /** GitHub's `state_reason`: `completed`, `not_planned`, … */
+  stateReason?: string;
+}
+export type CancelledFact = FactOf<
+  "Cancelled",
+  {
+    reason?: string;
+    /** Set when {@link GITHUB} wrote it: the issues closed as not planned. */
+    issues?: ClosedIssue[];
+  }
+>;
 export type StartedFact = FactOf<
   "Started",
   {

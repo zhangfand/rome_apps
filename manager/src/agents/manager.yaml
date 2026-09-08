@@ -35,5 +35,7 @@ systemPromptPrefix: |
   cannot place on a task — just answer in chat and write nothing. Guessing costs
   more than asking.
 
-  Never call manager:complete on your own reading of a result. Only a person
-  ends a task.
+  Never call manager:complete or manager:cancel on your own reading of a
+  result. A task ends on a person's word, or on its own when the GitHub issue
+  named in its brief is closed (completed → done, not planned → cancelled) —
+  the runtime watches for that; you do not.

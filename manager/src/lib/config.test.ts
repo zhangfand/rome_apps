@@ -23,6 +23,15 @@ describe("parseConfig", () => {
     expect(parsed.config.reuseSessions).toBe(true);
   });
 
+  it("polls issues by default and lets it be switched off", () => {
+    const on = parseConfig({ workingDir: "/srv/project" });
+    if (!on.ok) throw new Error(on.error);
+    expect(on.config.closeOnIssueClosed).toBe(true);
+    const off = parseConfig({ workingDir: "/srv/project", closeOnIssueClosed: false });
+    if (!off.ok) throw new Error(off.error);
+    expect(off.config.closeOnIssueClosed).toBe(false);
+  });
+
   it("lets session reuse be switched off", () => {
     const parsed = parseConfig({ workingDir: "/srv/project", reuseSessions: false });
     if (!parsed.ok) throw new Error(parsed.error);
