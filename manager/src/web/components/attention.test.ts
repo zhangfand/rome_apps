@@ -19,8 +19,12 @@ describe("AttentionPanel collapsed", () => {
     const html = renderToStaticMarkup(createElement(AttentionPanel, props));
     expect(html).toContain("Give messages their own module");
     expect(html).toContain("Report ready");
-    expect(html).toContain("Is this task done, or does it need more work?");
-    expect(html).toContain("Review in chat");
+    expect(html).not.toContain("Is this task done, or does it need more work?");
+    expect(html).not.toContain("Review in chat");
+    expect(html).toContain("Open PR");
+    expect(html).toContain("Merge PR");
+    expect(html).toContain("comments");
+    expect(html).toContain("CI unknown");
     expect(html).toContain('data-size="xs"');
     expect(html).toContain('href="https://github.com/example/repo/pull/42"');
     expect(html).toContain("Details");

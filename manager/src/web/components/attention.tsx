@@ -3,6 +3,7 @@ import { navigateToApp, startChat } from "@rome-os/app-web-sdk";
 import { Button } from "@rome-os/ui/button";
 import { cn } from "@rome-os/ui/cn";
 import { ArrowUpRight, ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
+import { PullRequestCard } from "./pull-request";
 import { LightMarkdown } from "./light-markdown";
 import { RefLink, TaskName } from "./refs";
 import { attentionPrompt } from "../lib/attention-prompt";
@@ -12,8 +13,8 @@ import { formatRelative, truncate, useNow } from "../lib/format";
 /**
  * The one thing on the page that is addressed to the guardian: a worker is
  * stuck and asks, or the runtime reports that something is ready to look at.
- * The only way to answer is in chat, because the agent is what stamps who
- * said it — so the panel opens a chat that shows the question and waits.
+ * Questions keep their chat action. Reports promote live GitHub facts and
+ * explicit PR actions; the full narrative and task discussion live in Details.
  */
 export function chatAbout(taskId: string, handle: TaskHandle, kind: "Question" | "Report" | "status") {
   const name = handle.isRef ? handle.name : `"${truncate(handle.name, 60)}"`;
@@ -59,7 +60,8 @@ export function AttentionPanel({
   const detailsId = useId();
   const summary = attentionPrompt(kind, text);
   // Prefer a PR actually named by this report over unrelated historical references.
-  const reportPr = refsIn(text).find((ref) => ref.kind === "pr");
+  const reportPrs = refsIn(text).filter((ref) => ref.kind === "pr");
+  const reportPr = reportPrs[0];
   const primaryRef = reportPr ?? handle.issue;
   const otherPrs = handle.prs.filter((ref) => ref.url !== primaryRef?.url);
   const titleHandle = { ...handle, prs: [] };
@@ -89,14 +91,15 @@ export function AttentionPanel({
       </header>
 
       {issueTitle ? <p className="mt-1 text-ui font-medium line-clamp-2">{issueTitle}</p> : null}
-      <p className="mt-2 text-ui break-words">{summary}</p>
+      {isQuestion ? <p className="mt-2 text-ui break-words">{summary}</p> : reportPrs.length ? (
+        reportPrs.map((pr) => <PullRequestCard key={pr.url} taskId={taskId} pr={pr} />)
+      ) : <p className="mt-2 text-ui text-muted-foreground">No PR linked in this report. Open Details to see the result.</p>}
 
       <footer className="mt-3 flex flex-wrap items-center gap-2">
-        <Button size={isQuestion ? "sm" : "xs"} onClick={() => void chatAbout(taskId, handle, kind)}>
-          <MessageSquare className={isQuestion ? "size-4" : "size-3"} aria-hidden />
-          {isQuestion ? "Answer in chat" : "Review in chat"}
-        </Button>
-        {primaryRef && primaryRef.url !== handle.issue?.url ? <RefLink r={primaryRef} className="mx-1" /> : null}
+        {isQuestion ? <Button size="sm" onClick={() => void chatAbout(taskId, handle, kind)}>
+          <MessageSquare className="size-4" aria-hidden /> Answer in chat
+        </Button> : null}
+        {isQuestion && primaryRef && primaryRef.url !== handle.issue?.url ? <RefLink r={primaryRef} className="mx-1" /> : null}
         <button
           type="button"
           onClick={() => setFull((value) => !value)}
@@ -125,6 +128,9 @@ export function AttentionPanel({
                   Open task <ArrowUpRight className="size-4" aria-hidden />
                 </Button>
               ) : null}
+              {!isQuestion ? <Button variant="ghost" size="xs" onClick={() => void chatAbout(taskId, handle, kind)}>
+                <MessageSquare className="size-3" aria-hidden /> Discuss task
+              </Button> : null}
               {otherPrs.map((ref) => <RefLink key={ref.url} r={ref} />)}
             </div>
           </>

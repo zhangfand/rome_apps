@@ -1,3 +1,4 @@
+import { PullRequestError, PullRequestService, reportPullRequests, type MergeMethod } from "../lib/pull-request.js";
 import type { RomeAppApiHandler, RomeAppApiRequest, RomeAppContext } from "@rome-os/app-runtime";
 import { createBoardRepository } from "../db/repositories/board.js";
 import { createLedgerRepository } from "../db/repositories/ledger.js";
@@ -22,6 +23,7 @@ import { briefFromIssue, type IntakeIssue } from "../lib/intake.js";
  */
 class ManagerApiHandler implements RomeAppApiHandler {
   private readonly syncDeps: SyncDeps;
+  private readonly pullRequests = new PullRequestService();
 
   constructor(private readonly ctx: RomeAppContext) {
     this.syncDeps = {
@@ -147,6 +149,29 @@ class ManagerApiHandler implements RomeAppApiHandler {
         return json({ taskId, issueId: issue.id }, 201);
       }
 
+      if (request.path[0] === "tasks" && request.path[2] === "pull-request") {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        const merging = request.path.length === 4 && request.path[3] === "merge" && request.method === "POST";
+        const reading = request.path.length === 3 && request.method === "GET";
+        if (!merging && !reading) return json({ error: "not_found" }, 404);
+        const facts = ledger.factsFor(request.path[1]);
+        if (!facts.length) return json({ error: "task_not_found" }, 404);
+        const body = merging ? readJsonBody<{ url?: unknown; sha?: unknown; method?: unknown; confirmed?: unknown }>(request) : null;
+        if (merging && (!body || typeof body !== "object" || Array.isArray(body))) return json({ error: "invalid_json" }, 400);
+        const url = merging ? body?.url : request.query.get("url");
+        if (typeof url !== "string") return json({ error: "invalid_pr_url" }, 400);
+        const ref = reportPullRequests(facts).find((ref) => ref.url.toLowerCase() === url.toLowerCase());
+        if (!ref) return json({ error: "PR is not in this task's current report" }, 404);
+        if (reading) return json(await this.pullRequests.read(ref));
+        if (body?.confirmed !== true || typeof body.sha !== "string" || !/^[a-f0-9]{40}$/i.test(body.sha)
+          || typeof body.method !== "string" || !["merge", "squash", "rebase"].includes(body.method)) {
+          return json({ error: "Explicit confirmation, head SHA, and merge method are required" }, 400);
+        }
+        const result = await this.pullRequests.merge(ref, body.sha, body.method as MergeMethod);
+        this.ctx.log.info("guardian merged pull request", { taskId: request.path[1], url: ref.url, method: body.method, sha: result.sha });
+        return json(result);
+      }
+
       if (request.method === "GET" && route === "worker-health") {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
         const now = new Date();
@@ -191,6 +216,7 @@ class ManagerApiHandler implements RomeAppApiHandler {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.ctx.log.error("manager api failed", { route, error: message });
+      if (error instanceof PullRequestError) return json({ error: message }, error.status);
       if (error instanceof GithubError) {
         return json(
           {
