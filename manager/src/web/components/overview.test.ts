@@ -54,6 +54,15 @@ describe("dashboard navigation and secondary views", () => {
     for (const page of ["tasks", "history", "board", "workers", "ledger", "diagnostics"]) expect(dashboardRoute(`/${page}/`).taskId).toBe(null);
     expect(dashboardRoute("t-123")).toEqual({ page: "overview", taskId: "t-123" });
   });
+  it("uses the shared small Select trigger with a stable selected label", () => {
+    const html = screen("overview");
+    expect(html).toContain('data-slot="select-trigger"');
+    expect(html).toContain('role="combobox"');
+    expect(html).toContain('aria-label="Filter by project"');
+    expect(html).toContain('data-size="sm"');
+    expect(html).toContain("All projects");
+    expect(screen("overview", { projectId: "manager" })).toContain(">manager</span>");
+  });
   it("hides the project filter for a single-project installation", () => {
     expect(screen("overview", { view: { ...view, projects: ["rome"] } })).not.toContain('aria-label="Filter by project"');
   });

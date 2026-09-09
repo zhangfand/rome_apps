@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchAppApi, getCurrentAppPath, navigateToApp, subscribeToAppPath, type RomeAppBootstrap } from "@rome-os/app-web-sdk";
 import { Button } from "@rome-os/ui/button";
 import { cn } from "@rome-os/ui/cn";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@rome-os/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@rome-os/ui/dropdown-menu";
 import { ChevronDown, RefreshCw, TriangleAlert } from "lucide-react";
 import { Ledger } from "./components/ledger";
@@ -92,10 +93,17 @@ export function DashboardScreen({ page, view, projectId, onProject, loading, war
   return <>
     <header className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-border pb-3">
       <h1 className="text-title">Manager</h1>
-      {view && (view.projects?.length ?? 0) > 1 && page !== "board" ? <select aria-label="Filter by project" value={projectId} onChange={(e) => onProject(e.target.value)}
-        className="max-w-48 rounded-6 border border-border bg-surface px-2 py-1 text-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <option value="">All projects</option>{view.projects!.map((id) => <option key={id} value={id}>{id}</option>)}
-      </select> : null}
+      {view && (view.projects?.length ?? 0) > 1 && page !== "board" ? (
+        <Select value={projectId ? `project:${projectId}` : "all"} onValueChange={(value) => onProject(value === "all" ? "" : value.slice(8))}>
+          <SelectTrigger size="sm" className="w-auto max-w-48" aria-label="Filter by project">
+            <SelectValue>{projectId || "All projects"}</SelectValue>
+          </SelectTrigger>
+          <SelectContent className="max-h-80">
+            <SelectItem value="all">All projects</SelectItem>
+            {view.projects!.map((id) => <SelectItem key={id} value={`project:${id}`}>{id}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      ) : null}
       <nav aria-label="Manager navigation" className="flex flex-wrap items-center gap-1 md:ml-auto">
         {([{ page: "overview", label: "Overview" }, { page: "tasks", label: "All tasks" }, { page: "board", label: "Board" }] as const).map((item) =>
           <Button key={item.page} size="sm" variant="ghost" aria-current={page === item.page ? "page" : undefined}
