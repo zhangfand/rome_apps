@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { fetchAppApi } from "@rome-os/app-web-sdk";
 import { Button } from "@rome-os/ui/button";
 import { ExternalLink, GitMerge, MessageSquare, RefreshCw, TriangleAlert } from "lucide-react";
@@ -36,7 +36,9 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return payload;
 }
 
-export function PullRequestCard({ taskId, pr }: { taskId: string; pr: PullRequestRef }) {
+export function PullRequestCard({ taskId, pr, compact = false, actions, details, context }: {
+  taskId: string; pr: PullRequestRef; compact?: boolean; actions?: ReactNode; details?: ReactNode; context?: string;
+}) {
   const [data, setData] = useState<PullRequestStatus>();
   const [error, setError] = useState<string>();
   const [mergeError, setMergeError] = useState<string>();
@@ -44,6 +46,8 @@ export function PullRequestCard({ taskId, pr }: { taskId: string; pr: PullReques
   const [merging, setMerging] = useState(false);
   const [merged, setMerged] = useState(false);
   const [confirmation, setConfirmation] = useState<{ sha: string; base: string; method: MergeMethod }>();
+  const blockedId = useId();
+  const [showBlocked, setShowBlocked] = useState(false);
   const sequence = useRef(0);
   const busy = useRef(false);
   const now = useNow();
@@ -85,19 +89,27 @@ export function PullRequestCard({ taskId, pr }: { taskId: string; pr: PullReques
   };
 
   return (
-    <div className="mt-3 min-w-0 rounded-8 border border-border px-3 py-3">
+    <div className={compact ? "min-w-0 rounded-12 border border-border bg-surface p-4" : "mt-3 min-w-0 rounded-8 border border-border px-3 py-3"}>
+      {context ? <span className="mb-1 block text-aux text-muted-foreground">{context}</span> : null}
       <PullRequestMetrics pr={pr} data={data} error={warning} />
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <a href={pr.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-4 border border-border px-2 py-1 text-aux font-medium hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           Open PR <ExternalLink className="size-3" aria-hidden />
         </a>
-        <Button size="xs" disabled={loading || merging || merged || !!warning || !data || !!data.mergeBlocked}
+        <Button size="xs" className="aria-disabled:opacity-50" aria-disabled={loading || merging || merged || !!warning || !data || !!data.mergeBlocked}
+          aria-describedby={showBlocked ? blockedId : undefined}
           title={warning ? "Current PR data is required before merging" : data?.mergeBlocked ?? "Confirm and merge this PR"}
-          onClick={() => data && setConfirmation({ sha: data.headSha, base: data.baseBranch, method: data.methods[0] })}>
+          onClick={() => {
+            if (loading || merging || merged || warning || !data || data.mergeBlocked) { setShowBlocked(!showBlocked); return; }
+            setShowBlocked(false);
+            setConfirmation({ sha: data.headSha, base: data.baseBranch, method: data.methods[0] });
+          }}>
           <GitMerge className="size-3" aria-hidden /> {merging ? "Merging…" : merged || data?.state === "MERGED" ? "Merged" : "Merge PR"}
         </Button>
+        {actions}
         <PullRequestFreshness loading={loading} warning={warning} number={pr.number} disabled={merging} retry={() => void refresh()} />
       </div>
+      {showBlocked ? <p id={blockedId} role="status" className="mt-2 text-aux text-muted-foreground">{merging ? "A merge is in progress." : merged ? "Already merged." : loading ? "Checking the latest PR status." : warning ?? data?.mergeBlocked ?? "PR is ready to merge."}</p> : null}
       {mergeError ? <p role="alert" className="mt-2 text-aux text-destructive-fg break-words">{mergeError}</p> : null}
       {merged ? <p role="status" className="mt-2 text-aux text-success-fg">Merged on GitHub. Task completion still follows its tracked issue or your instructions.</p> : null}
       {confirmation ? (
@@ -115,6 +127,7 @@ export function PullRequestCard({ taskId, pr }: { taskId: string; pr: PullReques
           </div>
         </div>
       ) : null}
+      {details}
     </div>
   );
 }
@@ -126,7 +139,8 @@ export function PullRequestMetrics({ pr, data, error }: { pr: PullRequestRef; da
     <>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-ui">
         <a className="font-medium hover:underline break-all" href={pr.url} target="_blank" rel="noopener noreferrer">PR #{pr.number}</a>
-        <span className="min-w-0 break-words">{data?.title ?? pr.repo}</span>
+        <span className="min-w-0 font-medium break-words">{data?.title ?? pr.repo}</span>
+        {data ? <span className="text-aux text-muted-foreground break-all">{pr.repo}</span> : null}
         {data?.state === "MERGED" ? <span className="text-aux text-success-fg">Merged</span> : data?.state === "CLOSED" ? <span className="text-aux text-muted-foreground">Closed</span> : data?.draft ? <span className="text-aux text-muted-foreground">Draft</span> : null}
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-aux tabular-nums" aria-label="Pull request statistics">

@@ -60,7 +60,7 @@ export function TaskDetail({ taskId }: { taskId: string }) {
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" onClick={() => navigateToApp("")} className="-ml-2">
           <ArrowLeft className="size-4" aria-hidden />
-          All tasks
+          Overview
         </Button>
         {task && handle ? (
           <Button
