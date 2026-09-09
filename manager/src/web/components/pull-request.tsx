@@ -1,12 +1,32 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchAppApi } from "@rome-os/app-web-sdk";
 import { Button } from "@rome-os/ui/button";
-import { ExternalLink, GitMerge, MessageSquare, RefreshCw } from "lucide-react";
+import { ExternalLink, GitMerge, MessageSquare, RefreshCw, TriangleAlert } from "lucide-react";
 import type { MergeMethod, PullRequestRef, PullRequestStatus } from "../../lib/pull-request.js";
-import { formatRelative, useNow } from "../lib/format";
+import { useNow } from "../lib/format";
 
 const REVIEW = { APPROVED: "Approved", CHANGES_REQUESTED: "Changes requested", REVIEW_REQUIRED: "Review required", UNREVIEWED: "Not approved", UNKNOWN: "Review unknown" };
 const CI = { SUCCESS: "CI passed", FAILURE: "CI failed", PENDING: "CI pending", NONE: "No CI checks", UNKNOWN: "CI unknown" };
+export const PR_STALE_AFTER_MS = 3 * 60_000;
+export function prDataStale(checkedAt: string | undefined, now: number): boolean {
+  const checked = checkedAt ? Date.parse(checkedAt) : NaN;
+  return !Number.isFinite(checked) || now - checked > PR_STALE_AFTER_MS;
+}
+
+/** Quiet when healthy; progress and problems occupy the same compact slot. */
+export function PullRequestFreshness({ loading, warning, number, disabled, retry }: {
+  loading: boolean; warning?: string; number: number; disabled?: boolean; retry: () => void;
+}) {
+  if (loading) return <span role="status" aria-label={`Refreshing PR #${number}`} className="inline-flex items-center px-1 text-muted-foreground">
+    <RefreshCw className="size-3 animate-spin" aria-hidden />
+  </span>;
+  if (!warning) return null;
+  const label = `${warning} Retry loading PR #${number}.`;
+  return <Button size="xs" variant="ghost" disabled={disabled} onClick={retry} aria-label={label} title={label}>
+    <TriangleAlert className="size-3.5 text-warning-fg" aria-hidden />
+  </Button>;
+}
+
 const METHODS = { squash: "Squash and merge", merge: "Create merge commit", rebase: "Rebase and merge" };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -19,6 +39,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 export function PullRequestCard({ taskId, pr }: { taskId: string; pr: PullRequestRef }) {
   const [data, setData] = useState<PullRequestStatus>();
   const [error, setError] = useState<string>();
+  const [mergeError, setMergeError] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [merging, setMerging] = useState(false);
   const [merged, setMerged] = useState(false);
@@ -26,6 +47,8 @@ export function PullRequestCard({ taskId, pr }: { taskId: string; pr: PullReques
   const sequence = useRef(0);
   const busy = useRef(false);
   const now = useNow();
+  const stale = prDataStale(data?.checkedAt, now);
+  const warning = error ?? (stale ? data ? "PR data is over 3 minutes old or its timestamp is unavailable." : "PR data is unavailable." : undefined);
   const path = `tasks/${encodeURIComponent(taskId)}/pull-request`;
   const refresh = useCallback(async () => {
     const ticket = ++sequence.current;
@@ -33,7 +56,7 @@ export function PullRequestCard({ taskId, pr }: { taskId: string; pr: PullReques
     try {
       const next = await api<PullRequestStatus>(`${path}?url=${encodeURIComponent(pr.url)}`);
       if (ticket !== sequence.current) return;
-      setData(next); setError(undefined);
+      setData(next); setError(undefined); setMergeError(undefined);
     } catch (e) {
       if (ticket === sequence.current) setError(e instanceof Error ? e.message : "Could not load PR status.");
     } finally { if (ticket === sequence.current) setLoading(false); }
@@ -49,7 +72,7 @@ export function PullRequestCard({ taskId, pr }: { taskId: string; pr: PullReques
 
   const merge = async () => {
     if (!confirmation || busy.current) return;
-    busy.current = true; setMerging(true); setError(undefined);
+    busy.current = true; setMerging(true); setError(undefined); setMergeError(undefined);
     try {
       await api(`${path}/merge`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -57,31 +80,25 @@ export function PullRequestCard({ taskId, pr }: { taskId: string; pr: PullReques
       });
       setMerged(true); setConfirmation(undefined);
       await refresh();
-    } catch (e) { setError(e instanceof Error ? e.message : "Merge failed. Refresh before trying again."); setConfirmation(undefined); }
+    } catch (e) { const message = e instanceof Error ? e.message : "Merge failed. Retry loading before trying again."; setError(message); setMergeError(message); setConfirmation(undefined); }
     finally { busy.current = false; setMerging(false); }
   };
 
   return (
     <div className="mt-3 min-w-0 rounded-8 border border-border px-3 py-3">
-      <PullRequestMetrics pr={pr} data={data} error={error} />
+      <PullRequestMetrics pr={pr} data={data} error={warning} />
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <a href={pr.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-4 border border-border px-2 py-1 text-aux font-medium hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           Open PR <ExternalLink className="size-3" aria-hidden />
         </a>
-        <Button size="xs" disabled={loading || merging || merged || !!error || !data || !!data.mergeBlocked}
-          title={error ? "Refresh PR status first" : data?.mergeBlocked ?? "Confirm and merge this PR"}
+        <Button size="xs" disabled={loading || merging || merged || !!warning || !data || !!data.mergeBlocked}
+          title={warning ? "Current PR data is required before merging" : data?.mergeBlocked ?? "Confirm and merge this PR"}
           onClick={() => data && setConfirmation({ sha: data.headSha, base: data.baseBranch, method: data.methods[0] })}>
           <GitMerge className="size-3" aria-hidden /> {merging ? "Merging…" : merged || data?.state === "MERGED" ? "Merged" : "Merge PR"}
         </Button>
-        <Button size="xs" variant="ghost" disabled={loading || merging} onClick={() => void refresh()} aria-label={`Refresh PR #${pr.number}`}>
-          <RefreshCw className={`size-3 ${loading ? "animate-spin" : ""}`} aria-hidden />
-        </Button>
-        <span className="text-aux text-muted-foreground" title={data?.checkedAt}>
-          {loading ? "Checking GitHub…" : data ? `Checked ${formatRelative(data.checkedAt, now)}` : "Status unavailable"}
-        </span>
+        <PullRequestFreshness loading={loading} warning={warning} number={pr.number} disabled={merging} retry={() => void refresh()} />
       </div>
-      {data?.mergeBlocked && data.state === "OPEN" && !error ? <p className="mt-2 text-aux text-muted-foreground">{data.mergeBlocked}</p> : null}
-      {error ? <p role="alert" className="mt-2 text-aux text-destructive-fg break-words">{error} {data ? "Shown data may be stale; merging is disabled." : ""}</p> : null}
+      {mergeError ? <p role="alert" className="mt-2 text-aux text-destructive-fg break-words">{mergeError}</p> : null}
       {merged ? <p role="status" className="mt-2 text-aux text-success-fg">Merged on GitHub. Task completion still follows its tracked issue or your instructions.</p> : null}
       {confirmation ? (
         <div role="group" aria-label={`Confirm merge PR #${pr.number}`} className="mt-3 border-t border-border pt-3">
@@ -93,7 +110,7 @@ export function PullRequestCard({ taskId, pr }: { taskId: string; pr: PullReques
               className="max-w-full rounded-4 border border-border bg-surface px-2 py-1 text-aux">
               {data?.methods.map((method) => <option key={method} value={method}>{METHODS[method]}</option>)}
             </select>
-            <Button size="xs" disabled={merging || !!error} onClick={() => void merge()}>{merging ? "Merging…" : "Confirm merge"}</Button>
+            <Button size="xs" disabled={merging || loading || !!warning} onClick={() => void merge()}>{merging ? "Merging…" : "Confirm merge"}</Button>
             <Button size="xs" variant="ghost" disabled={merging} onClick={() => setConfirmation(undefined)}>Cancel</Button>
           </div>
         </div>

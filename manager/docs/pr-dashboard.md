@@ -5,7 +5,7 @@ A Report's current, explicit GitHub PR links appear on the dashboard and task de
 - live additions/deletions;
 - comment count: discussion comments + inline review comments (not review-summary bodies, reactions, or worker chat messages);
 - GitHub approval and current-head aggregate check status, with check count;
-- Open PR, Merge PR, and refresh shortcuts.
+- Open PR and Merge PR shortcuts.
 
 Reports without PR URLs say so instead of selecting an unrelated historical PR. Multiple PRs have independent cards. Questions keep Answer in chat. Full reports, evidence, task links and Discuss task remain in Details. No task lifecycle, worker protocol, or scheduler change.
 
@@ -13,7 +13,7 @@ Reports without PR URLs say so instead of selecting an unrelated historical PR. 
 
 Guardian-only GET `tasks/:id/pull-request?url=...` requires the canonical PR to be present in the task's latest Report. Uses Rome-managed `gh api` with argument arrays, never a shell command or credentials. REST PR totals avoid comment pagination; GraphQL supplies current-head CI, review decision, merge status and repository permissions/methods. When GitHub has no review rule, latest opinionated reviews are used; a truncated review set is unknown. Missing CI is never passing; successful GitHub rollups may include neutral/skipped checks.
 
-Reads share a 30-second disposable cache. Visible cards refresh every minute and on returning to the tab; manual refresh is also available. Errors show unavailable/stale status and disable merging. REST/GraphQL head mismatch fails rather than combining stats from different commits.
+Reads share a 30-second disposable cache. Visible cards refresh every minute and on returning to the tab. Fresh idle cards show no refresh icon, timestamp, or merge-blocked explanation line (the disabled merge button retains its reason in a tooltip). A spinner appears only while refreshing. Read failures, unavailable timestamps/data, or data over 3 minutes old show an accessible warning icon with a reason/retry tooltip; clicking it retries. Stale/error data disables merging and mutes positive status colors. Explicit merge failures remain visible as actionable errors. REST/GraphQL head mismatch fails rather than combining stats from different commits.
 
 ## Explicit merges
 
