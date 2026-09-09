@@ -55,6 +55,34 @@ async function start(l: ReturnType<typeof ledger>, config: Awaited<ReturnType<ty
 }
 
 describe("real Git worktree isolation", () => {
+  for (const processFilter of [true, false]) {
+    it(`checks out LFS pointers without a missing ${processFilter ? "process" : "smudge"} filter or shared config changes`, async () => {
+      const { source, workingDir } = await fixture();
+      const pointer = `version https://git-lfs.github.com/spec/v1\noid sha256:${"a".repeat(64)}\nsize 32454880\n`;
+      await writeFile(path.join(source, ".gitattributes"), "asset.bin filter=lfs diff=lfs merge=lfs -text\n");
+      await writeFile(path.join(source, "asset.bin"), pointer);
+      git(source, "add", ".gitattributes", "asset.bin");
+      git(source, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "LFS pointer");
+      // Deliberately absent regardless of whether the test host has real Git LFS.
+      git(source, "config", "filter.lfs.smudge", "manager-test-missing-git-lfs smudge -- %f");
+      git(source, "config", "filter.lfs.process", processFilter ? "manager-test-missing-git-lfs filter-process" : "");
+      git(source, "config", "filter.lfs.required", "true");
+      const configBefore = await readFile(path.join(source, ".git/config"), "utf8");
+      expect(() => git(source, "cat-file", "--filters", "HEAD:asset.bin")).toThrow();
+
+      const workspace = await prepareWorkspace({ workingDir, taskId: "t-lfs", workerId: "w-lfs" });
+      expect(await readFile(path.join(workspace.root, "asset.bin"), "utf8")).toBe(pointer);
+      expect(await readFile(path.join(workspace.workingDir, "code.txt"), "utf8")).toBe("base\n");
+      expect(await readFile(path.join(source, ".git/config"), "utf8")).toBe(configBefore);
+      expect(git(workspace.root, "config", "--get", "filter.lfs.required")).toBe("true");
+      await validateWorkspace(workspace);
+      // Reuse must not overwrite assets a worker explicitly hydrated later.
+      await writeFile(path.join(workspace.root, "asset.bin"), "downloaded asset\n");
+      expect(await prepareWorkspace({ workingDir, taskId: "t-lfs", workerId: "w-next", previous: workspace })).toEqual(workspace);
+      expect(await readFile(path.join(workspace.root, "asset.bin"), "utf8")).toBe("downloaded asset\n");
+    });
+  }
+
   it("routes simultaneous tasks into two real repositories, preserving subdirectories", async () => {
     const one = await fixture(); const two = await fixture();
     const config = { ...one.config, projects: {
@@ -273,6 +301,8 @@ describe("real Git worktree isolation", () => {
     const first = await start(l, config);
     const prompt = bindWorkspacePrompt(buildWorkerPrompt({ task: foldTask(l.b.facts), config, reason: "resume rejected" }), first.payload.workspace!, config.workingDir);
     expect(prompt).toContain(`Working directory: ${first.payload.workspace!.workingDir}`);
+    expect(prompt).toContain("Git LFS assets as small pointer files by default");
+    expect(prompt).toContain('git lfs pull --include="<needed paths>" --exclude=""');
     expect(prompt).not.toContain(`Working directory: ${config.workingDir}\n`);
   });
 

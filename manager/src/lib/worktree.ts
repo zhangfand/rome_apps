@@ -100,7 +100,12 @@ export async function prepareWorkspace(input: {
   const root = path.join(await realpath(parent), `${input.taskId}-${input.workerId}`);
   const branch = `manager/${input.taskId}/${input.workerId}`;
   // Git refuses existing paths/branches. Never adopt an unknown leftover tree.
-  await git(repo.root, "worktree", "add", "-b", branch, root, baseCommit);
+  // Leave LFS assets as pointers: avoid large downloads/copies for every worker.
+  // SKIP_SMUDGE alone still requires git-lfs. Disable both checkout filters for
+  // this command only; never weaken the shared repo's clean/commit behavior.
+  await git(repo.root,
+    "-c", "filter.lfs.process=", "-c", "filter.lfs.smudge=", "-c", "filter.lfs.required=false",
+    "worktree", "add", "-b", branch, root, baseCommit);
   const workspace = { commonDir: repo.commonDir, root, workingDir: path.join(root, repo.relativeDir), branch, baseCommit };
   await validateWorkspace(workspace);
   return workspace;
@@ -118,6 +123,9 @@ export function workspaceInstructions(workspace: WorkerWorkspace): string {
     "This overrides paths and working directories in earlier session context or task history.",
     "Keep branch changes inside this worktree; never force-checkout a branch used by another worktree.",
     "Install dependencies here if needed; do not share node_modules or copy ignored/private files from the source.",
+    "New worktrees leave Git LFS assets as small pointer files by default; reused trees keep their existing assets.",
+    "Fetch LFS assets only when this task needs them. With git-lfs available, run git lfs pull --include=\"<needed paths>\" --exclude=\"\" in this worktree.",
+    "Do not run an unrestricted git lfs pull or disable LFS filters in shared Git config. Later Git operations may still require git-lfs.",
     "Do not remove this worktree: follow-up workers need its branch and uncommitted work.",
     "Do not reinstall or upgrade the running Manager controller unless the task explicitly authorizes deployment.",
   ].join("\n");

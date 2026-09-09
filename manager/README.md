@@ -110,6 +110,16 @@ The source must be inside a non-bare Git repository with at least one commit.
   `origin/HEAD`, local `main`, local `master`, then `HEAD`. Manager does not fetch;
   update the source repository's refs when a newer base is needed. Uncommitted
   source changes and unrelated checked-out feature branches are not copied.
+- New worktrees check out Git LFS assets as **pointer files**, saving disk space
+  and avoiding automatic asset downloads. Normal source files are checked out
+  fully. Manager bypasses only the LFS checkout filters for the creation command;
+  shared Git configuration and clean/commit filters are unchanged. This works
+  without `git-lfs` for checkout filtering, though repository hooks or later Git
+  operations may still require it. `GIT_LFS_SKIP_SMUDGE=1` alone is not enough
+  when the executable is missing.
+  Workers needing actual assets can use `git lfs pull --include="<needed paths>"
+  --exclude=""` inside their worktree once Git LFS is available. Avoid an
+  unrestricted pull. Reused/existing worktrees are not rewritten or shrunk.
 - A follow-up reuses the latest worker's tree only after **Returned or Failed**,
   preserving its branch and dirty files even with `reuseSessions: false`.
   A running or **Lost** worker never hands its tree to a replacement: it may
