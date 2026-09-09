@@ -8,6 +8,8 @@ import {
 import { createLedgerRepository, type LedgerRepository } from "../../db/repositories/ledger.js";
 import { createBoardRepository } from "../../db/repositories/board.js";
 import { createLockRepository, RECONCILE_LOCK } from "../../db/repositories/lock.js";
+import { createWorkerHealthRepository, type WorkerHealthRepository } from "../../db/repositories/worker-health.js";
+import { HEARTBEAT_PROTOCOL } from "../../lib/worker-health.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import type { ManagerConfig } from "../../lib/config.js";
 import { RUNTIME, isWorkerTerminalKind } from "../../lib/facts.js";
@@ -66,7 +68,10 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         const managerConfig = settings.get();
         if (!managerConfig) return { status: "error", error: "manager is not configured. Run manager:setup first." };
         for (const fact of legacyBindingFacts(ledger.all(), managerConfig)) ledger.append(fact);
-        // Ask GitHub first. Intake before observe, so an issue labeled and
+        // Supervise workers before any external polling. A health read failure
+        // is unknown, never permission to declare a worker dead.
+        const healthFacts = observeWorkerHealth(ledger, createWorkerHealthRepository(appContext.db));
+        // Ask GitHub next. Intake before observe, so an issue labeled and
         // closed between two passes is opened and then ended in the same one,
         // leaving a complete record rather than no task at all. Both run
         // before the rules below, so a task taken in here is started this
@@ -88,7 +93,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
           newWorkerId: () => `w-${crypto.randomUUID().slice(0, 8)}`,
         });
 
-        const applied: string[] = [...taken, ...observed];
+        const applied: string[] = [...healthFacts, ...taken, ...observed];
         for (const action of actions) {
           applied.push(await apply(action, ledger, appContext, managerConfig));
         }
@@ -100,6 +105,26 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       }
     },
   };
+}
+
+/** No model calls, no heartbeat writes, and no manual task steering. */
+export function observeWorkerHealth(
+  ledger: Pick<LedgerRepository, "all">,
+  health: Pick<WorkerHealthRepository, "expire">,
+  now = new Date(),
+): string[] {
+  const applied: string[] = [];
+  for (const task of fold(now, ledger.all()).tasks) {
+    const worker = task.liveWorker;
+    const started = worker && task.facts.find((fact) => fact.seq === worker.startedSeq);
+    if (!worker || started?.kind !== "Started" || started.payload.heartbeatProtocol !== HEARTBEAT_PROTOCOL) continue;
+    try {
+      if (health.expire(task.id, worker.workerId, now)) applied.push(`Lost(${task.id}): worker heartbeat expired`);
+    } catch (error) {
+      log.warn("worker health unavailable; leaving worker unchanged", { taskId: task.id, workerId: worker.workerId, error: String(error) });
+    }
+  }
+  return applied;
 }
 
 async function refreshBoardSnapshots(

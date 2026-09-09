@@ -6,6 +6,8 @@ import {
   type AppActionRuntimeDeps,
 } from "@rome-os/app-runtime";
 import { createLedgerRepository, type LedgerRepository } from "../../db/repositories/ledger.js";
+import { createWorkerHealthRepository } from "../../db/repositories/worker-health.js";
+import { HEARTBEAT_PROTOCOL, startHeartbeatTimer } from "../../lib/worker-health.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import type { ManagerConfig } from "../../lib/config.js";
 import { REPLY_PROTOCOL, validateWorkerRun, type ValidatedWorkerRun } from "../../lib/worker-reply.js";
@@ -93,68 +95,97 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         resumeSessionId,
       });
 
-      const initial = await summonWithFallback({
-        appContext,
-        ledger,
-        managerConfig,
-        started,
-        source,
-      });
-
-      // Old in-flight workers retain the prose contract they were launched with.
-      // Every new Started is explicitly versioned, including resumed sessions.
-      const run: SummonRun | ValidatedWorkerRun =
-        started.payload.replyProtocol === REPLY_PROTOCOL
-          ? await validateWorkerRun(initial, async (prompt, sessionId) => {
-              const task = foldTask(ledger.factsFor(taskId));
-              if (task.state !== "taken" || task.liveWorker?.workerId !== workerId) {
-                return { ok: false, error: "Worker was stopped before reply repair." };
-              }
-              return summon(appContext, managerConfig.workerAgent, prompt, sessionId);
-            })
-          : initial;
-
+      let stopHeartbeat = () => {};
+      if (started.payload.heartbeatProtocol === HEARTBEAT_PROTOCOL) {
+        const health = createWorkerHealthRepository(appContext.db);
+        const ownerId = crypto.randomUUID();
+        if (!health.claim(started, ownerId)) {
+          return { status: "ok", data: { taskId, workerId, outcome: "skipped (heartbeat lease unavailable)" } };
+        }
+        stopHeartbeat = startHeartbeatTimer(
+          () => health.renew(taskId, workerId, ownerId),
+          (error) => log.warn("worker heartbeat write failed", { taskId, workerId, error: String(error) }),
+        );
+      }
       let outcome: string;
-      if (run.ok) {
-        const written = ledger.appendWorkerOutcome({
-          taskId,
-          kind: "Returned",
-          by: workerId,
+      let resultSessionId: string | undefined;
+      let restarted = false;
+      try {
+        const initial = await summonWithFallback({
+          appContext,
+          ledger,
+          managerConfig,
+          started,
           source,
-          payload: {
-            workerId,
-            reply: run.reply,
-            sessionId: run.sessionId,
-            ...("result" in run ? { result: run.result } : {}),
-            ...("repair" in run ? { repair: run.repair } : {}),
-          },
         });
-        outcome = written ? "Returned" : "dropped (worker already closed)";
-      } else {
-        const written = ledger.appendWorkerOutcome({
+
+        // Old in-flight workers retain the prose contract they were launched with.
+        // Every new Started is explicitly versioned, including resumed sessions.
+        const run: SummonRun | ValidatedWorkerRun =
+          started.payload.replyProtocol === REPLY_PROTOCOL
+            ? await validateWorkerRun(initial, async (prompt, sessionId) => {
+                const task = foldTask(ledger.factsFor(taskId));
+                if (task.state !== "taken" || task.liveWorker?.workerId !== workerId) {
+                  return { ok: false, error: "Worker was stopped before reply repair." };
+                }
+                return summon(appContext, managerConfig.workerAgent, prompt, sessionId);
+              })
+            : initial;
+
+        if (run.ok) {
+          const written = ledger.appendWorkerOutcome({
+            taskId,
+            kind: "Returned",
+            by: workerId,
+            source,
+            payload: {
+              workerId,
+              reply: run.reply,
+              sessionId: run.sessionId,
+              ...("result" in run ? { result: run.result } : {}),
+              ...("repair" in run ? { repair: run.repair } : {}),
+            },
+          });
+          outcome = written ? "Returned" : "dropped (worker already closed)";
+        } else {
+          const written = ledger.appendWorkerOutcome({
+            taskId,
+            kind: "Failed",
+            by: workerId,
+            source,
+            payload: {
+              workerId,
+              error: run.error,
+              sessionId: run.sessionId,
+              ...("failureKind" in run ? { failureKind: run.failureKind } : {}),
+              ...("reply" in run ? { reply: run.reply } : {}),
+              ...("repair" in run ? { repair: run.repair } : {}),
+            },
+          });
+          outcome = written ? "Failed" : "dropped (worker already closed)";
+        }
+
+        log.info("worker finished", {
           taskId,
-          kind: "Failed",
-          by: workerId,
-          source,
-          payload: {
-            workerId,
-            error: run.error,
-            sessionId: run.sessionId,
-            ...("failureKind" in run ? { failureKind: run.failureKind } : {}),
-            ...("reply" in run ? { reply: run.reply } : {}),
-            ...("repair" in run ? { repair: run.repair } : {}),
-          },
+          workerId,
+          outcome,
+          sessionId: run.sessionId,
+          restarted: initial.restarted,
+        });
+
+        resultSessionId = run.sessionId;
+        restarted = initial.restarted;
+      } catch (error) {
+        // Unexpected wrapper errors also become durable outcomes; a hard crash
+        // cannot run this handler and is recovered by heartbeat observation.
+        const written = ledger.appendWorkerOutcome({
+          taskId, kind: "Failed", by: workerId, source,
+          payload: { workerId, error: error instanceof Error ? error.message : String(error) },
         });
         outcome = written ? "Failed" : "dropped (worker already closed)";
+      } finally {
+        stopHeartbeat();
       }
-
-      log.info("worker finished", {
-        taskId,
-        workerId,
-        outcome,
-        sessionId: run.sessionId,
-        restarted: initial.restarted,
-      });
 
       // A new fact exists, so the runtime reconciles now rather than waiting
       // for the next tick.
@@ -162,7 +193,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
 
       return {
         status: "ok",
-        data: { taskId, workerId, outcome, sessionId: run.sessionId, restarted: initial.restarted },
+        data: { taskId, workerId, outcome, sessionId: resultSessionId, restarted },
       };
     },
   };
@@ -223,6 +254,9 @@ export async function summonWithFallback(input: {
   // The delta brief on the Started assumed a session that holds the history.
   // The fresh session holds nothing, so it gets the full brief instead.
   const task = foldTask(ledger.factsFor(taskId));
+  if (task.state !== "taken" || task.liveWorker?.workerId !== workerId) {
+    return { ok: false, error: "Worker was stopped before session fallback.", restarted: false };
+  }
   const prompt = bindWorkspacePrompt(buildWorkerPrompt({
     task,
     config: managerConfig,

@@ -2,6 +2,7 @@ import type { RomeAppApiHandler, RomeAppApiRequest, RomeAppContext } from "@rome
 import { createBoardRepository } from "../db/repositories/board.js";
 import { createLedgerRepository } from "../db/repositories/ledger.js";
 import { createLockRepository, RECONCILE_LOCK } from "../db/repositories/lock.js";
+import { createWorkerHealthRepository } from "../db/repositories/worker-health.js";
 import { createSettingsRepository } from "../db/repositories/settings.js";
 import { buildView, summarizeFact, workersOf } from "../lib/view.js";
 import { fold, foldTask } from "../lib/fold.js";
@@ -144,6 +145,12 @@ class ManagerApiHandler implements RomeAppApiHandler {
         }
         const taskId = (result.data as { taskId?: string } | undefined)?.taskId;
         return json({ taskId, issueId: issue.id }, 201);
+      }
+
+      if (request.method === "GET" && route === "worker-health") {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        const now = new Date();
+        return json({ now: now.toISOString(), workers: createWorkerHealthRepository(this.ctx.db).status(now) });
       }
 
       if (request.method === "GET" && route === "state") {

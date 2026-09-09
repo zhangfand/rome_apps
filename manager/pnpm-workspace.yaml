@@ -3,6 +3,7 @@
 # ERR_PNPM_IGNORED_BUILDS (which also breaks drizzle-kit's install preflight)
 # and pnpm rewrites this file with an interactive placeholder.
 allowBuilds:
+  better-sqlite3: true
   esbuild: false
 # Apps may depend on just-published packages (e.g. a fresh @rome-os SDK
 # release); don't quarantine new versions for 24h.

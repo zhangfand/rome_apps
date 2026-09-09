@@ -298,11 +298,10 @@ These are limits of what Rome exposes to an app today, not choices.
   through summon to run another app's agent. Manager creates and validates an isolated Git worktree, then states its
   directory in every worker brief. The actual process cwd is still not
   enforced by the platform.
-- **No boot-time restart detection.** An app cannot ask whether an execution it
-  launched is still alive, so the runtime cannot write `Lost(why="host restart")`
-  on boot. The age cap covers the same case: a worker silent past `ageCapHours`
-  gets `Lost(why="silent past cap")` and is retried. The cost is latency, up to
-  the cap, on a restart.
+- **No authoritative execution-death probe.** New workers use durable wrapper
+  heartbeats (below) to detect missing liveness after a restart on the next
+  reconcile after lease expiry. This is suspicion, not proof that an agent
+  cannot still act. Historical workers retain the legacy age-cap fallback.
 - **No person id in an action.** `getCurrentActionContext()` gives the calling
   session, agent, and channel thread, but core deliberately drops the resolved
   `SessionActor` before the context reaches app code. So a fact from a chat is
@@ -374,3 +373,25 @@ The pure logic is unit-tested next to it — `fold.test.ts`, `reconcile.test.ts`
 `judge.test.ts`, `config.test.ts`, `observe.test.ts`, `intake.test.ts`. None of them touches a database: `reconcile`
 takes a snapshot value and returns actions, and the action layer applies them.
 Run them with `pnpm test`.
+
+
+## Worker heartbeats
+
+New workers have Manager-owned durable wrapper heartbeats, separate from the
+append-only facts. `manager__worker_health` holds one row per worker:
+`worker_id`, `task_id`, `owner_id`, `last_heartbeat_at`, and `expires_at`.
+`run_worker` claims its row before summon, renews every 30 seconds with a
+3-minute lease, and stops the timer in `finally`. No model heartbeat prompts,
+extra routine, core change, or per-heartbeat ledger writes are needed.
+
+Reconciliation observes outstanding versioned workers before external polls,
+then appends a guarded `Lost` on expiry and applies the existing bounded retry
+policy. A `Started` with no initial heartbeat also expires after a 3-minute
+startup grace. Old in-flight workers without `heartbeatProtocol: 1` stay on the
+legacy age cap; installing does not fabricate a heartbeat or restart them.
+
+[Read-only worker health](/api/apps/manager/worker-health) exposes `starting`,
+`alive`, `expired`, or `legacy`, with last heartbeat and expiry timestamps.
+This guardian-only endpoint never refreshes a lease. See
+[worker-heartbeats.md](docs/worker-heartbeats.md) for guarantees, limitations,
+race handling, and validation.

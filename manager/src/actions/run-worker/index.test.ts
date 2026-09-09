@@ -6,6 +6,8 @@ import { prepareWorkspace } from "../../lib/worktree.js";
 import { afterEach, beforeEach, describe, expect, it, rs } from "@rstest/core";
 import type { ActionConfig, AppActionRuntimeDeps } from "@rome-os/app-runtime";
 import * as ledgerModule from "../../db/repositories/ledger.js";
+import * as healthModule from "../../db/repositories/worker-health.js";
+import { HEARTBEAT_INTERVAL_MS } from "../../lib/worker-health.js";
 import * as settingsModule from "../../db/repositories/settings.js";
 import { createAction } from "./index.js";
 import { foldTask } from "../../lib/fold.js";
@@ -18,6 +20,7 @@ let b: LedgerBuilder;
 
 let parent: string;
 afterEach(async () => {
+  rs.useRealTimers();
   if (parent) await rm(parent, { recursive: true, force: true });
 });
 beforeEach(async () => {
@@ -74,7 +77,7 @@ beforeEach(async () => {
   });
 });
 
-type Response = { reply?: string; error?: string; beforeReturn?: () => void };
+type Response = { reply?: string; error?: string; beforeReturn?: () => void | Promise<void> };
 async function execute(responses: Response[]) {
   const calls: { name: string; args: Record<string, unknown> }[] = [];
   const reconciles: string[] = [];
@@ -93,8 +96,8 @@ async function execute(responses: Response[]) {
               romeSession: { _romeSessionId: "rome-s1", _type: "coding" },
             };
         })(),
-        result: Promise.resolve().then(() => {
-          response.beforeReturn?.();
+        result: Promise.resolve().then(async () => {
+          await response.beforeReturn?.();
           return response.error
             ? { status: "error", error: response.error }
             : { status: "ok", data: { result: response.reply, sessionId: "s1" } };
@@ -184,5 +187,77 @@ describe("run_worker protocol wiring", () => {
     ]);
     expect(calls).toHaveLength(1);
     expect(terminal()).toBeUndefined();
+  });
+});
+
+
+describe("run_worker heartbeat wiring", () => {
+  function monitored() {
+    const start = b.facts.at(-1)!;
+    if (start.kind === "Started") start.payload.heartbeatProtocol = 1;
+    const claim = rs.spyOn(healthModule.WorkerHealthRepository.prototype, "claim").mockReturnValue(true);
+    const renew = rs.spyOn(healthModule.WorkerHealthRepository.prototype, "renew").mockReturnValue(true);
+    rs.useFakeTimers();
+    return { claim, renew };
+  }
+  it("keeps beating while summon is quiet and stops before reconciliation", async () => {
+    const { claim, renew } = monitored();
+    const { result } = await execute([{ reply: JSON.stringify(WAIT), beforeReturn: () => {
+      expect(claim).toHaveBeenCalledTimes(1);
+      rs.advanceTimersByTime(HEARTBEAT_INTERVAL_MS * 2);
+      expect(renew).toHaveBeenCalledTimes(2);
+    } }]);
+    expect(result.status).toBe("ok");
+    rs.advanceTimersByTime(HEARTBEAT_INTERVAL_MS * 10);
+    expect(renew).toHaveBeenCalledTimes(2);
+    expect(renew.mock.calls[0].slice(0, 2)).toEqual(["t1", "w0"]);
+  });
+  it("cleans up the timer on failure", async () => {
+    const { renew } = monitored();
+    await execute([{ error: "provider died", beforeReturn: () => { rs.advanceTimersByTime(HEARTBEAT_INTERVAL_MS); } }]);
+    expect(terminal()?.kind).toBe("Failed");
+    rs.advanceTimersByTime(HEARTBEAT_INTERVAL_MS * 5);
+    expect(renew).toHaveBeenCalledTimes(1);
+  });
+  it("covers resumed execution, fresh fallback, and reply repair with one lease", async () => {
+    const { claim, renew } = monitored();
+    const start = b.facts.at(-1)!;
+    if (start.kind === "Started") start.payload.resumeSessionId = "old-session";
+    const beforeReturn = () => { rs.advanceTimersByTime(HEARTBEAT_INTERVAL_MS); };
+    const { calls } = await execute([
+      { error: "Session was not found or cannot be resumed", beforeReturn },
+      { reply: "bad protocol", beforeReturn },
+      { reply: JSON.stringify(WAIT), beforeReturn },
+    ]);
+    expect(calls).toHaveLength(3);
+    expect(claim).toHaveBeenCalledTimes(1);
+    expect(renew).toHaveBeenCalledTimes(3);
+    rs.advanceTimersByTime(HEARTBEAT_INTERVAL_MS * 5);
+    expect(renew).toHaveBeenCalledTimes(3);
+  });
+  it("does not invoke an agent for a duplicate, closed, or late lease claim", async () => {
+    const { claim, renew } = monitored();
+    claim.mockReturnValue(false);
+    const { calls, result } = await execute([]);
+    expect(calls).toEqual([]);
+    expect(result).toMatchObject({ status: "ok", data: { outcome: "skipped (heartbeat lease unavailable)" } });
+    rs.advanceTimersByTime(HEARTBEAT_INTERVAL_MS * 5);
+    expect(renew).not.toHaveBeenCalled();
+  });
+  it("does not launch a fresh fallback after heartbeat observation closed the worker", async () => {
+    monitored();
+    const start = b.facts.at(-1)!;
+    if (start.kind === "Started") start.payload.resumeSessionId = "old-session";
+    const { calls } = await execute([{ error: "Session was not found or cannot be resumed", beforeReturn: () => {
+      b.add({ taskId: "t1", kind: "Lost", by: "runtime", payload: { workerId: "w0", why: "heartbeat expired" } }, 0);
+    } }]);
+    expect(calls).toHaveLength(1);
+    expect(terminal()).toBeUndefined();
+    expect(b.facts.some((fact) => fact.kind === "Restarted")).toBe(false);
+  });
+  it("does not retrofit historical Started facts with fictitious heartbeats", async () => {
+    const claim = rs.spyOn(healthModule.WorkerHealthRepository.prototype, "claim");
+    await execute([{ reply: JSON.stringify(WAIT) }]);
+    expect(claim).not.toHaveBeenCalled();
   });
 });

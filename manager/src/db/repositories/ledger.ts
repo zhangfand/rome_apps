@@ -13,7 +13,7 @@ export class LedgerRepository {
 
   constructor(
     private readonly db: DrizzleDb,
-    tablePrefix: string,
+    private readonly tablePrefix: string,
   ) {
     this.tables = createAppDbSchema(tablePrefix);
   }
@@ -58,13 +58,17 @@ export class LedgerRepository {
    * reply would move a task the runtime has already moved on from.
    */
   appendWorkerOutcome(fact: NewFact & { payload: { workerId: string } }): Fact | undefined {
-    const closed = this.factsFor(fact.taskId).some(
-      (existing) =>
-        isWorkerTerminalKind(existing.kind) &&
-        (existing.payload as { workerId?: string }).workerId === fact.payload.workerId,
-    );
-    if (closed) return undefined;
-    return this.append(fact);
+    // Multiple action processes have separate SQLite connections. Reserve the
+    // write lock before reading so a Returned/Failed cannot race a Lost.
+    return this.db.transaction((tx) => {
+      const ledger = new LedgerRepository(tx as unknown as DrizzleDb, this.tablePrefix);
+      const closed = ledger.factsFor(fact.taskId).some(
+        (existing) =>
+          isWorkerTerminalKind(existing.kind) &&
+          (existing.payload as { workerId?: string }).workerId === fact.payload.workerId,
+      );
+      return closed ? undefined : ledger.append(fact);
+    }, { behavior: "immediate" });
   }
 
   all(): Fact[] {

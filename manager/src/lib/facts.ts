@@ -165,6 +165,8 @@ export type StartedFact = FactOf<
     resumeSessionId?: string;
     /** Absent on historical starts whose workers were taught the old prose protocol. */
     replyProtocol?: 1;
+    /** Only versioned starts require a heartbeat; historical workers stay legacy. */
+    heartbeatProtocol?: 1;
     /** Isolated checkout prepared before launch; absent on legacy facts. */
     workspace?: WorkerWorkspace;
   }

@@ -4,7 +4,8 @@ import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
  * The Manager's whole store. `facts` is the ledger: append-only, never updated,
  * never deleted, and the only description of a task there is. `config` holds
  * the handful of settings that are not facts about a task, and `locks` holds
- * the one lock that keeps reconciles from overlapping.
+ * the one lock that keeps reconciles from overlapping. `workerHealth` holds
+ * mutable wrapper leases; only their loss becomes a fact.
  */
 export function createAppDbSchema(tablePrefix: string = "manager") {
   const facts = sqliteTable(
@@ -56,7 +57,16 @@ export function createAppDbSchema(tablePrefix: string = "manager") {
     syncedAt: integer("synced_at", { mode: "timestamp_ms" }).notNull(),
   });
 
-  return { facts, config, locks, preferences, snapshots };
+  const workerHealth = sqliteTable(`${tablePrefix}__worker_health`, {
+    workerId: text("worker_id").primaryKey(),
+    taskId: text("task_id").notNull(),
+    /** Unique wrapper invocation; duplicate dispatches cannot share a lease. */
+    ownerId: text("owner_id").notNull(),
+    lastHeartbeatAt: integer("last_heartbeat_at").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+  });
+
+  return { facts, config, locks, preferences, snapshots, workerHealth };
 }
 
 const defaultSchema = createAppDbSchema();
@@ -66,3 +76,5 @@ export const config = defaultSchema.config;
 export const locks = defaultSchema.locks;
 export const preferences = defaultSchema.preferences;
 export const snapshots = defaultSchema.snapshots;
+
+export const workerHealth = defaultSchema.workerHealth;

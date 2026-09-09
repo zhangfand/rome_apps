@@ -2,6 +2,7 @@ import type { ManagerConfig } from "./config.js";
 import { type NewFact, RUNTIME } from "./facts.js";
 import { isTerminal, type LedgerSnapshot, type TaskView, workerAgeMs } from "./fold.js";
 import type { Judge } from "./judge.js";
+import { HEARTBEAT_PROTOCOL } from "./worker-health.js";
 import { REPLY_PROTOCOL } from "./worker-reply.js";
 import { buildWorkerPrompt } from "./prompt.js";
 
@@ -71,8 +72,8 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
         kind: "Started",
         by: RUNTIME,
         payload: resume
-          ? { workerId, prompt, resumeSessionId: resume.sessionId, replyProtocol: REPLY_PROTOCOL }
-          : { workerId, prompt, replyProtocol: REPLY_PROTOCOL },
+          ? { workerId, prompt, resumeSessionId: resume.sessionId, replyProtocol: REPLY_PROTOCOL, heartbeatProtocol: HEARTBEAT_PROTOCOL }
+          : { workerId, prompt, replyProtocol: REPLY_PROTOCOL, heartbeatProtocol: HEARTBEAT_PROTOCOL },
       },
     });
     actions.push({ type: "launch", taskId: task.id, workerId });
@@ -138,7 +139,11 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
     // A worker that has been silent past the age cap is treated as dead. The
     // runtime writes the Lost the worker never could, then handles it as one.
     const worker = task.liveWorker;
-    if (worker && workerAgeMs(worker, snapshot.now) > config.ageCapHours * 3_600_000) {
+    const startFact = worker && task.facts.find((fact) => fact.seq === worker.startedSeq);
+    const monitored = startFact?.kind === "Started" && startFact.payload.heartbeatProtocol === HEARTBEAT_PROTOCOL;
+    // Heartbeat expiry is observed atomically before this fold. An old but
+    // healthy monitored worker must not be killed by the legacy total-age cap.
+    if (worker && !monitored && workerAgeMs(worker, snapshot.now) > config.ageCapHours * 3_600_000) {
       actions.push({
         type: "append",
         fact: {
