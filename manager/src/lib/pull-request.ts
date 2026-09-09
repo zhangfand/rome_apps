@@ -99,7 +99,11 @@ export function mergeBlockReason(pr: Omit<PullRequestStatus, "mergeBlocked">): s
   if (pr.draft) return "PR is a draft";
   if (!pr.canWrite) return "GitHub write access is required";
   if (!pr.methods.length) return "No supported merge method";
-  if (pr.review !== "APPROVED") return pr.review === "CHANGES_REQUESTED" ? "Changes requested" : "Approval required";
+  if (pr.review === "CHANGES_REQUESTED") return "Changes requested";
+  if (pr.review === "REVIEW_REQUIRED") return "Approval required by GitHub";
+  if (pr.review === "UNKNOWN") return "Review status is unknown";
+  // Do not invent an approval requirement on repos that do not have one.
+  // CLEAN plus GitHub's merge endpoint still enforce repository rules.
   if (pr.ci !== "SUCCESS") return pr.ci === "NONE" ? "No CI checks reported" : "CI must be passing";
   if (pr.mergeState !== "CLEAN") return `GitHub merge state: ${pr.mergeState.toLowerCase()}`;
   return null;

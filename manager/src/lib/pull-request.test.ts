@@ -45,6 +45,11 @@ describe("PR data", () => {
       const f = fixture(); mutate(f); await expect(readPullRequest(ref, f.request)).rejects.toThrow();
     }
   });
+  it("does not invent a required formal approval on repositories without that rule", async () => {
+    const f = fixture(); f.pr.reviewDecision = null;
+    const data = await readPullRequest(ref, f.request);
+    expect(data.review).toBe("UNREVIEWED"); expect(data.mergeBlocked).toBe(null);
+  });
   it("fails closed on every unsafe merge state", async () => {
     const good = await readPullRequest(ref, fixture().request);
     for (const change of [{ state: "CLOSED" }, { state: "MERGED" }, { draft: true }, { canWrite: false }, { methods: [] }, { review: "REVIEW_REQUIRED" }, { review: "UNKNOWN" }, { ci: "NONE" }, { ci: "PENDING" }, { mergeState: "DIRTY" }, { mergeState: "UNKNOWN" }, { mergeState: "BLOCKED" }, { mergeState: "BEHIND" }] as Partial<PullRequestStatus>[]) {

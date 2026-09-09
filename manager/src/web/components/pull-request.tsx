@@ -86,7 +86,7 @@ export function PullRequestCard({ taskId, pr }: { taskId: string; pr: PullReques
       {confirmation ? (
         <div role="group" aria-label={`Confirm merge PR #${pr.number}`} className="mt-3 border-t border-border pt-3">
           <p className="text-ui break-words">Merge <strong>{pr.repo}#{pr.number}</strong> into <strong>{confirmation.base}</strong>?</p>
-          <p className="mt-1 text-aux text-muted-foreground">Commit {confirmation.sha.slice(0, 7)}. This changes the repository. Approval, CI, and mergeability are checked again before merging.</p>
+          <p className="mt-1 text-aux text-muted-foreground">Commit {confirmation.sha.slice(0, 7)}. This changes the repository. Review requirements, CI, and mergeability are checked again before merging.</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <select aria-label="Merge method" disabled={merging} value={confirmation.method}
               onChange={(event) => setConfirmation({ ...confirmation, method: event.target.value as MergeMethod })}
