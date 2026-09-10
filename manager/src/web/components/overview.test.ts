@@ -47,7 +47,7 @@ describe("dashboard navigation and secondary views", () => {
   it("renders secondary pages without the attention/overview stack", () => {
     for (const page of ["tasks", "history", "workers", "ledger", "diagnostics"] as const) expect(screen(page)).not.toContain('aria-label="Task overview"');
     expect(screen("history")).toContain('data-task-id="done"'); expect(screen("history")).not.toContain('data-task-id="pr"');
-    expect(screen("diagnostics")).toContain("coding:coding"); expect(screen("diagnostics")).toContain("Legacy worker age cap");
+    expect(screen("diagnostics")).toContain("coding:coding"); expect(screen("diagnostics")).toContain("Infrastructure");
   });
   it("keeps existing deep links and makes the root the overview", () => {
     expect(dashboardRoute("")).toEqual({ page: "overview", taskId: null });

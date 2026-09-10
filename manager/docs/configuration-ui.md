@@ -1,9 +1,18 @@
 # Editing configuration
 
-Open **More → Configuration & status → Edit configuration**. Setup is still
-required for initialization. The form loads the full configuration independently
-of the dashboard's project filter and polling does not overwrite unsaved edits.
-Save applies only changed fields; Cancel discards the draft.
+Open **More → Configuration & status**. Each setting is already editable in a
+full-width row: name/description on the left, control on the right (stacked on
+mobile), following Rome's settings-row pattern. No Edit button or separate form
+view. Save/Cancel appear inline only on the row with a change, including switches.
+Saving one row does not commit or discard other rows' drafts. Saved status and
+validation/network errors stay with the affected row. Runtime counts are in a
+collapsed status disclosure, not duplicated alongside the setting controls.
+
+Setup is still required for initialization. Settings load independently of the
+dashboard's project filter. Polling never replaces unsaved edits. Each successful
+save advances the shared revision for subsequent row saves. Stale edits require
+an explicit discard/reload. When rearranging shared-repository routes, disable
+intake first, edit the routing labels/repos, then enable intake again.
 
 ## Mutable after initialization
 

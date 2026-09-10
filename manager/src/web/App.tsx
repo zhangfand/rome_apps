@@ -11,7 +11,7 @@ import { TaskDetail } from "./components/task-detail";
 import { TaskList } from "./components/task-list";
 import { WorkerTable } from "./components/worker-table";
 import { Board } from "./components/board";
-import { ConfigurationEditor } from "./components/configuration";
+import { ConfigurationEditor, SettingRow } from "./components/configuration";
 import { Overview } from "./components/overview";
 import { handleOf, nameWorkers } from "./lib/domain";
 import { useNow } from "./lib/format";
@@ -146,20 +146,22 @@ function Diagnostics({ view, onSaved }: { view: DashboardView; onSaved: () => vo
     ["Open tasks", view.counts.tasks.created + view.counts.tasks.taken], ["Completed / cancelled", view.counts.tasks.completed + view.counts.tasks.cancelled],
     ["Ledger entries", view.counts.facts], ["Running workers in this view", view.counts.workers.running], ["Reconcile lock", view.lock.held ? "Held" : "Free"],
   ];
-  if (config) rows.push(["Worker agent", config.workerAgent], ["Global worker limit", config.maxWorkers], ["Retry limit", config.startCap],
-    ["Reconcile interval", `${config.intervalMinutes} minutes`], ["Legacy worker age cap", `${config.ageCapHours} hours (heartbeat-based workers use their lease instead)`]);
-  return <section className="flex flex-col gap-4" aria-label="Configuration and status">
+  return <section className="flex flex-col gap-6" aria-label="Configuration and status">
     <h2 className="text-section">Configuration & status</h2>
-    <p className="text-aux text-muted-foreground">Adjust runtime limits and project intake without restarting Manager.</p>
-    {config ? <ConfigurationEditor onSaved={onSaved} /> : null}
-    {!config ? <p className="text-ui">Run <code>manager:setup</code> with a project directory to configure workers and the reconcile schedule.</p> : null}
-    <dl className="grid gap-3 rounded-12 border border-border bg-surface p-4 sm:grid-cols-2">
-      {rows.map(([label, value]) => <div key={label}><dt className="text-aux text-muted-foreground">{label}</dt><dd className="mt-1 text-ui break-words">{value}</dd></div>)}
-    </dl>
-    {config ? <div className="flex flex-col gap-3"><h3 className="text-section">Projects</h3>
-      {Object.entries(config.projects ?? { default: { workingDir: config.workingDir } }).map(([id, project]) => <div key={id} className="rounded-8 border border-border p-3 text-ui">
-        <p className="font-medium">{id}{id === config.defaultProject ? " · default" : ""}</p><p className="mt-1 break-all text-aux text-muted-foreground">{project.workingDir}</p>{"repo" in project && project.repo ? <p className="mt-1 text-aux">{project.repo}</p> : null}
-      </div>)}
-    </div> : null}
+    {config ? <ConfigurationEditor onSaved={onSaved} /> : <p className="text-ui">Run <code>manager:setup</code> with a project directory to configure workers and the reconcile schedule.</p>}
+    {config ? <section aria-label="Infrastructure settings">
+      <h3 className="text-section">Infrastructure</h3>
+      <div className="mt-2 divide-y divide-border">
+        <SettingRow title="Worker agent" hint="Read-only here. Changing agents needs session compatibility planning via manager:setup."><span className="text-ui">{config.workerAgent}</span></SettingRow>
+        <SettingRow title="Reconcile interval" hint="Read-only here. Changing cadence replaces the scheduled routine via manager:setup."><span className="text-ui">{config.intervalMinutes} minutes</span></SettingRow>
+        <SettingRow title="Project IDs" hint="Use manager:setup to add, remove, or rename projects."><span className="text-ui break-words">{Object.keys(config.projects ?? { default: {} }).join(", ")}</span></SettingRow>
+      </div>
+    </section> : null}
+    <details className="border-t border-border pt-4">
+      <summary className="cursor-pointer text-section">Runtime status</summary>
+      <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+        {rows.map(([label, value]) => <div key={label}><dt className="text-aux text-muted-foreground">{label}</dt><dd className="mt-1 text-ui break-words">{value}</dd></div>)}
+      </dl>
+    </details>
   </section>;
 }

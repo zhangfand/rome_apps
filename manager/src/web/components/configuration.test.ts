@@ -1,33 +1,42 @@
 import { describe, expect, it } from "@rstest/core";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ConfigurationFields, ConfigurationEditor, configurationChanges } from "./configuration";
+import { ConfigurationFields, ConfigurationEditor, configurationRows } from "./configuration";
 import { parseConfig } from "../../lib/config";
 const p = parseConfig({ projects: { a: { workingDir: "/a", repo: "acme/a" }, b: { workingDir: "/b", intakeEnabled: false } } });
 if (!p.ok) throw new Error(p.error);
 const config = p.config;
-describe("configuration form", () => {
-  it("only sends changed safe fields, not infrastructure", () => {
-    expect(configurationChanges(config, structuredClone(config))).toEqual({});
-    expect(configurationChanges(config, { ...config, maxWorkers: 5, workerAgent: "ignored", intervalMinutes: 10 })).toEqual({ maxWorkers: 5 });
-    expect(configurationChanges(config, { ...config, projects: { ...config.projects, b: { workingDir: "/b", intakeEnabled: true } } })).toEqual({ projects: { ...config.projects, b: { workingDir: "/b", intakeEnabled: true } } });
+const rows = configurationRows(config).flatMap((s) => s.rows);
+describe("inline setting rows", () => {
+  it("sends only the changed setting and exposes no infrastructure controls", () => {
+    expect(rows.find((r) => r.id === "maxWorkers")!.changes(5)).toEqual({ maxWorkers: 5 });
+    expect(rows.some((r) => ["workerAgent", "intervalMinutes"].includes(r.id))).toBe(false);
+    expect(rows.find((r) => r.id === "defaultProject")!.options).toEqual(["a", "b"]);
   });
-  it("exposes labeled fields, bounds, impact notes, and read-only infrastructure", () => {
-    const html = renderToStaticMarkup(createElement(ConfigurationFields, { config, disabled: false, onChange() {} }));
-    for (const text of ["Global worker limit", "Retry limit", "Legacy worker age cap", "Reuse worker sessions", "Close tasks when GitHub issues close", "Default project", "a source directory", "a repository", "a intake label", "a project label", "Enable b issue intake", "Infrastructure", "coding:coding", "new tasks only", "does not stop running workers", 'min="1"', 'max="20"', 'max="168"', 'role="switch"', 'aria-describedby=']) expect(html).toContain(text);
-    expect(html).not.toContain('value="coding:coding"');
-    expect(html).not.toContain('value="a" name="projectId"');
+  it("project row changes preserve other projects and sibling fields", () => {
+    expect(rows.find((r) => r.id === "projects.b.intakeEnabled")!.changes(true)).toEqual({ projects: { ...config.projects, b: { workingDir: "/b", intakeEnabled: true } } });
+    expect(rows.find((r) => r.id === "projects.a.repo")!.changes("")).toEqual({ projects: { ...config.projects, a: { workingDir: "/a" } } });
+    expect(rows.find((r) => r.id === "projects.a.workingDir")!.changes("/new")).toEqual({ projects: { ...config.projects, a: { workingDir: "/new", repo: "acme/a" } } });
   });
-  it("supports legacy repositories without inventing project mappings", () => {
+  it("renders controls immediately in labeled rows, with no separate edit view", () => {
+    const html = renderToStaticMarkup(createElement(ConfigurationFields, { config, disabled: false, async save() {} }));
+    for (const text of ["Global worker limit", "Retry limit", "Legacy worker age cap", "Reuse worker sessions", "Close tasks when GitHub issues close", "Default project", "Source directory", "Repository", "Intake label", "Project label", "Issue intake", "new tasks only", "does not stop running workers", 'min="1"', 'max="20"', 'max="168"', 'role="switch"', 'aria-describedby=', 'data-setting-row']) expect(html).toContain(text);
+    expect(html.split('data-setting-row').length - 1).toBe(rows.length);
+    expect(html).not.toContain("Edit configuration"); expect(html).not.toContain("Save changes");
+    expect(html).not.toContain(">Save<"); // Save/Cancel only appear on the row with edits.
+  });
+  it("supports legacy repository lists without inventing project mappings", () => {
     const legacy = parseConfig({ workingDir: "/legacy", intakeRepos: ["acme/a", "acme/b"] });
     if (!legacy.ok) throw new Error(legacy.error);
-    const html = renderToStaticMarkup(createElement(ConfigurationFields, { config: legacy.config, disabled: true, onChange() {} }));
+    const html = renderToStaticMarkup(createElement(ConfigurationFields, { config: legacy.config, disabled: true, async save() {} }));
     expect(html).toContain("Intake repositories"); expect(html).toContain("acme/a, acme/b"); expect(html).toContain("disabled");
     expect(html).not.toContain("Default project");
-    expect(configurationChanges(legacy.config, { ...legacy.config, intakeRepos: [] })).toEqual({ intakeRepos: [] });
+    const row = configurationRows(legacy.config).flatMap((s) => s.rows).find((r) => r.id === "intakeRepos")!;
+    expect(row.changes("acme/a, acme/b, ")).toEqual({ intakeRepos: ["acme/a", "acme/b"] });
+    expect(row.changes("")).toEqual({ intakeRepos: [] });
   });
-  it("starts collapsed and makes editing explicit", () => {
+  it("needs no edit button to enter settings", () => {
     const html = renderToStaticMarkup(createElement(ConfigurationEditor, { onSaved() {} }));
-    expect(html).toContain("Edit configuration"); expect(html).not.toContain("Save changes");
+    expect(html).toContain("Edit a row"); expect(html).not.toContain("Edit configuration");
   });
 });
