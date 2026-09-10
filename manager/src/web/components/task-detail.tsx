@@ -3,12 +3,13 @@ import { fetchAppApi, navigateToApp } from "@rome-os/app-web-sdk";
 import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
 import { Button } from "@rome-os/ui/button";
 import { Spinner } from "@rome-os/ui/spinner";
-import { ArrowLeft, MessageSquare } from "lucide-react";
-import { AttentionPanel, chatAbout } from "./attention";
+import { ArrowLeft } from "lucide-react";
+import { AttentionPanel } from "./attention";
 import { PositionBadge, TaskStateBadge } from "./badges";
 import { Ledger } from "./ledger";
 import { LightMarkdown } from "./light-markdown";
 import { TaskName } from "./refs";
+import { TaskComposer } from "./task-composer";
 import { WorkerLink } from "./worker-link";
 import { WorkerTable } from "./worker-table";
 import { handleOf, nameWorkers } from "../lib/domain";
@@ -57,23 +58,12 @@ export function TaskDetail({ taskId }: { taskId: string }) {
   const awaiting = task && openWord && task.state === "taken" && (task.position === "stuck" || task.position === "reported");
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-1 flex-col gap-5">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" onClick={() => navigateToApp("")} className="-ml-2">
           <ArrowLeft className="size-4" aria-hidden />
           Overview
         </Button>
-        {task && handle ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="ml-auto"
-            onClick={() => void chatAbout(taskId, handle, "status")}
-          >
-            <MessageSquare className="size-4" aria-hidden />
-            Discuss in chat
-          </Button>
-        ) : null}
       </div>
 
       {error ? (
@@ -164,6 +154,9 @@ export function TaskDetail({ taskId }: { taskId: string }) {
             <h2 className="text-section">History</h2>
             <Ledger facts={task.facts} names={names} showTask={false} oldestFirst filterable={false} />
           </section>
+          <div data-task-composer-dock className="sticky bottom-0 z-10 mt-auto shrink-0 bg-background pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+            <TaskComposer key={task.id} taskId={task.id} closed={task.state === "completed" || task.state === "cancelled"} onSent={() => void load()} />
+          </div>
         </>
       ) : null}
     </div>
