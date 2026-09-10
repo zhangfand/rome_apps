@@ -45,13 +45,21 @@ describe("dashboard navigation and secondary views", () => {
     for (const absent of ["coding:coding", "999", "reconciling", "just now", "3h of silence", "Task scope", "Created or Taken"]) expect(html).not.toContain(absent);
   });
   it("renders secondary pages without the attention/overview stack", () => {
-    for (const page of ["tasks", "history", "workers", "ledger", "diagnostics"] as const) expect(screen(page)).not.toContain('aria-label="Task overview"');
+    for (const page of ["tasks", "history", "workers", "ledger", "diagnostics", "status"] as const) expect(screen(page)).not.toContain('aria-label="Task overview"');
     expect(screen("history")).toContain('data-task-id="done"'); expect(screen("history")).not.toContain('data-task-id="pr"');
     expect(screen("diagnostics")).toContain("coding:coding"); expect(screen("diagnostics")).toContain("Infrastructure");
   });
+  it("keeps runtime status separate from configuration", () => {
+    const settings = screen("diagnostics");
+    expect(settings).toContain('aria-label="Configuration"');
+    expect(settings).not.toContain("Reconcile lock"); expect(settings).not.toContain("Runtime status");
+    const status = screen("status");
+    expect(status).toContain("Runtime status"); expect(status).toContain("Reconcile lock"); expect(status).toContain("999");
+    expect(status).not.toContain("Infrastructure"); expect(status).not.toContain("Manager settings");
+  });
   it("keeps existing deep links and makes the root the overview", () => {
     expect(dashboardRoute("")).toEqual({ page: "overview", taskId: null });
-    for (const page of ["tasks", "history", "board", "workers", "ledger", "diagnostics"]) expect(dashboardRoute(`/${page}/`).taskId).toBe(null);
+    for (const page of ["tasks", "history", "board", "workers", "ledger", "diagnostics", "status"]) expect(dashboardRoute(`/${page}/`).taskId).toBe(null);
     expect(dashboardRoute("t-123")).toEqual({ page: "overview", taskId: "t-123" });
   });
   it("uses the shared small Select trigger with a stable selected label", () => {

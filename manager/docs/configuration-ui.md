@@ -1,12 +1,13 @@
 # Editing configuration
 
-Open **More → Configuration & status**. Each setting is already editable in a
+Open **More → Configuration**. Each setting is already editable in a
 full-width row: name/description on the left, control on the right (stacked on
 mobile), following Rome's settings-row pattern. No Edit button or separate form
 view. Save/Cancel appear inline only on the row with a change, including switches.
 Saving one row does not commit or discard other rows' drafts. Saved status and
-validation/network errors stay with the affected row. Runtime counts are in a
-collapsed status disclosure, not duplicated alongside the setting controls.
+validation/network errors stay with the affected row. Runtime counts and the reconcile lock live on **More → Runtime status**
+(`/apps/manager/status`), separate from configuration. Existing `/diagnostics`
+links remain valid and now show configuration only.
 
 Setup is still required for initialization. Settings load independently of the
 dashboard's project filter. Polling never replaces unsaved edits. Each successful

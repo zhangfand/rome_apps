@@ -19,10 +19,11 @@ import type { DashboardView } from "./lib/types";
 
 const POLL_MS = 15_000;
 const LEDGER_LIMIT = 300;
-export type Page = "overview" | "tasks" | "board" | "history" | "workers" | "ledger" | "diagnostics";
-const PAGES: Page[] = ["overview", "tasks", "board", "history", "workers", "ledger", "diagnostics"];
+export type Page = "overview" | "tasks" | "board" | "history" | "workers" | "ledger" | "diagnostics" | "status";
+const PAGES: Page[] = ["overview", "tasks", "board", "history", "workers", "ledger", "diagnostics", "status"];
 const MORE: Array<{ page: Page; label: string }> = [
-  { page: "history", label: "History" }, { page: "diagnostics", label: "Configuration & status" },
+  { page: "history", label: "History" }, { page: "diagnostics", label: "Configuration" },
+  { page: "status", label: "Runtime status" },
   { page: "workers", label: "Workers" }, { page: "ledger", label: "Ledger" },
 ];
 
@@ -37,7 +38,7 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
   const [route, setRoute] = useState(() => getCurrentAppPath());
   useEffect(() => subscribeToAppPath(setRoute), []);
   const { page, taskId } = dashboardRoute(route);
-  return <main className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 md:p-6 md:pt-5">
+  return <main className={`mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 md:p-6 md:pt-5${taskId ? " min-h-dvh pb-0 md:pb-0" : ""}`}>
     {taskId ? <TaskDetail key={taskId} taskId={taskId} /> : <Dashboard page={page} />}
   </main>;
 }
@@ -113,7 +114,7 @@ export function DashboardScreen({ page, view, projectId, onProject, loading, war
           <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" className={cn("px-2", MORE.some((m) => m.page === page) && "bg-surface-muted")}>More<ChevronDown className="size-3" aria-hidden /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onSelect={() => go("history")}>History</DropdownMenuItem>
-            <DropdownMenuSeparator /><DropdownMenuLabel>Diagnostics</DropdownMenuLabel>
+            <DropdownMenuSeparator /><DropdownMenuLabel>Manager</DropdownMenuLabel>
             {MORE.slice(1).map((item) => <DropdownMenuItem key={item.page} onSelect={() => go(item.page)}>{item.label}</DropdownMenuItem>)}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -129,7 +130,8 @@ export function DashboardScreen({ page, view, projectId, onProject, loading, war
       {page === "board" ? <Board /> : null}
       {page === "workers" ? <section className="flex flex-col gap-3"><h2 className="text-section">Workers</h2><WorkerTable workers={view.workers} names={names} handles={handles} /></section> : null}
       {page === "ledger" ? <section className="flex flex-col gap-3"><h2 className="text-section">Ledger</h2><p className="text-aux text-muted-foreground">Newest {view.ledger.length} of {view.counts.facts} entries. Open a task for its full history.</p><Ledger facts={view.ledger} names={names} taskNames={handles} /></section> : null}
-      {page === "diagnostics" ? <Diagnostics view={view} onSaved={retry} /> : null}
+      {page === "diagnostics" ? <Configuration view={view} onSaved={retry} /> : null}
+      {page === "status" ? <RuntimeStatus view={view} /> : null}
     </>}
   </>;
 }
@@ -140,14 +142,10 @@ export function DashboardFreshness({ loading, warning, retry }: { loading: boole
   return <Button variant="ghost" size="xs" onClick={retry} title={`${warning} Click to retry.`} aria-label={`${warning} Retry loading dashboard.`}><TriangleAlert className="size-3.5 text-warning-fg" aria-hidden /></Button>;
 }
 
-function Diagnostics({ view, onSaved }: { view: DashboardView; onSaved: () => void }) {
+function Configuration({ view, onSaved }: { view: DashboardView; onSaved: () => void }) {
   const config = view.config;
-  const rows: Array<[string, string | number]> = [
-    ["Open tasks", view.counts.tasks.created + view.counts.tasks.taken], ["Completed / cancelled", view.counts.tasks.completed + view.counts.tasks.cancelled],
-    ["Ledger entries", view.counts.facts], ["Running workers in this view", view.counts.workers.running], ["Reconcile lock", view.lock.held ? "Held" : "Free"],
-  ];
-  return <section className="flex flex-col gap-6" aria-label="Configuration and status">
-    <h2 className="text-section">Configuration & status</h2>
+  return <section className="flex flex-col gap-6" aria-label="Configuration">
+    <h2 className="text-section">Configuration</h2>
     {config ? <ConfigurationEditor onSaved={onSaved} /> : <p className="text-ui">Run <code>manager:setup</code> with a project directory to configure workers and the reconcile schedule.</p>}
     {config ? <section aria-label="Infrastructure settings">
       <h3 className="text-section">Infrastructure</h3>
@@ -157,11 +155,19 @@ function Diagnostics({ view, onSaved }: { view: DashboardView; onSaved: () => vo
         <SettingRow title="Project IDs" hint="Use manager:setup to add, remove, or rename projects."><span className="text-ui break-words">{Object.keys(config.projects ?? { default: {} }).join(", ")}</span></SettingRow>
       </div>
     </section> : null}
-    <details className="border-t border-border pt-4">
-      <summary className="cursor-pointer text-section">Runtime status</summary>
-      <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-        {rows.map(([label, value]) => <div key={label}><dt className="text-aux text-muted-foreground">{label}</dt><dd className="mt-1 text-ui break-words">{value}</dd></div>)}
-      </dl>
-    </details>
+  </section>;
+}
+
+function RuntimeStatus({ view }: { view: DashboardView }) {
+  const rows: Array<[string, string | number]> = [
+    ["Open tasks", view.counts.tasks.created + view.counts.tasks.taken], ["Completed / cancelled", view.counts.tasks.completed + view.counts.tasks.cancelled],
+    ["Ledger entries", view.counts.facts], ["Running workers in this view", view.counts.workers.running], ["Reconcile lock", view.lock.held ? "Held" : "Free"],
+  ];
+  return <section className="flex flex-col gap-4" aria-label="Runtime status">
+    <h2 className="text-section">Runtime status</h2>
+    <p className="text-aux text-muted-foreground">Task, worker, and ledger counts follow the selected project. The reconcile lock is shared across all projects.</p>
+    <dl className="grid gap-4 sm:grid-cols-2">
+      {rows.map(([label, value]) => <div key={label}><dt className="text-aux text-muted-foreground">{label}</dt><dd className="mt-1 text-ui break-words">{value}</dd></div>)}
+    </dl>
   </section>;
 }
