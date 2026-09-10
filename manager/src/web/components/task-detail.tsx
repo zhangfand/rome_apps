@@ -7,10 +7,11 @@ import { ArrowLeft, MessageSquare } from "lucide-react";
 import { AttentionPanel, chatAbout } from "./attention";
 import { PositionBadge, TaskStateBadge } from "./badges";
 import { Ledger } from "./ledger";
+import { LightMarkdown } from "./light-markdown";
 import { TaskName } from "./refs";
 import { WorkerLink } from "./worker-link";
 import { WorkerTable } from "./worker-table";
-import { briefText, handleOf, nameWorkers } from "../lib/domain";
+import { handleOf, nameWorkers } from "../lib/domain";
 import { formatStamp } from "../lib/format";
 import type { TaskDetail as TaskDetailData } from "../lib/types";
 
@@ -106,9 +107,11 @@ export function TaskDetail({ taskId }: { taskId: string }) {
               ) : null}
             </div>
 
-            <h1 className="max-w-prose font-serif text-title leading-snug whitespace-pre-wrap text-foreground">
-              {briefText(task.brief, handle)}
-            </h1>
+            <h1 className="sr-only">Task details: {handle.name}</h1>
+            <LightMarkdown
+              className="min-w-0 max-w-prose break-words text-ui text-foreground"
+              markdown={task.brief}
+            />
 
             <dl className="flex flex-wrap gap-x-5 gap-y-1 text-aux text-muted-foreground">
               <Stat n={task.facts.length} one="fact" many="facts" />
