@@ -137,9 +137,13 @@ export function DashboardScreen({ page, view, projectId, onProject, loading, war
 }
 
 export function DashboardFreshness({ loading, warning, retry }: { loading: boolean; warning?: string | null; retry: () => void }) {
-  if (loading) return <span role="status" aria-label="Refreshing dashboard" className="inline-flex text-muted-foreground"><RefreshCw className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden /></span>;
-  if (!warning) return null;
-  return <Button variant="ghost" size="xs" onClick={retry} title={`${warning} Click to retry.`} aria-label={`${warning} Retry loading dashboard.`}><TriangleAlert className="size-3.5 text-warning-fg" aria-hidden /></Button>;
+  // Reserve the same header space while idle, refreshing, or showing a retry.
+  // Otherwise the right-aligned navigation shifts on every polling request.
+  return <span className="inline-flex size-6 shrink-0 items-center justify-center">
+    {loading ? <span role="status" aria-label="Refreshing dashboard" className="inline-flex text-muted-foreground"><RefreshCw className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden /></span>
+      : warning ? <Button variant="ghost" size="xs" className="size-full p-0" onClick={retry} title={`${warning} Click to retry.`} aria-label={`${warning} Retry loading dashboard.`}><TriangleAlert className="size-3.5 text-warning-fg" aria-hidden /></Button>
+      : null}
+  </span>;
 }
 
 function Configuration({ view, onSaved }: { view: DashboardView; onSaved: () => void }) {

@@ -75,9 +75,19 @@ describe("dashboard navigation and secondary views", () => {
     expect(screen("overview", { view: { ...view, projects: ["rome"] } })).not.toContain('aria-label="Filter by project"');
   });
   it("has quiet idle health, a loading spinner and retry alarm", () => {
-    expect(renderToStaticMarkup(createElement(DashboardFreshness, { loading: false, retry() {} }))).toBe("");
+    const idle = renderToStaticMarkup(createElement(DashboardFreshness, { loading: false, retry() {} }));
+    expect(idle).not.toContain("<svg");
+    expect(idle).not.toContain('role="status"');
+    expect(idle).not.toContain("<button");
     expect(renderToStaticMarkup(createElement(DashboardFreshness, { loading: true, retry() {} }))).toContain("animate-spin");
     expect(renderToStaticMarkup(createElement(DashboardFreshness, { loading: false, warning: "Offline", retry() {} }))).toContain("Retry loading dashboard");
+  });
+  it("reserves identical non-shrinking header space in every refresh state", () => {
+    for (const state of [{ loading: false }, { loading: true }, { loading: false, warning: "Offline" }, { loading: true, warning: "Offline" }]) {
+      const html = renderToStaticMarkup(createElement(DashboardFreshness, { ...state, retry() {} }));
+      expect(html).toMatch(/^<span class="inline-flex size-6 shrink-0 items-center justify-center">/);
+      expect(screen("overview", state)).toContain(`</nav>${html}</header>`);
+    }
   });
   it("does not show old report claims or execution counters in All tasks", () => {
     const html = renderToStaticMarkup(createElement(TaskList, { tasks }));
