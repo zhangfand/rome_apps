@@ -11,6 +11,7 @@ import { TaskDetail } from "./components/task-detail";
 import { TaskList } from "./components/task-list";
 import { WorkerTable } from "./components/worker-table";
 import { Board } from "./components/board";
+import { ConfigurationEditor } from "./components/configuration";
 import { Overview } from "./components/overview";
 import { handleOf, nameWorkers } from "./lib/domain";
 import { useNow } from "./lib/format";
@@ -128,7 +129,7 @@ export function DashboardScreen({ page, view, projectId, onProject, loading, war
       {page === "board" ? <Board /> : null}
       {page === "workers" ? <section className="flex flex-col gap-3"><h2 className="text-section">Workers</h2><WorkerTable workers={view.workers} names={names} handles={handles} /></section> : null}
       {page === "ledger" ? <section className="flex flex-col gap-3"><h2 className="text-section">Ledger</h2><p className="text-aux text-muted-foreground">Newest {view.ledger.length} of {view.counts.facts} entries. Open a task for its full history.</p><Ledger facts={view.ledger} names={names} taskNames={handles} /></section> : null}
-      {page === "diagnostics" ? <Diagnostics view={view} /> : null}
+      {page === "diagnostics" ? <Diagnostics view={view} onSaved={retry} /> : null}
     </>}
   </>;
 }
@@ -139,7 +140,7 @@ export function DashboardFreshness({ loading, warning, retry }: { loading: boole
   return <Button variant="ghost" size="xs" onClick={retry} title={`${warning} Click to retry.`} aria-label={`${warning} Retry loading dashboard.`}><TriangleAlert className="size-3.5 text-warning-fg" aria-hidden /></Button>;
 }
 
-function Diagnostics({ view }: { view: DashboardView }) {
+function Diagnostics({ view, onSaved }: { view: DashboardView; onSaved: () => void }) {
   const config = view.config;
   const rows: Array<[string, string | number]> = [
     ["Open tasks", view.counts.tasks.created + view.counts.tasks.taken], ["Completed / cancelled", view.counts.tasks.completed + view.counts.tasks.cancelled],
@@ -149,7 +150,8 @@ function Diagnostics({ view }: { view: DashboardView }) {
     ["Reconcile interval", `${config.intervalMinutes} minutes`], ["Legacy worker age cap", `${config.ageCapHours} hours (heartbeat-based workers use their lease instead)`]);
   return <section className="flex flex-col gap-4" aria-label="Configuration and status">
     <h2 className="text-section">Configuration & status</h2>
-    <p className="text-aux text-muted-foreground">Read-only. Ask Manager to change its setup.</p>
+    <p className="text-aux text-muted-foreground">Adjust runtime limits and project intake without restarting Manager.</p>
+    {config ? <ConfigurationEditor onSaved={onSaved} /> : null}
     {!config ? <p className="text-ui">Run <code>manager:setup</code> with a project directory to configure workers and the reconcile schedule.</p> : null}
     <dl className="grid gap-3 rounded-12 border border-border bg-surface p-4 sm:grid-cols-2">
       {rows.map(([label, value]) => <div key={label}><dt className="text-aux text-muted-foreground">{label}</dt><dd className="mt-1 text-ui break-words">{value}</dd></div>)}

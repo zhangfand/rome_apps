@@ -1,3 +1,4 @@
+import { applyConfigEdit, configRevision } from "../lib/config-edit.js";
 import { PullRequestError, PullRequestService, reportPullRequests, type MergeMethod } from "../lib/pull-request.js";
 import type { RomeAppApiHandler, RomeAppApiRequest, RomeAppContext } from "@rome-os/app-runtime";
 import { createBoardRepository } from "../db/repositories/board.js";
@@ -7,7 +8,7 @@ import { createWorkerHealthRepository } from "../db/repositories/worker-health.j
 import { createSettingsRepository } from "../db/repositories/settings.js";
 import { buildView, summarizeFact, workersOf } from "../lib/view.js";
 import { fold, foldTask } from "../lib/fold.js";
-import { readProjectBinding, resolveBoardProject } from "../lib/projects.js";
+import { legacyBindingFacts, readProjectBinding, resolveBoardProject } from "../lib/projects.js";
 import { buildBoardState, openTaskForIssue } from "../lib/board.js";
 import { GithubError, listRepositories, syncRepository, type SyncDeps } from "../lib/board-sync.js";
 import { briefFromIssue, type IntakeIssue } from "../lib/intake.js";
@@ -41,6 +42,55 @@ class ManagerApiHandler implements RomeAppApiHandler {
     const locks = createLockRepository(this.ctx.db);
 
     try {
+      if (request.path[0] === "tasks" && request.path[2] === "reply" && request.path.length === 3) {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+        if ((request.body?.byteLength ?? 0) > 64_000) return json({ error: "Reply is too large." }, 413);
+        const body = readJsonBody<{ text?: unknown }>(request);
+        if (!body || typeof body !== "object" || Array.isArray(body) || typeof body.text !== "string" || !body.text.trim()) {
+          return json({ error: "Enter an instruction, feedback, or question." }, 400);
+        }
+        if (!ledger.reachable()) return json({ error: "the ledger is unreachable" }, 503);
+        const facts = ledger.factsFor(request.path[1]);
+        if (!facts.length) return json({ error: "task_not_found" }, 404);
+        const task = foldTask(facts);
+        if (task.state === "completed" || task.state === "cancelled") {
+          return json({ error: "This task is closed. Start a chat to discuss it." }, 409);
+        }
+        // Reuse the existing person-fact/reconciliation path; never create a chat here.
+        const result = await this.ctx.runAction("manager:reply", { taskId: task.id, text: body.text, source: body.text });
+        if (result.status !== "ok") {
+          return json({ error: result.status === "error" ? result.error : `Reply returned ${result.status}` }, 502);
+        }
+        return json(result.data ?? { taskId: task.id });
+      }
+      // No actions, routine mutations, or worker launches: only a guarded config write.
+      if (route === "config") {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        if (request.method === "GET") {
+          const config = settings.get();
+          return config ? json({ config, revision: configRevision(config) }) : json({ error: "Run manager:setup first." }, 409);
+        }
+        if (request.method !== "PATCH") return json({ error: "method_not_allowed" }, 405);
+        if ((request.body?.byteLength ?? 0) > 64_000) return json({ error: "Configuration request is too large." }, 413);
+        const body = readJsonBody<{ revision?: unknown; changes?: unknown }>(request);
+        if (!body || typeof body !== "object" || Array.isArray(body) || typeof body.revision !== "string") return json({ error: "A configuration revision and changes are required." }, 400);
+        if (!locks.tryAcquire(RECONCILE_LOCK, 5 * 60_000)) return json({ error: "Manager is reconciling. Retry saving shortly; nothing was changed." }, 409);
+        try {
+          const config = settings.get();
+          if (!config) return json({ error: "Run manager:setup first." }, 409);
+          if (configRevision(config) !== body.revision) return json({ error: "Configuration changed elsewhere. Reload settings and reapply your edits.", conflict: true }, 409);
+          let next;
+          try { next = applyConfigEdit(config, body.changes); }
+          catch (error) { return json({ error: error instanceof Error ? error.message : String(error) }, 400); }
+          if (!ledger.reachable()) return json({ error: "Ledger unavailable; nothing was changed." }, 503);
+          // Preserve the OLD source for every legacy task, as setup does. No history is rewritten.
+          for (const fact of legacyBindingFacts(ledger.all(), config)) ledger.append(fact);
+          settings.put(next);
+          this.ctx.log.info("guardian updated manager configuration", { fields: Object.keys(body.changes as object) });
+          return json({ config: next, revision: configRevision(next) });
+        } finally { locks.release(RECONCILE_LOCK); }
+      }
       if (request.path[0] === "board" && request.caller.kind !== "guardian") {
         return json({ error: "forbidden" }, 403);
       }
