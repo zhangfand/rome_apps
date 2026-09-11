@@ -51,6 +51,15 @@ export class LedgerRepository {
     return toFact(row);
   }
 
+  /** Compare-and-append under a SQLite write reservation; safe against human edits too. */
+  appendIfLatest(fact: NewFact, expectedSeq: number): Fact | undefined {
+    return this.db.transaction((tx) => {
+      const ledger = new LedgerRepository(tx as unknown as DrizzleDb, this.tablePrefix);
+      if (ledger.factsFor(fact.taskId).at(-1)?.seq !== expectedSeq) return undefined;
+      return ledger.append(fact);
+    }, { behavior: "immediate" });
+  }
+
   /**
    * Append a worker's own outcome, unless the runtime already closed that
    * worker. The runtime records a stop as a Lost fact, and the stopped worker

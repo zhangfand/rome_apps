@@ -168,3 +168,20 @@ No hooks are enabled automatically. Existing tasks—including the original two
 reported Manager tasks—are not restarted or retroactively reassessed. To change
 an existing task, steer it explicitly with its required deliverable; editing these
 settings alone does not retrofit the hook pipeline.
+
+## Explicit backfill of existing reports
+
+`manager:backfill` is the opt-in exception to intake-only snapshots. Only call it
+on an explicit user request. Pass selected task IDs and current Report sequences,
+the revision from GET `/config`, and the user's verbatim `source` message. The
+action snapshots current resolved hooks into an append-only human Reply, preserving
+the original project/source binding, existing worktree, task ID and every old fact.
+It refuses configuration drift, skips changed/running/closed tasks, and is idempotent
+for the same report. SQLite compare-and-append also guards concurrent human edits.
+
+Backfill runs Prepare (when configured), then Evaluate against the exact previous
+work submission and the new criteria, without an intervening implementation run.
+Only an explicit rework verdict resumes implementation. Accepted still creates a
+Report, never Completed. Subsequent ordinary human steering invalidates the old
+assessment authorization but retains the explicitly adopted hooks. Backfill is not
+an automatic migration and does not change any unselected task or global setting.

@@ -35,3 +35,4 @@ actions:
   - actions/complete
   - actions/cancel
   - actions/snapshot
+  - actions/backfill

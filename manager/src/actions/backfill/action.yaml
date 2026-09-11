@@ -1,0 +1,14 @@
+name: backfill
+type: custom
+description: >-
+  Explicitly adopt the current Prepare/Evaluate definitions for selected existing
+  reported tasks, only when the user asks. Preserves task IDs, history and workspaces.
+  Prepares acceptance criteria then evaluates the existing submission before any
+  rework. Read state/config first and pass exact report sequences and config revision.
+  Does not close tasks or change global settings. Duplicate requests for a report are
+  idempotent; running, closed or changed tasks are skipped.
+entry: ./index.ts
+complexity: moderate
+speed: fast
+reliability: high
+sideEffects: write

@@ -1,4 +1,4 @@
-import { hooksOf, lastStart, startFor, latestAgreement, assessmentSubmission, workSession, phaseAttempts, type Phase, type AssessmentContext } from "./lifecycle.js";
+import { authorizedHistoricalAssessment, hooksOf, lastStart, startFor, latestAgreement, assessmentSubmission, workSession, phaseAttempts, type Phase, type AssessmentContext } from "./lifecycle.js";
 import { replyText } from "./worker-reply.js";
 import type { ManagerConfig } from "./config.js";
 import { type NewFact, RUNTIME } from "./facts.js";
@@ -216,7 +216,7 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
         if (phase === "evaluate") {
           const context = started?.kind === "Started" ? started.payload.assessment : undefined;
           const submission = assessmentSubmission(task, context);
-          if (!submission || context?.agreementSeq !== latestAgreement(task)?.seq || submission.seq < task.lastPersonFactSeq) {
+          if (!submission || context?.agreementSeq !== latestAgreement(task)?.seq || (submission.seq < task.lastPersonFactSeq && !authorizedHistoricalAssessment(task, context))) {
             actions.push({ type: "append", fact: { taskId: task.id, kind: "Question", by: RUNTIME, payload: { why: "Evaluation no longer matches the current agreement and submission; human input is required." } } });
             break;
           }
@@ -296,12 +296,24 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
         // Steering. A worker started before the reply cannot read it, so it is
         // stopped and replaced by one whose brief carries the reply.
         stop(task, LOST_STOPPED);
-        start(task, `a person replied: ${task.latest.payload.text}`, hooksOf(task).prepare ? "prepare" : "work");
+        if (task.latest.payload.reassessment) {
+          start(task, `Reassess existing delivery; do not redo implementation before evaluation. ${task.latest.payload.text}`,
+            hooksOf(task).prepare ? "prepare" : "evaluate", {
+              submissionSeq: task.latest.payload.reassessment.submissionSeq,
+              ...(hooksOf(task).prepare ? {} : { agreementSeq: latestAgreement(task)?.seq }),
+            });
+        } else start(task, `a person replied: ${task.latest.payload.text}`, hooksOf(task).prepare ? "prepare" : "work");
         break;
 
-      case "Prepared":
-        start(task, "implement the recorded prepared agreement");
+      case "Prepared": {
+        const assessment = startFor(task, task.latest.payload.workerId)?.payload.assessment;
+        if (assessment && authorizedHistoricalAssessment(task, assessment)) {
+          start(task, "assess the existing delivery against the backfilled agreement; do not redo already satisfied work", "evaluate", {
+            submissionSeq: assessment.submissionSeq, agreementSeq: task.latest.seq,
+          });
+        } else start(task, "implement the recorded prepared agreement");
         break;
+      }
 
       case "Rework": {
         const attempts = phaseAttempts(task, "work");

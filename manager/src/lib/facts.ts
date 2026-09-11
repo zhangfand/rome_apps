@@ -1,4 +1,4 @@
-import type { Phase, LifecycleHook, AssessmentContext } from "./lifecycle.js";
+import type { Phase, LifecycleHook, LifecycleHooks, AssessmentContext } from "./lifecycle.js";
 import { replyText, type ReplyRepair, type WorkerReply } from "./worker-reply.js";
 import type { WorkerWorkspace } from "./worktree.js";
 import type { ProjectBinding } from "./projects.js";
@@ -233,7 +233,11 @@ export type PreparedFact = FactOf<"Prepared", {
 export type ReworkFact = FactOf<"Rework", { workerId: string; reason: string; submissionSeq: number }>;
 export type QuestionFact = FactOf<"Question", { why: string }>;
 export type ReportFact = FactOf<"Report", { what: string; evidence: string }>;
-export type ReplyFact = FactOf<"Reply", { text: string }>;
+export type ReplyFact = FactOf<"Reply", {
+  text: string;
+  /** Explicit human adoption only. Never supplied by worker output or ordinary reply. */
+  reassessment?: { hooks: LifecycleHooks; reportSeq: number; submissionSeq: number };
+}>;
 
 export type Fact =
   | CreatedFact

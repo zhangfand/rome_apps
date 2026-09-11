@@ -45,8 +45,18 @@ export function resolveHooks(defaults?: LifecycleHooks, overrides?: LifecycleHoo
   return structuredClone({ ...defaults, ...overrides });
 }
 
-/** Only the intake snapshot is authoritative. Never retrofit new settings onto old tasks. */
-export function hooksOf(task: TaskView): LifecycleHooks { return task.project?.hooks ?? {}; }
+/** Only intake or an explicit human adoption is authoritative; never consult mutable config. */
+export function hooksOf(task: TaskView): LifecycleHooks {
+  const adoption = task.facts.filter((f) => f.kind === "Reply" && f.payload.reassessment).at(-1);
+  return adoption?.kind === "Reply" ? adoption.payload.reassessment!.hooks : task.project?.hooks ?? {};
+}
+
+/** A human can explicitly ask to assess a historical submission, but later steering invalidates it. */
+export function authorizedHistoricalAssessment(task: TaskView, context?: AssessmentContext): boolean {
+  const person = task.facts.find((f) => f.seq === task.lastPersonFactSeq);
+  return person?.kind === "Reply" && !!context &&
+    person.payload.reassessment?.submissionSeq === context.submissionSeq;
+}
 
 export function lastStart(task: TaskView): StartedFact | undefined {
   return task.facts.filter((f): f is StartedFact => f.kind === "Started").at(-1);

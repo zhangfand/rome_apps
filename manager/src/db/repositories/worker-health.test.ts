@@ -57,6 +57,21 @@ function returned(workerId = "w1") {
 function after(started: StartedFact, ms: number) { return new Date(+started.createdAt + ms); }
 
 describe("durable worker heartbeats (real SQLite migrations and connections)", () => {
+  it("compare-and-append prevents backfill from overriding a concurrent human change", () => {
+    start(); returned();
+    const report = ledger.append({ taskId: "t1", kind: "Report", by: "runtime", payload: { what: "ready", evidence: "w1" } });
+    const other = connect().ledger;
+    other.append({ taskId: "t1", kind: "Completed", by: "guardian", payload: {} });
+    expect(ledger.appendIfLatest({ taskId: "t1", kind: "Reply", by: "guardian", payload: { text: "backfill" } }, report.seq)).toBeUndefined();
+    expect(ledger.all().at(-1)?.kind).toBe("Completed");
+  });
+  it("compare-and-append records a matching request exactly once", () => {
+    start(); returned();
+    const report = ledger.append({ taskId: "t1", kind: "Report", by: "runtime", payload: { what: "ready", evidence: "w1" } });
+    const fact = { taskId: "t1", kind: "Reply" as const, by: "guardian", payload: { text: "backfill" } };
+    expect(ledger.appendIfLatest(fact, report.seq)?.kind).toBe("Reply");
+    expect(ledger.appendIfLatest(fact, report.seq)).toBeUndefined();
+  });
   it("rejects a late assessment after human steering even before Lost is written", () => {
     start();
     ledger.append({ taskId: "t1", kind: "Reply", by: "guardian", payload: { text: "Changed acceptance criteria" } });
