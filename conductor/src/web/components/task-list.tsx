@@ -1,33 +1,66 @@
+import { useMemo, useState } from "react";
 import { navigateToApp } from "@rome-os/app-web-sdk";
-import { cn } from "@rome-os/ui/cn";
-import { formatRelative, truncate } from "../lib/format";
-import { factBody, KIND_TONE } from "../lib/facts";
+import { SegmentedControl } from "@rome-os/ui/segmented-control";
+import { bucketTask, latestText, safeText, taskStateLabel, taskTone, type TaskBucket } from "../lib/facts";
+import { formatRelative } from "../lib/format";
 import type { TaskSummary } from "../lib/types";
+import { FreshEdge, StateChip, taskTitle } from "./board";
 
-export function TaskList({ tasks, now, empty }: { tasks: TaskSummary[]; now: string; empty: string }) {
+type Filter = "All" | "Needs you" | "Running" | "Resting" | "Closed";
+const FILTER_BUCKET: Partial<Record<Filter, TaskBucket>> = {
+  "Needs you": "needs-you",
+  Running: "running",
+  Resting: "resting",
+  Closed: "closed",
+};
+
+export function TaskList({ tasks, now, freshIds }: { tasks: TaskSummary[]; now: string; freshIds: Set<string> }) {
+  const [filter, setFilter] = useState<Filter>("All");
   const nowMs = new Date(now).getTime();
-  if (!tasks.length) return empty ? <p className="text-sm text-muted-foreground">{empty}</p> : null;
+  const counts = useMemo(() => ({
+    All: tasks.length,
+    "Needs you": tasks.filter((task) => bucketTask(task) === "needs-you").length,
+    Running: tasks.filter((task) => bucketTask(task) === "running").length,
+    Resting: tasks.filter((task) => bucketTask(task) === "resting").length,
+    Closed: tasks.filter((task) => bucketTask(task) === "closed").length,
+  }), [tasks]);
+  const visible = tasks.filter((task) => filter === "All" || bucketTask(task) === FILTER_BUCKET[filter]);
+  const options = (Object.keys(counts) as Filter[]).map((value) => ({
+    value,
+    label: <span className="inline-flex items-center gap-1.5">{value}<span className="font-mono text-[10.5px] text-current/60">{counts[value]}</span></span>,
+  }));
+
   return (
-    <ul className="divide-y divide-border rounded-lg border border-border">
-      {tasks.map((task) => {
-        const decision = task.lastDecision ? factBody(task.lastDecision) : undefined;
-        return (
-          <li key={task.id} className="flex cursor-pointer flex-col gap-1 px-4 py-3 hover:bg-muted/50" onClick={() => navigateToApp(`/${task.id}`)}>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="font-mono text-xs text-muted-foreground">{task.id}</span>
-              <span className="font-medium">{truncate(task.brief.split("\n")[0], 100)}</span>
-              {task.projectId && <span className="rounded bg-muted px-1.5 text-xs text-muted-foreground">{task.projectId}</span>}
-              {task.liveWorker && <span className="rounded bg-sky-500/15 px-1.5 text-xs text-sky-700 dark:text-sky-300">worker running · {task.liveWorker.agent}</span>}
-              {task.needsAttention && task.state === "open" && <span className="rounded bg-orange-500/15 px-1.5 text-xs text-orange-700 dark:text-orange-300">orchestrator pending</span>}
-              <span className="ml-auto text-xs text-muted-foreground">{formatRelative(task.updatedAt, nowMs)}</span>
-            </div>
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-              <span className={cn("shrink-0 rounded px-1.5 text-xs", KIND_TONE[task.latest.kind] ?? "bg-muted")}>{task.latest.kind}</span>
-              <span>{decision && task.lastDecision === task.latest ? truncate(decision.body ?? decision.title, 160) : truncate(factBody(task.latest).body ?? factBody(task.latest).title, 160)}</span>
-            </div>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="flex flex-col gap-3">
+      <div className="overflow-x-auto pb-0.5">
+        <SegmentedControl options={options} value={filter} onValueChange={setFilter} size="sm" aria-label="Filter tasks" className="border border-border bg-surface-muted p-0.5" />
+      </div>
+      <div className="overflow-x-auto rounded-[14px] border border-border bg-surface">
+        <div className="min-w-[760px]">
+          <div className="grid grid-cols-[104px_minmax(0,1fr)_96px_118px_66px] items-center gap-[18px] border-b border-border bg-surface-muted px-5 py-[11px] font-mono text-[10px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">
+            <span>task</span><span>brief · latest</span><span>project</span><span>state</span><span className="text-right">age</span>
+          </div>
+          {visible.map((task) => (
+            <button
+              key={task.id}
+              type="button"
+              className="relative grid w-full grid-cols-[104px_minmax(0,1fr)_96px_118px_66px] items-center gap-[18px] border-b border-border-subtle px-5 py-4 text-left transition-[background-color,border-color,transform] duration-[var(--dur-fast)] ease-[var(--ease-classical)] outline-none last:border-b-0 hover:bg-surface-muted active:translate-y-px focus-visible:border-ring focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-ring"
+              onClick={() => navigateToApp(`/${task.id}`)}
+            >
+              {freshIds.has(task.id) && <FreshEdge />}
+              <span className="truncate font-mono text-[11.5px] text-muted-foreground">{task.id}</span>
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="truncate text-[15px] font-medium">{taskTitle(task)}</span>
+                <span className="truncate text-[13px] text-muted-foreground">{latestText(task)}</span>
+              </span>
+              <span className="truncate font-mono text-[11px] text-muted-foreground">{safeText(task.projectId ?? "—")}</span>
+              <StateChip label={taskStateLabel(task)} tone={taskTone(task)} />
+              <span className="text-right font-mono text-[11px] text-subtle-foreground">{formatRelative(task.updatedAt, nowMs)}</span>
+            </button>
+          ))}
+          {!visible.length && <p className="px-5 py-6 text-sm text-muted-foreground">No tasks match this filter.</p>}
+        </div>
+      </div>
+    </div>
   );
 }

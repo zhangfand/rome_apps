@@ -1,4 +1,45 @@
-/* Rome's design-token layer: Tailwind + tw-animate-css from the web SDK, then
-   the component kit's token vocabulary, base resets, and source scan. */
 @import "@rome-os/app-web-sdk/styles";
 @import "@rome-os/ui/styles.css";
+
+:root {
+  --inset-soft: inset 0 1px 2px color-mix(in srgb, var(--foreground) 10%, transparent);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --ease-classical: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes afterglow {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@keyframes dot {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
+.afterglow-edge,
+.loading-dot {
+  opacity: 1;
+}
+
+.loading-dot-2 { animation-delay: 200ms !important; }
+.loading-dot-3 { animation-delay: 400ms !important; }
+
+.clamp-four {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .afterglow-edge { animation: afterglow 60s var(--ease-classical) forwards; }
+  .loading-dot { animation: dot 1.4s var(--ease-classical) infinite; }
+  .live-pulse { animation: pulse 1.4s var(--ease-classical) infinite; }
+}

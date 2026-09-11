@@ -1,52 +1,212 @@
-import type { FactJson } from "./types";
+import type { FactJson, TaskSummary } from "./types";
+import { formatStamp } from "./format";
 
-export const KIND_TONE: Record<string, string> = {
-  Created: "bg-primary/15 text-primary",
-  Reply: "bg-primary/15 text-primary",
-  Completed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  Cancelled: "bg-muted text-muted-foreground",
-  Dispatched: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-  Asked: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  Reported: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-  Waited: "bg-muted text-muted-foreground",
-  Noted: "bg-muted text-muted-foreground",
-  Opened: "bg-muted text-muted-foreground",
-  Returned: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-  Failed: "bg-destructive/15 text-destructive",
-  Lost: "bg-destructive/15 text-destructive",
-  Event: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
+export type TaskBucket = "needs-you" | "running" | "resting" | "closed";
+export type Tone = "person" | "neutral" | "question" | "report" | "success" | "destructive" | "info" | "quiet";
+
+export const TONE_CLASS: Record<Tone, string> = {
+  person: "bg-accent text-info-fg",
+  neutral: "bg-surface-muted text-muted-foreground",
+  question: "bg-warning-bg text-warning-fg",
+  report: "bg-primary/[0.14] text-primary-hover",
+  success: "bg-success-bg text-success-fg",
+  destructive: "bg-destructive-bg text-destructive-fg",
+  info: "bg-info-bg text-info-fg",
+  quiet: "bg-surface-muted text-subtle-foreground",
 };
 
-export function authorLabel(by: string): string {
-  if (by === "orchestrator") return "orchestrator";
-  if (by === "runtime") return "runtime";
-  if (by.startsWith("github:")) return by;
-  if (/^w-[0-9a-f]{8}$/.test(by)) return `worker ${by}`;
-  return by;
+const LABELS: Record<string, string> = {
+  Created: "request",
+  Reply: "reply",
+  Dispatched: "started work",
+  Opened: "session",
+  Returned: "came back",
+  Waited: "waiting",
+  Asked: "question",
+  Reported: "report",
+  Completed: "done",
+  Cancelled: "cancelled",
+  Failed: "failed",
+  Lost: "lost",
+  Event: "github",
+  // Notes are quiet implementation detail and are hidden by default. When
+  // revealed, this neutral word describes the content rather than its storage.
+  Noted: "update",
+};
+
+export function factLabel(kind: string): string {
+  return LABELS[kind] ?? "update";
 }
 
-/** The body of a fact, as markdown-ish text for display. */
-export function factBody(fact: FactJson): { title: string; body?: string; extra?: string } {
-  const p = fact.payload as Record<string, unknown>;
-  const s = (k: string) => (typeof p[k] === "string" ? (p[k] as string) : undefined);
-  switch (fact.kind) {
-    case "Created": return { title: "Request", body: s("brief") };
-    case "Reply": return { title: "Reply", body: s("text") };
-    case "Completed": return { title: "Completed", body: [s("reason"), s("evidence") ? `Evidence: ${s("evidence")}` : undefined].filter(Boolean).join("\n\n") };
-    case "Cancelled": return { title: "Cancelled", body: s("reason") };
-    case "Dispatched": return {
-      title: `Dispatched ${s("workerId")} as ${s("agent")}${s("resumeWorkerId") ? ` (continuing ${s("resumeWorkerId")})` : ""}`,
-      body: s("note"), extra: s("instructions"),
-    };
-    case "Asked": return { title: "Question for you", body: s("question") };
-    case "Reported": return { title: "Report", body: s("report") };
-    case "Waited": return { title: `Waiting until ${s("resumeAfter") ? new Date(s("resumeAfter")!).toLocaleString() : "?"}`, body: s("reason") };
-    case "Noted": return { title: "Note", body: s("note") };
-    case "Opened": return { title: `Worker ${s("workerId")} session ${s("romeSessionId")}` };
-    case "Returned": return { title: `Worker ${s("workerId")} returned: ${s("status")}`, body: s("summary"), extra: s("detail") };
-    case "Failed": return { title: `Worker ${s("workerId")} failed`, body: s("error") };
-    case "Lost": return { title: `Worker ${s("workerId")} lost`, body: s("why") };
-    case "Event": return { title: `Event ${s("source")}/${s("type")}`, body: s("summary") };
-    default: return { title: fact.kind, body: JSON.stringify(p) };
+export function isSafetyEvent(fact: FactJson | undefined): boolean {
+  return fact?.kind === "Event" && value(fact.payload, "type") === "circuit_breaker";
+}
+
+/** The four user-facing task groups are derived solely from TaskSummary. */
+export function bucketTask(task: TaskSummary): TaskBucket {
+  if (task.state !== "open") return "closed";
+  if (task.liveWorker) return "running";
+  if (task.waiting) return "resting";
+  if (isSafetyEvent(task.latest) || task.lastDecision?.kind === "Asked" || task.lastDecision?.kind === "Reported") {
+    return "needs-you";
   }
+  return "resting";
+}
+
+export function taskStateLabel(task: TaskSummary): string {
+  const bucket = bucketTask(task);
+  if (bucket === "running") return "running";
+  if (bucket === "resting") return "waiting";
+  if (bucket === "closed") return task.state === "completed" ? "completed" : "cancelled";
+  if (isSafetyEvent(task.latest)) return "paused";
+  return task.lastDecision?.kind === "Asked" ? "question" : "report";
+}
+
+export function taskTone(task: TaskSummary): Tone {
+  const bucket = bucketTask(task);
+  if (bucket === "running" || bucket === "resting") return "neutral";
+  if (bucket === "closed") return task.state === "completed" ? "success" : "quiet";
+  if (isSafetyEvent(task.latest)) return "destructive";
+  return task.lastDecision?.kind === "Asked" ? "question" : "report";
+}
+
+export function factTone(fact: FactJson): Tone {
+  if (fact.kind === "Returned") {
+    const status = value(fact.payload, "status");
+    if (status === "succeeded") return "success";
+    if (status === "waiting") return "question";
+    if (status === "failed" || status === "blocked") return "destructive";
+  }
+  switch (fact.kind) {
+    case "Created":
+    case "Reply": return "person";
+    case "Dispatched":
+    case "Waited":
+    case "Returned": return "neutral";
+    case "Opened":
+    case "Noted":
+    case "Cancelled": return "quiet";
+    case "Asked": return "question";
+    case "Reported": return "report";
+    case "Completed": return "success";
+    case "Failed":
+    case "Lost": return "destructive";
+    case "Event": return "info";
+    default: return "quiet";
+  }
+}
+
+/** Raw identities become the four plain author labels used by the detail views. */
+export function authorLabel(by: string, kind?: string): "you" | "github" | "conductor" | "worker" {
+  if (by === "orchestrator") return "conductor";
+  if (kind === "Event" && by === "runtime") return "github";
+  if (by.startsWith("github:")) return "github";
+  if (/^w-[0-9a-z-]+$/i.test(by)) return "worker";
+  return "you";
+}
+
+export function authorLane(fact: FactJson): 1 | 2 | 3 | 4 {
+  if (fact.kind === "Event") return 4;
+  const author = authorLabel(fact.by, fact.kind);
+  if (author === "conductor") return 2;
+  if (author === "worker") return 3;
+  return 1;
+}
+
+export function isRoutine(fact: FactJson): boolean {
+  return fact.kind === "Opened" || fact.kind === "Noted";
+}
+
+export function expandedTextLabel(fact: FactJson): "instructions" | "detail" {
+  return fact.kind === "Dispatched" ? "instructions" : "detail";
+}
+
+export interface FactContent {
+  title: string;
+  body: string;
+  extra?: string;
+}
+
+/** Payload-aware, user-facing copy. Internal kind names never become labels. */
+export function factBody(fact: FactJson): FactContent {
+  const p = fact.payload;
+  const s = (key: string) => safeText(value(p, key));
+  switch (fact.kind) {
+    case "Created": return { title: "", body: s("brief") };
+    case "Reply": return { title: "", body: s("text") };
+    case "Completed": return { title: "", body: [s("reason"), s("evidence") ? `Evidence: ${s("evidence")}` : ""].filter(Boolean).join("\n\n") };
+    case "Cancelled": return { title: "", body: s("reason") };
+    case "Dispatched": return {
+      title: [value(p, "workerId"), value(p, "agent") ? `as ${value(p, "agent")}` : ""].filter(Boolean).join(" "),
+      body: s("note") || "Work started on this request.",
+      extra: s("instructions") || undefined,
+    };
+    case "Asked": return { title: "", body: s("question") };
+    case "Reported": return { title: "", body: s("report") };
+    case "Waited": return {
+      title: value(p, "resumeAfter") ? `Waiting until ${formatStamp(value(p, "resumeAfter"))}` : "Waiting",
+      body: s("reason"),
+    };
+    case "Noted": return { title: "", body: s("note") };
+    case "Opened": return { title: value(p, "romeSessionId") ? `Session ${value(p, "romeSessionId")}` : "Session opened", body: "" };
+    case "Returned": return { title: sentenceCase(value(p, "status")), body: s("summary"), extra: s("detail") || undefined };
+    case "Failed": return { title: "Work failed", body: s("error") };
+    case "Lost": return { title: "Work stopped", body: s("why") };
+    case "Event": return { title: eventTitle(fact), body: s("summary") };
+    default: return { title: "", body: "An update was recorded." };
+  }
+}
+
+export function latestText(task: TaskSummary): string {
+  const content = factBody(task.latest);
+  return [content.title, content.body].filter(Boolean).join(" — ") || "No summary was provided.";
+}
+
+export function attentionText(task: TaskSummary): string {
+  const item = isSafetyEvent(task.latest) ? task.latest : task.lastDecision ?? task.latest;
+  const content = factBody(item);
+  return content.body || content.title || "Your input is needed before this can continue.";
+}
+
+export function eventTitle(fact: FactJson): string {
+  const type = value(fact.payload, "type");
+  const titles: Record<string, string> = {
+    issue_closed: "The issue closed",
+    pr_review: "A review was added",
+    pr_review_comment: "A review comment was added",
+    pr_comment: "Someone commented on the pull request",
+    checks_completed: "Checks finished",
+    pr_merged: "The pull request was merged",
+    pr_closed: "The pull request was closed",
+    pr_opened: "A pull request appeared",
+    circuit_breaker: "I stopped picking this up",
+  };
+  return titles[type] ?? (value(fact.payload, "source") === "github" ? "Something changed on GitHub" : "Something changed");
+}
+
+/** Keep implementation vocabulary out of payload prose while preserving meaning. */
+export function safeText(text: string): string {
+  return text
+    .replace(/\bappend-only\b/gi, "lasting")
+    .replace(/\bseenSeq\b/g, "current position")
+    .replace(/\bcircuit_breaker\b/gi, "safety limit")
+    .replace(/\borchestrators?\b/gi, (word) => word.toLowerCase().endsWith("s") ? "conductors" : "conductor")
+    .replace(/\bledgers?\b/gi, (word) => word.toLowerCase().endsWith("s") ? "histories" : "history")
+    .replace(/\bworktrees?\b/gi, (word) => word.toLowerCase().endsWith("s") ? "working folders" : "working folder")
+    .replace(/\bwakes?\b/gi, "picks up")
+    .replace(/\bwaking\b/gi, "picking up")
+    .replace(/\bwoken\b/gi, "picked up")
+    .replace(/\bfacts?\b/gi, (word) => word.toLowerCase().endsWith("s") ? "events" : "event")
+    .replace(/\bDispatched\b/g, "Started work")
+    .replace(/\bReturned\b/g, "Came back")
+    .replace(/\bNoted\b/g, "Updated")
+    .replace(/\bLost\b/g, "Stopped");
+}
+
+function value(payload: Record<string, unknown>, key: string): string {
+  return typeof payload[key] === "string" ? payload[key] as string : "";
+}
+
+function sentenceCase(text: string): string {
+  return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : "Came back";
 }

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-// A small, dependency-free markdown renderer for fact bodies (replies, reports, briefs). We deliberately
+// A small, dependency-free markdown renderer for event bodies (replies, reports, briefs). We deliberately
 // avoid `@rome-os/ui/markdown` here: it pulls in heavy peer dependencies
 // (streamdown + mermaid + katex) that this app does not otherwise need. This
 // covers what worker replies and runtime reports use: ATX headings, bullet and
@@ -27,7 +27,7 @@ function renderInline(text: string): ReactNode[] {
     const token = match[0];
     if (token.startsWith("`")) {
       nodes.push(
-        <code key={key++} className="rounded bg-muted px-1 py-0.5 text-[0.85em]">
+        <code key={key++} className="rounded bg-surface-muted px-1 py-0.5 text-[0.85em]">
           {token.slice(1, -1)}
         </code>,
       );
@@ -46,7 +46,7 @@ function renderInline(text: string): ReactNode[] {
             href={link[2]}
             target="_blank"
             rel="noreferrer"
-            className="text-primary underline"
+            className="text-info-fg underline hover:text-primary-hover"
           >
             {link[1]}
           </a>,
@@ -90,7 +90,7 @@ export function LightMarkdown({
       }
       if (index < lines.length) index += 1; // consume closing fence
       blocks.push(
-        <pre key={key++} className="my-2 overflow-x-auto rounded bg-muted p-2 text-xs">
+        <pre key={key++} className="my-2 overflow-x-auto rounded bg-surface-muted p-2 text-xs">
           <code>{code.join("\n")}</code>
         </pre>,
       );
