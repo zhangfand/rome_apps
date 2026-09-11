@@ -35,6 +35,7 @@ export interface StateJson {
   now: string;
   configured: boolean;
   projects: Record<string, { workingDir: string; repo?: string }>;
+  maxWorkers: number;
   tickRunning: boolean;
   tasks: TaskSummary[];
   workers: Array<{ taskId: string; workerId: string; status: string; lastHeartbeatAt?: string; expiresAt?: string }>;
@@ -51,4 +52,8 @@ export interface ConfigJson {
   reuseSessions: boolean;
   intakeLabel: string;
   maxDecisionsPerTurn: number;
+}
+
+export interface RuntimeJson {
+  heartbeatLeaseSeconds: number;
 }

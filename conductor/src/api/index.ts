@@ -6,11 +6,14 @@ import { createWorkerHealthRepository } from "../db/repositories/worker-health.j
 import { parseConfig } from "../lib/config.js";
 import { type Fact } from "../lib/facts.js";
 import { fold, foldTask, needsAttention, type TaskView } from "../lib/fold.js";
+import { HEARTBEAT_LEASE_MS } from "../lib/worker-health.js";
 
 /**
  *   GET state              every task, folded, with its latest decision
  *   GET tasks/:id          one task with every fact
  *   POST tasks/:id/reply   a person's reply, through conductor:reply
+ *   POST tasks/:id/complete close as done, through conductor:complete
+ *   POST tasks/:id/cancel  close as not wanted, through conductor:cancel
  *   GET|PATCH config       settings; PATCH accepts { sop?, projects.<id>.sop? , ... } and re-parses
  *   POST tick              run a tick now
  */
@@ -33,6 +36,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
           now: now.toISOString(),
           configured: Boolean(config),
           projects: config ? Object.fromEntries(Object.entries(config.projects).map(([id, p]) => [id, { workingDir: p.workingDir, repo: p.repo }])) : {},
+          maxWorkers: config?.maxWorkers ?? 0,
           tickRunning: Boolean(lock && lock.heldUntil > now.getTime()),
           tasks: snapshot.tasks.map((task) => taskSummary(task, now)),
           workers: health ?? [],
@@ -54,11 +58,27 @@ class ConductorApiHandler implements RomeAppApiHandler {
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `reply returned ${result.status}` }, 502);
         return json(result.data ?? {});
       }
+      if (request.path[0] === "tasks" && request.path[2] === "complete" && request.path.length === 3) {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+        const taskId = request.path[1];
+        const result = await this.ctx.runAction("conductor:complete", { taskId, source: "Mark complete" });
+        if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `complete returned ${result.status}` }, 502);
+        return refreshedTask(ledger.factsFor(taskId));
+      }
+      if (request.path[0] === "tasks" && request.path[2] === "cancel" && request.path.length === 3) {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+        const taskId = request.path[1];
+        const result = await this.ctx.runAction("conductor:cancel", { taskId, source: "Cancel task" });
+        if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `cancel returned ${result.status}` }, 502);
+        return refreshedTask(ledger.factsFor(taskId));
+      }
       if (route === "config") {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
         if (request.method === "GET") {
           const config = settings.get();
-          return config ? json({ config }) : json({ error: "Run conductor:setup first." }, 409);
+          return config ? json({ config, runtime: runtimeJson() }) : json({ error: "Run conductor:setup first." }, 409);
         }
         if (request.method !== "PATCH") return json({ error: "method_not_allowed" }, 405);
         const body = readJsonBody<Record<string, unknown>>(request);
@@ -76,7 +96,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         if (!parsed.ok) return json({ error: parsed.error }, 400);
         settings.put(parsed.config);
         this.ctx.log.info("guardian updated conductor configuration", { fields: Object.keys(body) });
-        return json({ config: parsed.config });
+        return json({ config: parsed.config, runtime: runtimeJson() });
       }
       if (route === "tick" && request.method === "POST") {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
@@ -90,6 +110,17 @@ class ConductorApiHandler implements RomeAppApiHandler {
       return json({ error: message }, 500);
     }
   }
+}
+
+function refreshedTask(facts: Fact[]): Response {
+  if (!facts.length) return json({ error: "task_not_found" }, 404);
+  const now = new Date();
+  const task = foldTask(facts);
+  return json({ ...taskSummary(task, now), facts: task.facts.map(factJson) });
+}
+
+function runtimeJson() {
+  return { heartbeatLeaseSeconds: HEARTBEAT_LEASE_MS / 1000 };
 }
 
 function taskSummary(task: TaskView, now: Date) {
