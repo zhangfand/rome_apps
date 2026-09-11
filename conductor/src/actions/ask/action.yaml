@@ -1,0 +1,9 @@
+name: ask
+type: custom
+description: >-
+  Decision: ask the person a question. The task then waits for their reply. Use when only the requester can decide something.
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

@@ -1,0 +1,9 @@
+name: dispatch
+type: custom
+description: >-
+  Decision: start a worker on the task. Give the agent (one of the configured worker agents), self-contained instructions, and optionally the earlier worker whose session it should continue. Fails if a worker is live or no slot is free.
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

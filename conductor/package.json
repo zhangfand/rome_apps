@@ -1,0 +1,34 @@
+{
+  "name": "@rome/app-conductor",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.6.0",
+  "type": "module",
+  "scripts": {
+    "dev": "rome dev",
+    "build": "rm -rf dist && rome build",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "test": "rstest"
+  },
+  "dependencies": {
+    "@rome-os/app-runtime": "^0.6.0",
+    "@rome-os/app-web-sdk": "^0.2.20",
+    "@rome-os/ui": "^0.2.1",
+    "drizzle-orm": "^0.45.1",
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@rstest/core": "^0.11.12",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "better-sqlite3": "^12.11.1",
+    "drizzle-kit": "^0.31.9",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

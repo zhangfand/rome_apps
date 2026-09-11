@@ -1,0 +1,9 @@
+name: note
+type: custom
+description: >-
+  Decision: record a thought without changing anything. The task will not be woken again until something new happens, so prefer wait if you mean to come back.
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

@@ -1,0 +1,9 @@
+name: close
+type: custom
+description: >-
+  Decision: end the task as completed or cancelled. Give the reason and the evidence the SOP asks for.
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

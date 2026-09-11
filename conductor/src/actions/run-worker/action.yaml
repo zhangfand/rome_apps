@@ -1,0 +1,14 @@
+name: run_worker
+type: custom
+description: >-
+  Internal. Runs the worker named by a Dispatched fact: validates its worktree,
+  summons the agent (resuming the recorded session, or falling back to a fresh
+  one), records Opened as soon as the session exists, parses the reply into
+  status/summary/detail and writes Returned or Failed on the worker's behalf,
+  then ticks so the orchestrator is woken. Dispatch runs this detached; nothing
+  else should call it.
+entry: ./index.ts
+complexity: complex
+speed: slow
+reliability: medium
+sideEffects: write

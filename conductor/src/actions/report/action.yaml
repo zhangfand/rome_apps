@@ -1,0 +1,9 @@
+name: report
+type: custom
+description: >-
+  Decision: tell the person a result (what was delivered, where, what they should do next). The task then waits for a reply or an external event.
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

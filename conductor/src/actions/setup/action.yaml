@@ -1,0 +1,13 @@
+name: setup
+type: custom
+description: >-
+  Configure the Conductor and register its recurring tick. Takes a projects map
+  (id → workingDir, optional repo for GitHub issue intake, intakeLabel,
+  projectLabel, sop override), an optional global SOP prompt, the agents the
+  orchestrator may dispatch workers as, and caps. Safe to run again — it updates
+  the config and re-registers the routine only when the cadence changed.
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

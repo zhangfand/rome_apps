@@ -1,0 +1,9 @@
+name: ledger
+type: custom
+description: >-
+  Read one task's whole ledger: every fact, oldest first, plus the current seq to cite as seenSeq. Call this when a decision was refused because the ledger advanced.
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: read-only

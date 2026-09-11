@@ -1,0 +1,9 @@
+name: stop
+type: custom
+description: >-
+  Stop the live worker on a task (recorded as Lost). Call this before dispatching a new worker when the current one must change course. The worker's later reply is dropped.
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

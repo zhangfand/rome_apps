@@ -1,0 +1,49 @@
+formatVersion: 2
+id: conductor
+name: Conductor
+icon: assets/icon.svg
+version: 0.1.0
+description: >-
+  A long-running task runner whose workflow is a prompt, not a state machine.
+  A person or a labeled GitHub issue opens a task; an orchestrator agent reads
+  the task's append-only ledger together with an SOP and decides the next step
+  — dispatch a worker, ask, report, wait, or close. Workers, people and
+  external events all write to the same ledger. Swap the SOP to run a
+  different kind of work.
+appRoot: dist
+includeSource: true
+
+web:
+  manifest: web/manifest.json
+  displayName: Conductor
+  navLabel: Conductor
+
+api:
+  entry: api/index
+
+db:
+  migrations: db/migrations
+  tablePrefix: conductor
+
+agents:
+  - agents/conductor.yaml
+  - agents/orchestrator.yaml
+
+actions:
+  - actions/setup
+  - actions/tick
+  - actions/orchestrate
+  - actions/run-worker
+  - actions/create
+  - actions/reply
+  - actions/complete
+  - actions/cancel
+  - actions/snapshot
+  - actions/ledger
+  - actions/dispatch
+  - actions/ask
+  - actions/report
+  - actions/wait
+  - actions/close
+  - actions/note
+  - actions/stop

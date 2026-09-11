@@ -1,0 +1,9 @@
+name: wait
+type: custom
+description: >-
+  Decision: do nothing for a while. You will be woken after the given minutes, or sooner if something happens on the task.
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

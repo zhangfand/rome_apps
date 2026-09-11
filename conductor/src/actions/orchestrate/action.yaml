@@ -1,0 +1,12 @@
+name: orchestrate
+type: custom
+description: >-
+  Internal. Wake the orchestrator agent for one task: build its prompt from the
+  SOP and the task's whole ledger, summon it, and if it recorded no decision,
+  record its reply as a note so the same facts do not wake it again. Tick runs
+  this detached, one per task that needs attention.
+entry: ./index.ts
+complexity: complex
+speed: slow
+reliability: medium
+sideEffects: write

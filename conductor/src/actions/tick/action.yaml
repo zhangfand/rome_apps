@@ -1,0 +1,12 @@
+name: tick
+type: custom
+description: >-
+  Run one runtime pass: expire silent workers (Lost), take in labeled GitHub
+  issues (Created), record closed issues (Event), then wake the orchestrator
+  for every open task with facts it has not decided on or whose wait has
+  elapsed. Fires on a schedule and after every fact; safe to call any time.
+entry: ./index.ts
+complexity: moderate
+speed: fast
+reliability: high
+sideEffects: write
