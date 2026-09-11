@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/rome-design-system-orange-5d924a9c-feaf-4ada-bd30-023756fda68e/colors_and_type.css">
+<script src="_ds/rome-design-system-orange-5d924a9c-feaf-4ada-bd30-023756fda68e/_ds_bundle.js"></script>
+<style>
+body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans)}
+textarea,input,button{font-family:inherit}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes afterglow{0%{opacity:1}100%{opacity:0}}
+@keyframes dot{0%,100%{opacity:.2}50%{opacity:1}}
+</style>
+</helmet>
+<div style="margin:0 auto;width:100%;max-width:1060px;box-sizing:border-box;padding:40px 44px 104px;display:flex;flex-direction:column;gap:16px">
+
+  <header style="display:flex;flex-wrap:wrap;align-items:center;gap:20px;justify-content:space-between">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <h1 style="margin:0;font-size:19px;line-height:24px;font-weight:600;letter-spacing:-0.02em">Conductor</h1>
+    </div>
+  </header>
+
+  <nav style="display:flex;align-items:stretch;gap:2px;border-bottom:1px solid var(--border)">
+    <button type="button" onClick="{{ goBoard }}" style="display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;border:0;border-bottom:2px solid {{ tabBoardLine }};background:none;color:{{ tabBoardFg }};font-size:13px;font-weight:600;cursor:pointer;margin-bottom:-1px">Board
+      <span style="display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:999px;background:var(--warning-bg);color:var(--warning-fg);font-family:var(--font-mono);font-size:10.5px;font-weight:600">{{ attentionCount }}</span>
+    </button>
+    <button type="button" onClick="{{ goTasks }}" style="display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;border:0;border-bottom:2px solid {{ tabTasksLine }};background:none;color:{{ tabTasksFg }};font-size:13px;font-weight:600;cursor:pointer;margin-bottom:-1px">Tasks
+      <span style="font-family:var(--font-mono);font-size:10.5px;color:var(--subtle-foreground)">{{ taskCount }}</span>
+    </button>
+    <button type="button" onClick="{{ goConfig }}" style="display:inline-flex;align-items:center;height:34px;padding:0 12px;border:0;border-bottom:2px solid {{ tabConfigLine }};background:none;color:{{ tabConfigFg }};font-size:13px;font-weight:600;cursor:pointer;margin-bottom:-1px">SOP &amp; runtime</button>
+  </nav>
+
+  <!-- ═══════════ BOARD ═══════════ -->
+  <sc-if value="{{ onBoard }}" hint-placeholder-val="{{ true }}">
+  <sc-if value="{{ isLoading }}">
+    <p style="margin:24px 0;font-family:var(--font-mono);font-size:13px;letter-spacing:0.06em;color:var(--muted-foreground)">reading this app's history<span style="animation:dot 1.4s var(--ease-classical) infinite">.</span><span style="animation:dot 1.4s var(--ease-classical) .2s infinite">.</span><span style="animation:dot 1.4s var(--ease-classical) .4s infinite">.</span></p>
+  </sc-if>
+  <sc-if value="{{ isError }}">
+    <div style="border:1px solid var(--destructive-border);background:var(--destructive-bg);border-radius:14px;padding:20px 22px;display:flex;flex-direction:column;gap:12px;max-width:70ch">
+      <span style="font-size:15px;font-weight:600;color:var(--destructive-fg)">I couldn't read this app's history.</span>
+      <span style="font-size:14px;line-height:1.55;color:var(--foreground)">The app's database did not answer. Nothing has been lost. Try again, and if it keeps failing, check that the app is running.</span>
+      <button type="button" style="width:fit-content;display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--foreground);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--surface-hover)">Try again</button>
+    </div>
+  </sc-if>
+  <sc-if value="{{ isUnconfigured }}">
+    <div style="display:flex;flex-direction:column;gap:14px;max-width:64ch;padding:40px 0">
+      <h2 style="margin:0;font-family:var(--font-serif);font-size:32px;font-weight:500;letter-spacing:-0.015em">Nothing to conduct yet.</h2>
+      <p style="margin:0;font-size:15px;line-height:1.6;color:var(--muted-foreground)">Point Conductor at a working directory and a repository, and it will take in labeled issues from there.</p>
+      <pre style="margin:0;box-shadow:var(--inset-soft);background:var(--surface-muted);border:1px solid var(--border);border-radius:10px;padding:16px 18px;font-family:var(--font-mono);font-size:12.5px;line-height:1.7;overflow-x:auto">conductor:setup {
+  projects: { playground: {
+    workingDir: "/abs/path",
+    repo: "owner/name",
+    intakeLabel: "conductor" } }
+}</pre>
+    </div>
+  </sc-if>
+  <sc-if value="{{ boardReady }}">
+  <div style="display:flex;flex-direction:column;gap:48px">
+
+    <section style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <h2 style="margin:0;font-family:var(--font-serif);font-size:25px;font-weight:500;letter-spacing:-0.01em;color:var(--foreground)">Needs you</h2>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--subtle-foreground)">{{ attentionSub }}</span>
+      </div>
+      <sc-for list="{{ attention }}" as="t" hint-placeholder-count="2">
+        <article style="border:1px solid var(--border);border-left:3px solid {{ t.edge }};border-radius:14px;background:var(--surface);box-shadow:var(--shadow-sm);padding:24px 26px;display:flex;flex-direction:column;gap:18px">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:11px">
+            <span style="display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;background:{{ t.chipBg }};color:{{ t.chipFg }}">{{ t.chip }}</span>
+            <span style="font-size:18px;font-weight:600;letter-spacing:-0.015em">{{ t.title }}</span>
+            <span style="font-family:var(--font-mono);font-size:12px;color:var(--subtle-foreground)">{{ t.project }}</span>
+            <span style="margin-left:auto;font-family:var(--font-mono);font-size:12px;color:var(--muted-foreground)">{{ t.age }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <p style="margin:0;max-width:78ch;font-size:15px;line-height:1.6;color:var(--foreground);text-wrap:pretty;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;-webkit-line-clamp:{{ t.clamp }}">{{ t.text }}</p>
+            <sc-if value="{{ t.long }}">
+              <button type="button" onClick="{{ t.toggleFull }}" style="width:fit-content;padding:0;border:0;background:none;font-family:var(--font-mono);font-size:12px;color:var(--muted-foreground);text-decoration:underline;cursor:pointer">{{ t.fullLabel }}</button>
+            </sc-if>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+            <button type="button" onClick="{{ t.toggleReply }}" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:var(--primary);color:var(--primary-foreground);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--primary-hover)">{{ t.replyLabel }}</button>
+            <button type="button" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--foreground);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--surface-hover)">{{ t.secondary }}</button>
+            <button type="button" onClick="{{ t.open }}" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--muted-foreground);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--surface-hover)">Details</button>
+          </div>
+          <sc-if value="{{ t.replyOpen }}">
+            <div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--border);padding-top:18px">
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <sc-for list="{{ t.snippets }}" as="s" hint-placeholder-count="3">
+                  <button type="button" onClick="{{ s.use }}" style="height:26px;padding:0 11px;border:1px solid var(--border);border-radius:6px;background:var(--surface-muted);color:var(--muted-foreground);font-family:var(--font-mono);font-size:12px;cursor:pointer" style-hover="background:var(--surface-hover)">{{ s.label }}</button>
+                </sc-for>
+              </div>
+              <textarea value="{{ t.draft }}" onChange="{{ t.onDraft }}" style="min-height:96px;box-sizing:border-box;border:1px solid var(--input);border-radius:8px;background:var(--background);color:var(--foreground);padding:12px 14px;font-size:14px;line-height:1.55;resize:vertical"></textarea>
+              <div style="display:flex;align-items:center;gap:10px">
+                <button type="button" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:var(--primary);color:var(--primary-foreground);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--primary-hover)">Send reply</button>
+              </div>
+            </div>
+          </sc-if>
+        </article>
+      </sc-for>
+      <sc-if value="{{ attentionEmpty }}">
+        <p style="margin:0;font-size:15px;line-height:1.6;color:var(--muted-foreground)">Quiet. Nothing is waiting on you.</p>
+      </sc-if>
+    </section>
+
+    <section style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <h2 style="margin:0;font-family:var(--font-serif);font-size:25px;font-weight:500;letter-spacing:-0.01em;color:var(--foreground)">Running</h2>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--subtle-foreground)">{{ runningSub }}</span>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:14px;background:var(--surface);overflow:hidden">
+        <sc-if value="{{ runningEmpty }}">
+          <p style="margin:0;padding:20px 22px;font-size:14px;color:var(--muted-foreground)">No worker is running.</p>
+        </sc-if>
+        <sc-for list="{{ running }}" as="w" hint-placeholder-count="2">
+          <div style="position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:20px 22px;border-top:1px solid var(--border-subtle)">
+            <sc-if value="{{ w.fresh }}"><span style="position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--ring);animation:afterglow 60s var(--ease-classical) forwards"></span></sc-if>
+            <span onClick="{{ w.open }}" style="font-size:15.5px;font-weight:500;cursor:pointer;text-decoration-color:transparent" style-hover="text-decoration:underline">{{ w.title }}</span>
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--subtle-foreground)">{{ w.phase }}</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:12px">
+              <span style="font-family:var(--font-mono);font-size:11.5px;color:var(--foreground)">{{ w.elapsed }}</span>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <h2 style="margin:0;font-family:var(--font-serif);font-size:25px;font-weight:500;letter-spacing:-0.01em;color:var(--foreground)">Resting</h2>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--subtle-foreground)">{{ restingSub }}</span>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:14px;background:var(--surface);overflow:hidden">
+        <sc-if value="{{ restingEmpty }}">
+          <p style="margin:0;padding:18px 22px;font-size:14px;color:var(--muted-foreground)">Nothing is on a timer.</p>
+        </sc-if>
+        <sc-for list="{{ resting }}" as="t" hint-placeholder-count="2">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:18px 22px;border-top:1px solid var(--border-subtle)">
+            <span onClick="{{ t.open }}" style="font-size:15.5px;font-weight:500;cursor:pointer">{{ t.title }}</span>
+            <span style="font-size:13.5px;color:var(--muted-foreground)">{{ t.why }}</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:12px">
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted-foreground)">{{ t.when }}</span>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+  </div>
+  </sc-if>
+  </sc-if>
+
+  <!-- ═══════════ TASKS ═══════════ -->
+  <sc-if value="{{ onTasks }}">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between">
+      <div style="display:inline-flex;padding:2px;border:1px solid var(--border);border-radius:9px;background:var(--surface-muted);gap:2px">
+        <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5">
+          <button type="button" onClick="{{ f.pick }}" style="display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:0;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;background:{{ f.bg }};color:{{ f.fg }};box-shadow:{{ f.shadow }}">{{ f.label }}<span style="font-family:var(--font-mono);font-size:10.5px;opacity:.6">{{ f.count }}</span></button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:14px;background:var(--surface);overflow:hidden">
+      <div style="display:grid;grid-template-columns:104px minmax(0,1fr) 96px 118px 66px;gap:18px;align-items:center;padding:11px 20px;background:var(--surface-muted);border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted-foreground)">
+        <span>task</span><span>brief · latest</span><span>project</span><span>state</span><span style="text-align:right">age</span>
+      </div>
+      <sc-for list="{{ rows }}" as="t" hint-placeholder-count="5">
+        <div onClick="{{ t.open }}" style="position:relative;display:grid;grid-template-columns:104px minmax(0,1fr) 96px 118px 66px;gap:18px;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-subtle);cursor:pointer" style-hover="background:var(--surface-muted)">
+          <sc-if value="{{ t.fresh }}"><span style="position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--ring);animation:afterglow 60s var(--ease-classical) forwards"></span></sc-if>
+          <span style="font-family:var(--font-mono);font-size:11.5px;color:var(--muted-foreground);overflow:hidden;text-overflow:ellipsis">{{ t.id }}</span>
+          <span style="min-width:0;display:flex;flex-direction:column;gap:2px">
+            <span style="font-size:15px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.title }}</span>
+            <span style="font-size:13px;color:var(--muted-foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.latest }}</span>
+          </span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted-foreground);overflow:hidden;text-overflow:ellipsis">{{ t.project }}</span>
+          <span style="display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:6px;font-family:var(--font-mono);font-size:10.5px;font-weight:600;background:{{ t.chipBg }};color:{{ t.chipFg }};justify-self:start">{{ t.chip }}</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--subtle-foreground);text-align:right">{{ t.age }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ═══════════ DETAIL ═══════════ -->
+  <sc-if value="{{ onDetail }}">
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <button type="button" onClick="{{ goBoard }}" style="width:fit-content;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px 0 6px;border:0;border-radius:6px;background:transparent;color:var(--muted-foreground);font-family:var(--font-mono);font-size:11px;cursor:pointer" style-hover="background:var(--surface-hover)">← back to board</button>
+
+    <div style="border:1px solid var(--border);border-radius:14px;background:var(--surface);box-shadow:var(--shadow-sm);padding:26px;display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:9px">
+        <span style="display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:6px;font-family:var(--font-mono);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;background:var(--info-bg);color:var(--info-fg)">open</span>
+        <h2 style="margin:0;font-size:26px;line-height:32px;font-weight:500;font-family:var(--font-serif);letter-spacing:-0.015em">Rate-limit the public API</h2>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--subtle-foreground)">t-9c41a7d2</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;font-family:var(--font-mono);font-size:11px;color:var(--muted-foreground)">
+        <span>playground · zhangfand/playground</span><span>from github:zhangfand · issue #14</span><span>opened 29m ago</span>
+      </div>
+      <div style="border:1px solid var(--info-border);background:var(--info-bg);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:7px">
+        <span style="font-family:var(--font-mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:var(--info-fg)">where it stands</span>
+        <p style="margin:0;max-width:78ch;font-size:15px;line-height:1.6;color:var(--foreground)">PR #21 is open and verified read-only against issue #14. Conductor reported it and is waiting for you to review and merge — it will not merge for you. Nothing is running.</p>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <button type="button" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:var(--primary);color:var(--primary-foreground);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--primary-hover)">Reply</button>
+        <button type="button" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--foreground);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--surface-hover)">Mark complete</button>
+        <button type="button" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--muted-foreground);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--surface-hover)">Cancel task</button>
+        <span style="margin-left:auto;display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:10.5px;color:var(--subtle-foreground)">4 / 25 decisions since you last spoke</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <h3 style="margin:0;font-family:var(--font-serif);font-size:22px;font-weight:500;letter-spacing:-0.01em">What happened</h3>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--subtle-foreground)">12 events</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted-foreground);cursor:pointer">
+          <input type="checkbox" checked="{{ hideNoise }}" onChange="{{ toggleNoise }}" style="accent-color:var(--primary);width:13px;height:13px">hide routine steps
+        </label>
+        <div style="display:inline-flex;padding:2px;border:1px solid var(--border);border-radius:9px;background:var(--surface-muted);gap:2px">
+          <sc-for list="{{ views }}" as="v" hint-placeholder-count="3">
+            <button type="button" onClick="{{ v.pick }}" style="height:24px;padding:0 10px;border:0;border-radius:7px;font-size:11.5px;font-weight:600;cursor:pointer;background:{{ v.bg }};color:{{ v.fg }};box-shadow:{{ v.shadow }}">{{ v.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <!-- stream -->
+    <sc-if value="{{ isStream }}">
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <sc-for list="{{ wakes }}" as="g" hint-placeholder-count="4">
+        <section style="display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="font-family:var(--font-mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:var(--subtle-foreground)">{{ g.label }}</span>
+            <span style="height:1px;flex:1;background:var(--border)"></span>
+          </div>
+          <sc-for list="{{ g.facts }}" as="f" hint-placeholder-count="2">
+            <article style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;border:1px solid var(--border);border-radius:12px;background:{{ f.cardBg }};padding:20px 22px">
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <span style="font-family:var(--font-mono);font-size:11px;color:var(--subtle-foreground)">{{ f.seq }} · {{ f.time }}</span>
+                <span style="font-family:var(--font-mono);font-size:10.5px;font-weight:600;color:{{ f.byFg }}">{{ f.byShort }}</span>
+              </div>
+              <div style="min-width:0;display:flex;flex-direction:column;gap:5px">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+                  <span style="display:inline-flex;align-items:center;height:19px;padding:0 7px;border-radius:5px;font-family:var(--font-mono);font-size:10.5px;font-weight:600;background:{{ f.chipBg }};color:{{ f.chipFg }}">{{ f.label }}</span>
+                  <sc-if value="{{ f.title }}"><span style="font-size:15px;font-weight:600">{{ f.title }}</span></sc-if>
+                </div>
+                <p style="margin:0;max-width:76ch;font-size:14.5px;line-height:1.6;color:var(--foreground);text-wrap:pretty">{{ f.body }}</p>
+                <sc-if value="{{ f.extra }}">
+                  <div>
+                    <button type="button" onClick="{{ f.toggle }}" style="padding:0;border:0;background:none;font-family:var(--font-mono);font-size:11px;color:var(--muted-foreground);text-decoration:underline;cursor:pointer">{{ f.toggleLabel }}</button>
+                    <sc-if value="{{ f.showExtra }}">
+                      <pre style="margin:7px 0 0;white-space:pre-wrap;box-shadow:var(--inset-soft);background:var(--surface-muted);border-radius:8px;padding:10px;font-family:var(--font-mono);font-size:11.5px;line-height:1.55;color:var(--foreground)">{{ f.extra }}</pre>
+                    </sc-if>
+                  </div>
+                </sc-if>
+              </div>
+            </article>
+          </sc-for>
+        </section>
+      </sc-for>
+    </div>
+    </sc-if>
+
+    <!-- lanes -->
+    <sc-if value="{{ isLanes }}">
+    <div style="border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:12px 14px 16px">
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:10px">
+        <span style="font-family:var(--font-mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted-foreground)">you &amp; github</span>
+        <span style="font-family:var(--font-mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted-foreground)">conductor</span>
+        <span style="font-family:var(--font-mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted-foreground)">workers</span>
+        <span style="font-family:var(--font-mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted-foreground)">world</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px;align-items:start">
+        <sc-for list="{{ laneFacts }}" as="f" hint-placeholder-count="6">
+          <div style="grid-column:{{ f.lane }};border:1px solid var(--border);border-radius:10px;background:{{ f.cardBg }};padding:14px 15px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-family:var(--font-mono);font-size:10.5px;color:var(--subtle-foreground)">{{ f.seq }}</span>
+              <span style="display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:5px;font-family:var(--font-mono);font-size:10px;font-weight:600;background:{{ f.chipBg }};color:{{ f.chipFg }}">{{ f.label }}</span>
+              <span style="margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--subtle-foreground)">{{ f.time }}</span>
+            </div>
+            <span style="font-size:12.5px;font-weight:500;line-height:1.4">{{ f.lead }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- table -->
+    <sc-if value="{{ isTable }}">
+    <div style="border:1px solid var(--border);border-radius:14px;background:var(--surface);overflow:hidden">
+      <div style="display:grid;grid-template-columns:44px 104px 132px minmax(0,1fr) 84px;gap:10px;align-items:center;padding:10px 20px;background:var(--surface-muted);border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted-foreground)">
+        <span></span><span>what</span><span>who</span><span>what it says</span><span style="text-align:right">time</span>
+      </div>
+      <sc-for list="{{ tableFacts }}" as="f" hint-placeholder-count="8">
+        <div onClick="{{ f.toggle }}" style="display:grid;grid-template-columns:44px 104px 132px minmax(0,1fr) 84px;gap:10px;align-items:center;padding:13px 20px;border-bottom:1px solid var(--border-subtle);cursor:pointer;font-size:12.5px" style-hover="background:var(--surface-muted)">
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--subtle-foreground)">{{ f.seq }}</span>
+          <span style="display:inline-flex;align-items:center;height:19px;padding:0 7px;border-radius:5px;font-family:var(--font-mono);font-size:10.5px;font-weight:600;background:{{ f.chipBg }};color:{{ f.chipFg }};justify-self:start">{{ f.label }}</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted-foreground);overflow:hidden;text-overflow:ellipsis">{{ f.who }}</span>
+          <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.oneLine }}</span>
+          <span style="font-family:var(--font-mono);font-size:10.5px;color:var(--subtle-foreground);text-align:right">{{ f.time }}</span>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+
+    <section style="display:flex;flex-direction:column;gap:8px;border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:14px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <h3 style="margin:0;font-family:var(--font-serif);font-size:22px;font-weight:500;letter-spacing:-0.01em">Reply</h3>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <sc-for list="{{ detailSnippets }}" as="s" hint-placeholder-count="3">
+          <button type="button" onClick="{{ s.use }}" style="height:26px;padding:0 11px;border:1px solid var(--border);border-radius:6px;background:var(--surface-muted);color:var(--muted-foreground);font-family:var(--font-mono);font-size:12px;cursor:pointer" style-hover="background:var(--surface-hover)">{{ s.label }}</button>
+        </sc-for>
+      </div>
+      <textarea value="{{ detailDraft }}" onChange="{{ onDetailDraft }}" style="min-height:104px;box-sizing:border-box;border:1px solid var(--input);border-radius:8px;background:var(--background);color:var(--foreground);padding:12px 14px;font-size:14px;line-height:1.55;resize:vertical"></textarea>
+      <button type="button" style="width:fit-content;display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:var(--primary);color:var(--primary-foreground);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--primary-hover)">Send reply</button>
+    </section>
+  </div>
+  </sc-if>
+
+  <!-- ═══════════ CONFIG ═══════════ -->
+  <sc-if value="{{ onConfig }}">
+  <div style="display:grid;grid-template-columns:minmax(0,1.55fr) minmax(260px,1fr);gap:18px;align-items:start">
+    <section style="display:flex;flex-direction:column;gap:9px">
+      <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:10px">
+        <h2 style="margin:0;font-family:var(--font-serif);font-size:22px;font-weight:500;letter-spacing:-0.01em">SOP · the workflow, as a prompt</h2>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--subtle-foreground)">takes effect on every open task</span>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:14px;background:var(--surface);overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--surface-muted);border-bottom:1px solid var(--border)">
+          <span style="font-family:var(--font-mono);font-size:10.5px;color:var(--muted-foreground)">{{ sopMeta }}</span>
+          <span style="margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--warning-fg)">{{ dirtyLabel }}</span>
+        </div>
+        <textarea value="{{ sopText }}" onChange="{{ onSop }}" style="display:block;width:100%;min-height:420px;box-sizing:border-box;border:0;background:var(--surface);color:var(--foreground);padding:12px 14px;font-family:var(--font-mono);font-size:12px;line-height:1.65;resize:vertical;outline:none"></textarea>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:9px">
+        <button type="button" onClick="{{ saveSop }}" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:var(--primary);color:var(--primary-foreground);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--primary-hover)">Save SOP</button>
+        <button type="button" onClick="{{ resetSop }}" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--foreground);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--surface-hover)">Revert to built-in</button>
+        <span style="font-size:11.5px;color:var(--subtle-foreground)">{{ savedLabel }}</span>
+      </div>
+    </section>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <section style="display:flex;flex-direction:column;gap:8px">
+        <h2 style="margin:0;font-family:var(--font-serif);font-size:22px;font-weight:500;letter-spacing:-0.01em">Projects</h2>
+        <div style="border:1px solid var(--border);border-radius:14px;background:var(--surface);overflow:hidden">
+          <sc-for list="{{ projects }}" as="p" hint-placeholder-count="2">
+            <div style="display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-top:1px solid var(--border-subtle)">
+              <div style="display:flex;align-items:center;gap:7px">
+                <span style="font-size:13px;font-weight:600">{{ p.id }}</span>
+                <sc-if value="{{ p.ownSop }}"><span style="display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;background:var(--accent-wash);color:var(--info-fg);font-family:var(--font-mono);font-size:10px">own SOP</span></sc-if>
+                <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:10px;color:{{ p.intakeFg }}"><span style="width:5px;height:5px;border-radius:999px;background:{{ p.intakeFg }}"></span>{{ p.intakeLabel }}</span>
+              </div>
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--subtle-foreground);overflow:hidden;text-overflow:ellipsis">{{ p.workingDir }}</span>
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted-foreground)">{{ p.repoLine }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+      <section style="display:flex;flex-direction:column;gap:8px">
+        <h2 style="margin:0;font-family:var(--font-serif);font-size:22px;font-weight:500;letter-spacing:-0.01em">Runtime</h2>
+        <div style="border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:12px;display:flex;flex-direction:column;gap:7px">
+          <sc-for list="{{ runtime }}" as="r" hint-placeholder-count="6">
+            <div style="display:flex;align-items:baseline;gap:10px">
+              <span style="font-size:12.5px;color:var(--muted-foreground)">{{ r.k }}</span>
+              <span style="flex:1;border-bottom:1px dotted var(--border-strong);transform:translateY(-3px)"></span>
+              <span style="font-family:var(--font-mono);font-size:11.5px;color:var(--foreground);text-align:right">{{ r.v }}</span>
+            </div>
+          </sc-for>
+          <p style="margin:4px 0 0;font-size:11.5px;line-height:1.45;color:var(--subtle-foreground)">Change these with <span style="font-family:var(--font-mono);background:var(--surface-muted);padding:1px 5px;border-radius:4px">conductor:setup</span>.</p>
+        </div>
+      </section>
+      <section style="display:flex;flex-direction:column;gap:8px">
+        <h2 style="margin:0;font-family:var(--font-serif);font-size:22px;font-weight:500;letter-spacing:-0.01em">Worker agents</h2>
+        <div style="border:1px solid var(--border);border-radius:14px;background:var(--surface);overflow:hidden">
+          <sc-for list="{{ agents }}" as="a" hint-placeholder-count="2">
+            <div style="display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-top:1px solid var(--border-subtle)">
+              <span style="font-family:var(--font-mono);font-size:11.5px;color:var(--foreground)">{{ a.id }}</span>
+              <span style="font-size:12px;line-height:1.45;color:var(--muted-foreground)">{{ a.what }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </div>
+  </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;boardState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Live&quot;,&quot;Stressed&quot;,&quot;Quiet&quot;,&quot;Loading&quot;,&quot;Error&quot;,&quot;Not configured&quot;],&quot;default&quot;:&quot;Live&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;State&quot;},&quot;defaultLedgerView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Stream&quot;,&quot;Lanes&quot;,&quot;Table&quot;],&quot;default&quot;:&quot;Stream&quot;,&quot;tsType&quot;:&quot;\&quot;Stream\&quot; | \&quot;Lanes\&quot; | \&quot;Table\&quot;&quot;,&quot;section&quot;:&quot;Ledger&quot;},&quot;hideRuntimeNoise&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Ledger&quot;}}">
+const T = {
+  person: ["var(--accent-wash)", "var(--info-fg)"],
+  orch: ["var(--surface-muted)", "var(--muted-foreground)"],
+  ask: ["var(--warning-bg)", "var(--warning-fg)"],
+  report: ["color-mix(in srgb, var(--primary) 14%, transparent)", "var(--primary-hover)"],
+  ok: ["var(--success-bg)", "var(--success-fg)"],
+  bad: ["var(--destructive-bg)", "var(--destructive-fg)"],
+  world: ["var(--info-bg)", "var(--info-fg)"],
+  quiet: ["var(--surface-muted)", "var(--subtle-foreground)"],
+};
+const LABEL = {
+  Created: "request", Reply: "reply", Dispatched: "started work", Opened: "session",
+  Returned: "came back", Waited: "waiting", Asked: "question", Reported: "report",
+  Completed: "done", Cancelled: "cancelled", Failed: "failed", Lost: "lost", Event: "github",
+};
+const KIND = {
+  Created: T.person, Reply: T.person, Completed: T.ok, Cancelled: T.quiet,
+  Dispatched: T.orch, Waited: T.orch, Noted: T.quiet, Asked: T.ask, Reported: T.report,
+  Opened: T.quiet, Returned: T.orch, Failed: T.bad, Lost: T.bad, Event: T.world,
+};
+
+const SOP = `# SOP: software development
+
+## Goal
+
+Turn the person's request into a change that is **delivered as a pull request
+and independently verified to satisfy the request** — then see the task
+through until it is genuinely finished. A PR that exists is not the goal; a
+PR that a second pair of eyes has checked against what was asked, with the
+project's tests and checks passing, is.
+
+## What "done" means
+
+The task is complete when the request has been fulfilled in the world, not
+when a worker says it has: the GitHub issue the task came from is closed as
+completed, or the person says the result is accepted. An issue closed as not
+planned means the work was dropped.
+
+## Quality bar for the delivery
+
+- The change does what was asked — as written in the request and any
+  replies, not as a worker reinterpreted it.
+- It lives on a pushed branch with an open PR against the default branch;
+  if the task came from an issue, the PR closes it (\`Closes #N\`).
+- The project's own tests / typecheck / build pass on the PR's head.
+- Someone other than the author has read the diff against the request.
+- Review feedback people leave on the PR is part of the request.
+
+## Hard lines
+
+- Never merge a PR or close an issue on the person's behalf.
+- Never widen scope beyond the request.
+- Never claim a result the ledger cannot back.`;
+
+const FACTS = [
+  { seq: "#1", kind: "Created", by: "github:zhangfand", byShort: "github", lane: 1, wake: 1, time: "09:02:14",
+    title: "Request", body: "Issue #14: the public API has no rate limiting. Add a per-key limit with a sensible default and document it.",
+    short: "issue #14 taken in" },
+  { seq: "#2", kind: "Dispatched", by: "orchestrator", byShort: "conductor", lane: 2, wake: 1, time: "09:02:31",
+    title: "w-4f81ac20 as coding:coding", body: "Implement the limit on a branch and open a PR that closes #14.",
+    short: "implementer dispatched",
+    extra: "Read the request and the repo's conventions first. Add a per-API-key token bucket in the request pipeline, defaults configurable, with tests. Push to conductor/t-9c41a7d2/rate-limit and open a PR against main with `Closes #14`. Do not merge." },
+  { seq: "#3", kind: "Opened", by: "w-4f81ac20", byShort: "worker", lane: 3, wake: 1, time: "09:02:33", noise: true,
+    title: "session s-7712ab", body: "Worktree .rome/worktrees/t-9c41a7d2/w-4f81ac20 on conductor/t-9c41a7d2/rate-limit.", short: "session opened" },
+  { seq: "#4", kind: "Returned", by: "w-4f81ac20", byShort: "worker", lane: 3, wake: 2, time: "09:19:48", status: "succeeded",
+    title: "succeeded · PR #21 at fc621e0", body: "Token bucket per API key, 600 req/min default, configurable via env; 9 tests added; typecheck and test suite pass locally.",
+    short: "PR #21 opened",
+    extra: "Files changed: src/middleware/rate-limit.ts (new), src/middleware/index.ts, src/config.ts, docs/api.md, test/rate-limit.test.ts.\n\nLocal run: pnpm typecheck ✓ · pnpm test ✓ (223 passed)" },
+  { seq: "#5", kind: "Dispatched", by: "orchestrator", byShort: "conductor", lane: 2, wake: 2, time: "09:20:02",
+    title: "w-9e22c1f4 as assistant:assistant", body: "Read-only verification of PR #21 against the request.",
+    short: "verifier dispatched",
+    extra: "You may not write code. Read PR #21's diff against issue #14 and the replies on this task. Report anything missing, wrong, or out of scope, and whether the checks on the head are green." },
+  { seq: "#6", kind: "Opened", by: "w-9e22c1f4", byShort: "worker", lane: 3, wake: 2, time: "09:20:04", noise: true,
+    title: "session s-7713f0", body: "Read-only worktree at fc621e0.", short: "session opened" },
+  { seq: "#7", kind: "Returned", by: "w-9e22c1f4", byShort: "worker", lane: 3, wake: 3, time: "09:26:11", status: "waiting",
+    title: "waiting · no checks on fc621e0", body: "The diff matches the request and docs are updated. No checks recorded on head fc621e0 — CI may not be configured in this repository.",
+    short: "verified, CI unknown",
+    extra: "Checked: limit is per API key (not per IP), default documented in docs/api.md, 429 includes Retry-After. Nothing out of scope." },
+  { seq: "#8", kind: "Event", by: "runtime", byShort: "github", lane: 4, wake: 3, time: "09:26:18",
+    title: "A second PR appeared", body: "PR #22 was opened from the same branch as PR #21 — nothing on this task had mentioned it yet.",
+    short: "a second PR appeared" },
+  { seq: "#9", kind: "Waited", by: "orchestrator", byShort: "conductor", lane: 2, wake: 3, time: "09:26:25",
+    title: "Waiting until 09:41:25", body: "Give CI 15 minutes to report on fc621e0, and see whether the duplicate PR #22 closes itself.", short: "waiting 15m" },
+  { seq: "#10", kind: "Reply", by: "zhangfan", byShort: "you", lane: 1, wake: 4, time: "09:31:02",
+    title: "Reply", body: "No CI on this repo yet — proceed. I closed #22.", short: "no CI, proceed" },
+  { seq: "#11", kind: "Reported", by: "orchestrator", byShort: "conductor", lane: 2, wake: 4, time: "09:31:19",
+    title: "Report", body: "PR #21 is ready: per-key token bucket, 600 req/min by default, documented in docs/api.md, 9 new tests. Verified read-only against issue #14 by a second worker; no CI on this repo. The duplicate PR #22 you closed came from the same branch. Please review and merge — I will not merge for you.",
+    short: "reported to you" },
+  { seq: "#12", kind: "Event", by: "runtime", byShort: "github", lane: 4, wake: 4, time: "09:34:07",
+    title: "You commented on PR #21", body: "zhangfand commented on PR #21: \"reads right — merging after standup\".",
+    short: "you commented on the PR" },
+];
+
+const WAKES = [
+  { n: 1, label: "09:02" }, { n: 2, label: "09:20" }, { n: 3, label: "09:26" }, { n: 4, label: "09:31" },
+];
+
+const LONG_REPORT = "PR #34 is ready, and it turned into a bigger change than the issue implied. The settings table had three columns that no longer matched the parsed config shape, so migrating the sop field alone would have left the projects map unreadable on the next boot. I had the implementer write the migration for all three, kept the old columns readable for one release, and added a backfill that runs once on startup. Verification: a second worker read the diff against issue #31 and against the two replies you left on the PR, ran the suite on the head (223 passed), and checked that a database written by the previous release still opens. Two things need your judgement. First, the backfill logs a warning for rows it cannot parse and skips them rather than failing the boot — I chose the conservative option, but it means a malformed row stays malformed until someone looks. Second, the issue asked for the change to be invisible to existing installs, and it is, except that the first boot after upgrade takes about four seconds longer on a large ledger. Please review and merge — I will not merge for you.";
+
+const STRESS_ATTENTION = [
+  { id: "t-44c1a0e9", title: "Migrate settings to the new schema", project: "playground", bucket: "attention",
+    chip: "halted", tone: T.bad, age: "3m", latestKind: "Event",
+    latest: "circuit_breaker — 25 decisions since a person last spoke.",
+    text: "I stopped waking this task: 25 decisions have gone by since you last said anything, and the last four were the same two workers disagreeing about whether the backfill should fail the boot. Reply and I will pick it up from there.",
+    secondary: "Cancel task", snippets: ["fail the boot", "skip and warn", "cancel this"] },
+  { id: "t-9c41a7d2", title: "Rate-limit the public API", project: "playground", bucket: "attention",
+    chip: "report", tone: T.report, age: "2m", latestKind: "Reported", latest: "PR #34 is ready — please review and merge.",
+    text: LONG_REPORT, secondary: "Mark complete", snippets: ["merged, thanks", "revise: per-IP too", "hold"] },
+  { id: "t-3ad81009", title: "Document the task vocabulary", project: "docs-site", bucket: "attention",
+    chip: "question", tone: T.ask, age: "1h", latestKind: "Asked", latest: "Should the README cover the internal steps too?",
+    text: "Should the README cover the internal steps too, or only what a reader can see happen? It changes what the table promises.",
+    secondary: "Cancel task", snippets: ["yes, document it", "internal — leave it out"] },
+  { id: "t-77f2ba41", title: "Two workers lost in a row on the importer", project: "ops", bucket: "attention",
+    chip: "question", tone: T.ask, age: "26m", latestKind: "Asked", latest: "Two workers died mid-run. Is the box out of memory?",
+    text: "Two workers in a row stopped sending heartbeats inside the same step of the CSV importer, four minutes apart. Both worktrees were left behind. I would rather ask than start a third: is the machine short on memory, or should I split the importer step?",
+    secondary: "Cancel task", snippets: ["split the step", "it's memory — I'll fix the box"] },
+  { id: "t-2b90c7d5", title: "Retire the legacy webhook", project: "playground", bucket: "attention",
+    chip: "question", tone: T.ask, age: "2h", latestKind: "Asked", latest: "Two callers still use it. Break them or wait?",
+    text: "Two integrations still call the legacy webhook — one is your own staging box, one I cannot identify. Break them, or keep the endpoint alive behind a deprecation header?",
+    secondary: "Cancel task", snippets: ["keep it, add the header", "break it"] },
+  { id: "t-6de4118b", title: "Weekly work digest by email", project: "ops", bucket: "attention",
+    chip: "report", tone: T.report, age: "5h", latestKind: "Reported", latest: "Shipped behind a flag; needs your address.",
+    text: "The digest job is merged behind ROME_DIGEST=1. It needs a recipient before it can send anything. Give me an address and I will turn it on.",
+    secondary: "Mark complete", snippets: ["use my work address", "leave it off"] },
+  { id: "t-15a8f302", title: "Typo sweep across docs", project: "docs-site", bucket: "attention",
+    chip: "report", tone: T.report, age: "1d", latestKind: "Reported", latest: "PR #12 — 41 files, no prose rewritten.",
+    text: "PR #12 fixes 41 typos across the docs. No sentence was rewritten and no code samples were touched. Verified by a second read against the original text.",
+    secondary: "Mark complete", snippets: ["merged, thanks"] },
+  { id: "t-c0917ee2", title: "Bump the Node version in CI", project: "playground", bucket: "attention",
+    chip: "question", tone: T.ask, age: "2d", latestKind: "Asked", latest: "22 or 24? 24 drops a dependency you pin.",
+    text: "Node 24 drops support for one dependency you pin at an old version. 22 is boring and works. Which do you want to live with?",
+    secondary: "Cancel task", snippets: ["go to 22", "24 — I'll unpin"] },
+];
+
+const TASKS = [
+  { id: "t-9c41a7d2", title: "Rate-limit the public API", project: "playground", bucket: "attention",
+    chip: "report", tone: T.report, age: "2m", latestKind: "Reported",
+    latest: "PR #21 is ready — please review and merge; I will not merge for you.",
+    text: "PR #21 is ready: per-key token bucket, 600 req/min by default, documented in docs/api.md, 9 new tests. Verified read-only against issue #14 by a second worker; no CI on this repo. Please review and merge — I will not merge for you.",
+    secondary: "Mark complete", waitingFor: "waiting on you · 2m",
+    snippets: ["merged, thanks", "not what I asked — revise", "hold, I'll look tomorrow"] },
+  { id: "t-3ad81009", title: "Document the task vocabulary", project: "docs-site", bucket: "attention",
+    chip: "question", tone: T.ask, age: "1h", latestKind: "Asked",
+    latest: "Should the README cover the internal steps too, or only what a reader sees?",
+    text: "Should the README cover the internal steps too, or only what a reader can see happen? It changes what the table promises, so I'd rather ask than guess.",
+    secondary: "Cancel task", waitingFor: "waiting on you · 58m",
+    snippets: ["yes, document it", "internal — leave it out", "ask the docs owner"] },
+  { id: "t-7b02f13e", title: "Flaky auth test on CI", project: "playground", bucket: "running",
+    chip: "running", tone: T.orch, age: "14m", latestKind: "Event",
+    latest: "github/checks_completed — failure on head 8ad10c2 (1 failed, 214 passed)" },
+  { id: "t-52e0b81a", title: "Migrate settings to the new schema", project: "playground", bucket: "running",
+    chip: "running", tone: T.orch, age: "6m", latestKind: "Dispatched",
+    latest: "Back at it with your review feedback" },
+  { id: "t-8801fa3c", title: "Nightly snapshot to S3", project: "ops", bucket: "resting",
+    chip: "waiting", tone: T.quiet, age: "22m", latestKind: "Waited",
+    latest: "Waiting for the 02:00 snapshot window to confirm the upload." },
+  { id: "t-1f55b8c0", title: "Make the intake label configurable", project: "playground", bucket: "closed",
+    chip: "completed", tone: T.ok, age: "2d", latestKind: "Completed",
+    latest: "Issue #9 closed as completed. Evidence: Event #18, PR #11 merged." },
+  { id: "t-0e91d446", title: "Switch tick to a 5-minute interval", project: "playground", bucket: "closed",
+    chip: "cancelled", tone: T.quiet, age: "4d", latestKind: "Cancelled",
+    latest: "Superseded — configured with conductor:setup instead." },
+];
+
+class Component extends DCLogic {
+  state = {
+    clock: 0, page: "board", filter: "All", view: null, hideNoise: null, expanded: {},
+    openFacts: {}, replies: {}, drafts: {}, detailDraft: "", sop: SOP, saved: false,
+  };
+  componentDidMount() {
+    this.t0 = Date.now();
+    this.timer = setInterval(() => this.setState((s) => ({ clock: s.clock + 1 })), 1000);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  set(patch) { this.setState(patch); }
+  elapsed(baseSeconds) {
+    const total = baseSeconds + (this.state.clock || 0);
+    const m = Math.floor(total / 60);
+    return m + "m " + String(total % 60).padStart(2, "0") + "s";
+  }
+  renderVals() {
+    const s = this.state;
+    const p = this.props;
+    const view = s.view ?? (p.defaultLedgerView ?? "Stream");
+    const hideNoise = s.hideNoise ?? (p.hideRuntimeNoise ?? true);
+    const page = s.page;
+    const tab = (name) => ({
+      line: page === name ? "var(--primary)" : "transparent",
+      fg: page === name ? "var(--foreground)" : "var(--muted-foreground)",
+    });
+    const chipOf = (t) => ({ chipBg: t.tone[0], chipFg: t.tone[1] });
+    const mode = p.boardState ?? "Live";
+    const stressed = mode === "Stressed";
+    const quiet = mode === "Quiet";
+    const all = stressed ? STRESS_ATTENTION.concat(TASKS) : quiet ? TASKS.filter((t) => t.bucket === "closed") : TASKS;
+    const attention = all.filter((t) => t.bucket === "attention").map((t) => ({
+      ...t, ...chipOf(t),
+      edge: t.chip === "question" ? "var(--warning)" : "var(--primary)",
+      replyOpen: !!s.replies[t.id],
+      replyLabel: s.replies[t.id] ? "Close reply" : (t.chip === "question" ? "Answer" : "Reply"),
+      draft: s.drafts[t.id] ?? "",
+      onDraft: (e) => this.setState((st) => ({ drafts: { ...st.drafts, [t.id]: e.target.value } })),
+      toggleReply: () => this.setState((st) => ({ replies: { ...st.replies, [t.id]: !st.replies[t.id] } })),
+      open: () => this.set({ page: "detail" }),
+      long: t.text.length > 320,
+      clamp: s.expanded[t.id] ? 99 : 4,
+      fullLabel: s.expanded[t.id] ? "show less" : "show all",
+      toggleFull: () => this.setState((st) => ({ expanded: { ...st.expanded, [t.id]: !st.expanded[t.id] } })),
+      snippets: (t.snippets || []).map((label) => ({
+        label, use: () => this.setState((st) => ({ drafts: { ...st.drafts, [t.id]: label } })),
+      })),
+    }));
+    const filters = ["All", "Needs you", "Running", "Resting", "Closed"].map((label) => {
+      const on = s.filter === label;
+      const count = label === "All" ? all.length
+        : label === "Needs you" ? all.filter((t) => t.bucket === "attention").length
+        : label === "Running" ? all.filter((t) => t.bucket === "running").length
+        : label === "Resting" ? all.filter((t) => t.bucket === "resting").length
+        : all.filter((t) => t.bucket === "closed").length;
+      return { label, count,
+        bg: on ? "var(--background)" : "transparent",
+        fg: on ? "var(--foreground)" : "var(--muted-foreground)",
+        shadow: on ? "var(--shadow-xs)" : "none",
+        pick: () => this.set({ filter: label }) };
+    });
+    const bucketFor = { "Needs you": "attention", Running: "running", Resting: "resting", Closed: "closed" };
+    const rows = all.filter((t) => s.filter === "All" || t.bucket === bucketFor[s.filter]).map((t) => ({
+      ...t, ...chipOf(t),
+      fresh: t.bucket === "attention" || t.bucket === "running",
+      open: () => this.set({ page: "detail" }),
+    }));
+    const factView = (f) => {
+      const tone = f.status === "succeeded" ? T.ok : f.status === "waiting" ? T.ask : (KIND[f.kind] || T.quiet);
+      const restates = ["Request", "Reply", "Report", "Question", "Note"].includes(f.title);
+      return { ...f, chipBg: tone[0], chipFg: tone[1], title: restates ? "" : f.title,
+        label: LABEL[f.kind] || f.kind,
+        who: f.kind === "Event" ? "github" : f.byShort,
+        byShort: f.kind === "Event" ? "" : f.byShort,
+        byFg: f.lane === 1 ? "var(--info-fg)" : f.lane === 2 ? "var(--foreground)" : "var(--muted-foreground)",
+        cardBg: f.noise ? "var(--background)" : "var(--surface)",
+        oneLine: restates ? f.body : f.title + " — " + f.body,
+        lead: restates ? f.body : f.title,
+        showExtra: !!s.openFacts[f.seq],
+        toggleLabel: (s.openFacts[f.seq] ? "hide " : "show ") + (f.kind === "Dispatched" ? "instructions" : "detail"),
+        toggle: () => this.setState((st) => ({ openFacts: { ...st.openFacts, [f.seq]: !st.openFacts[f.seq] } })) };
+    };
+    const visible = FACTS.filter((f) => !(hideNoise && f.noise)).map(factView);
+    return {
+      onBoard: page === "board", onTasks: page === "tasks", onDetail: page === "detail", onConfig: page === "config",
+      goBoard: () => this.set({ page: "board" }), goTasks: () => this.set({ page: "tasks" }), goConfig: () => this.set({ page: "config" }),
+      tabBoardLine: tab("board").line, tabBoardFg: tab("board").fg,
+      tabTasksLine: tab("tasks").line, tabTasksFg: tab("tasks").fg,
+      tabConfigLine: tab("config").line, tabConfigFg: tab("config").fg,
+      attentionCount: attention.length, taskCount: all.length,
+      isLoading: mode === "Loading", isError: mode === "Error", isUnconfigured: mode === "Not configured",
+      boardReady: !["Loading", "Error", "Not configured"].includes(mode),
+      attentionEmpty: attention.length === 0,
+      tickLabel: "NEXT RUN IN 2:41",
+      tickNow: () => {},
+      attention, attentionSub: "",
+      runningEmpty: quiet,
+      running: quiet ? [] : (stressed ? [
+        { title: "Two workers lost in a row on the importer", phase: "third attempt, importing 1.2M rows", elapsed: this.elapsed(1284), fresh: true, open: () => this.set({ page: "detail" }) },
+        { title: "Retire the legacy webhook", phase: "mapping every caller in the logs", elapsed: this.elapsed(640), fresh: false, open: () => this.set({ page: "detail" }) },
+        { title: "Bump the Node version in CI", phase: "running the suite on Node 24", elapsed: this.elapsed(95), fresh: true, open: () => this.set({ page: "detail" }) },
+      ] : [
+        { agent: "coding", title: "Migrate settings to the new schema", phase: "revising PR #19 after review", elapsed: this.elapsed(372), fresh: true, open: () => this.set({ page: "detail" }) },
+        { agent: "assistant", title: "Flaky auth test on CI", phase: "diagnosing the failing check", elapsed: this.elapsed(228), fresh: false, open: () => this.set({ page: "detail" }) },
+      ]),
+      runningSub: quiet ? "" : stressed ? "3 of 3 at once" : "2 of 3 at once",
+      restingEmpty: all.filter((t) => t.bucket === "resting").length === 0,
+      resting: all.filter((t) => t.bucket === "resting").map((t) => ({
+        ...t, ...chipOf(t), why: t.latest, when: "continues in 9m", open: () => this.set({ page: "detail" }),
+      })),
+      restingSub: "",
+      filters, rows, tableSub: rows.length + " of " + TASKS.length + " tasks",
+      views: ["Stream", "Lanes", "Table"].map((label) => ({
+        label, bg: view === label ? "var(--background)" : "transparent",
+        fg: view === label ? "var(--foreground)" : "var(--muted-foreground)",
+        shadow: view === label ? "var(--shadow-xs)" : "none",
+        pick: () => this.set({ view: label }),
+      })),
+      isStream: view === "Stream", isLanes: view === "Lanes", isTable: view === "Table",
+      hideNoise, toggleNoise: () => this.set({ hideNoise: !hideNoise }),
+      wakes: WAKES.map((w) => ({ ...w, facts: visible.filter((f) => f.wake === w.n) })),
+      laneFacts: visible, tableFacts: visible,
+      detailDraft: s.detailDraft,
+      onDetailDraft: (e) => this.set({ detailDraft: e.target.value }),
+      detailSnippets: ["merged, thanks", "revise: per-IP too", "stop and report"].map((label) => ({
+        label, use: () => this.set({ detailDraft: label }),
+      })),
+      sopText: s.sop,
+      onSop: (e) => this.set({ sop: e.target.value, saved: false }),
+      saveSop: () => this.set({ saved: true }),
+      resetSop: () => this.set({ sop: SOP, saved: false }),
+      sopMeta: "global sop · markdown · " + s.sop.length.toLocaleString("en-US") + " chars",
+      dirtyLabel: s.sop !== SOP ? "unsaved changes" : "",
+      savedLabel: s.saved ? "Saved." : "",
+      projects: [
+        { id: "playground", workingDir: "~/code/playground", repoLine: "zhangfand/playground · label \"conductor\"", ownSop: false, intakeLabel: "intake on", intakeFg: "var(--success-fg)" },
+        { id: "docs-site", workingDir: "~/code/docs-site", repoLine: "zhangfand/docs-site · labels \"conductor\" + \"docs\"", ownSop: true, intakeLabel: "intake on", intakeFg: "var(--success-fg)" },
+        { id: "ops", workingDir: "~/code/ops", repoLine: "no repo · chat intake only", ownSop: false, intakeLabel: "intake off", intakeFg: "var(--subtle-foreground)" },
+      ],
+      runtime: [
+        { k: "Orchestrator", v: "conductor:orchestrator" },
+        { k: "Max workers", v: "3" },
+        { k: "Tick every", v: "5 min" },
+        { k: "Reuse sessions", v: "true" },
+        { k: "Decisions per turn", v: "25" },
+        { k: "Heartbeat lease", v: "90s" },
+      ],
+      agents: [
+        { id: "coding:coding", what: "writes code in an isolated worktree, runs the project's tests, pushes a branch and opens the PR." },
+        { id: "assistant:assistant", what: "read-only: research, and independent verification of a PR against the request." },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
