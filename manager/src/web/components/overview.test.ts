@@ -74,20 +74,31 @@ describe("dashboard navigation and secondary views", () => {
   it("hides the project filter for a single-project installation", () => {
     expect(screen("overview", { view: { ...view, projects: ["rome"] } })).not.toContain('aria-label="Filter by project"');
   });
-  it("has quiet idle health, a loading spinner and retry alarm", () => {
-    const idle = renderToStaticMarkup(createElement(DashboardFreshness, { loading: false, retry() {} }));
-    expect(idle).not.toContain("<svg");
-    expect(idle).not.toContain('role="status"');
-    expect(idle).not.toContain("<button");
-    expect(renderToStaticMarkup(createElement(DashboardFreshness, { loading: true, retry() {} }))).toContain("animate-spin");
-    expect(renderToStaticMarkup(createElement(DashboardFreshness, { loading: false, warning: "Offline", retry() {} }))).toContain("Retry loading dashboard");
-  });
-  it("reserves identical non-shrinking header space in every refresh state", () => {
-    for (const state of [{ loading: false }, { loading: true }, { loading: false, warning: "Offline" }, { loading: true, warning: "Offline" }]) {
-      const html = renderToStaticMarkup(createElement(DashboardFreshness, { ...state, retry() {} }));
-      expect(html).toMatch(/^<span class="inline-flex size-6 shrink-0 items-center justify-center">/);
-      expect(screen("overview", state)).toContain(`</nav>${html}</header>`);
+  it("renders no refresh indicator or placeholder while healthy or refreshing", () => {
+    for (const loading of [false, true]) {
+      expect(renderToStaticMarkup(createElement(DashboardFreshness, { loading, retry() {} }))).toBe("");
+      const html = screen("overview", { loading });
+      expect(html).toContain("</nav></header>");
+      expect(html).not.toContain('aria-label="Refreshing dashboard"');
     }
+  });
+  it("puts persistent failure banners below the tabs and keeps them visible during retries", () => {
+    for (const loading of [false, true]) {
+      const banner = renderToStaticMarkup(createElement(DashboardFreshness, { loading, warning: "Repeated failures", retry() {} }));
+      expect(banner).toContain('role="alert"');
+      expect(banner).toContain("Repeated failures");
+      expect(banner).toContain("Retry now");
+      expect(banner).not.toContain("animate-spin");
+      expect(banner.includes('disabled=""')).toBe(loading);
+      expect(screen("overview", { loading, warning: "Repeated failures" })).toContain(`</header>${banner}`);
+    }
+  });
+  it("shows initial-load failures immediately without duplicating the refresh banner", () => {
+    const html = screen("overview", { view: null, initialError: "Offline", warning: "Repeated failures" });
+    expect(html).toContain("Could not load Manager.");
+    expect(html).toContain("Try again");
+    expect(html).not.toContain("Unable to refresh Manager");
+    expect(screen("overview", { view: null })).toContain("Loading tasks…");
   });
   it("does not show old report claims or execution counters in All tasks", () => {
     const html = renderToStaticMarkup(createElement(TaskList, { tasks }));

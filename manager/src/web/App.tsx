@@ -2,10 +2,11 @@ import "./styles.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchAppApi, getCurrentAppPath, navigateToApp, subscribeToAppPath, type RomeAppBootstrap } from "@rome-os/app-web-sdk";
 import { Button } from "@rome-os/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
 import { cn } from "@rome-os/ui/cn";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@rome-os/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@rome-os/ui/dropdown-menu";
-import { ChevronDown, RefreshCw, TriangleAlert } from "lucide-react";
+import { ChevronDown, TriangleAlert } from "lucide-react";
 import { Ledger } from "./components/ledger";
 import { TaskDetail } from "./components/task-detail";
 import { TaskList } from "./components/task-list";
@@ -15,6 +16,7 @@ import { ConfigurationEditor, SettingRow } from "./components/configuration";
 import { Overview } from "./components/overview";
 import { handleOf, nameWorkers } from "./lib/domain";
 import { useNow } from "./lib/format";
+import { refreshWarning, updateRefreshFailure, type RefreshFailure } from "./lib/refresh-health";
 import type { DashboardView } from "./lib/types";
 
 const POLL_MS = 15_000;
@@ -47,9 +49,8 @@ function Dashboard({ page }: { page: Page }) {
   const [projectId, setProjectId] = useState("");
   const requestId = useRef(0);
   const [view, setView] = useState<DashboardView | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<RefreshFailure | null>(null);
   const [loading, setLoading] = useState(true);
-  const [fetchedAt, setFetchedAt] = useState<number>();
   const now = useNow();
   const load = useCallback(async () => {
     const request = ++requestId.current;
@@ -62,9 +63,9 @@ function Dashboard({ page }: { page: Page }) {
       }
       const next = await res.json() as DashboardView;
       if (request !== requestId.current) return;
-      setView(next); setFetchedAt(Date.now()); setError(null);
+      setView(next); setFailure(null);
     } catch (e) {
-      if (request === requestId.current) setError(e instanceof Error ? e.message : String(e));
+      if (request === requestId.current) setFailure((previous) => updateRefreshFailure(previous, e instanceof Error ? e.message : String(e), Date.now()));
     } finally { if (request === requestId.current) setLoading(false); }
   }, [projectId]);
   useEffect(() => {
@@ -77,16 +78,16 @@ function Dashboard({ page }: { page: Page }) {
   }, [load]);
   const changeProject = (value: string) => {
     // Never label the previous project's tasks as the new selection while loading.
-    requestId.current++; setView(null); setFetchedAt(undefined); setError(null); setProjectId(value);
+    requestId.current++; setView(null); setFailure(null); setProjectId(value);
   };
   return <DashboardScreen page={page} view={view} projectId={projectId} onProject={changeProject}
-    loading={loading} warning={error ?? (fetchedAt && now - fetchedAt > 3 * 60_000 ? "Dashboard data is over 3 minutes old." : undefined)} retry={() => void load()} />;
+    loading={loading} initialError={failure?.message} warning={refreshWarning(failure, now)} retry={() => void load()} />;
 }
 
 /** Rendering is separate from polling so the navigation/content contract is testable. */
-export function DashboardScreen({ page, view, projectId, onProject, loading, warning, retry }: {
+export function DashboardScreen({ page, view, projectId, onProject, loading, initialError, warning, retry }: {
   page: Page; view: DashboardView | null; projectId: string; onProject: (id: string) => void;
-  loading: boolean; warning?: string | null; retry: () => void;
+  loading: boolean; initialError?: string; warning?: string | null; retry: () => void;
 }) {
   const handles = useMemo(() => new Map((view?.tasks ?? []).map((t) => [t.id, handleOf(t)])), [view]);
   const names = useMemo(() => nameWorkers(view?.tasks ?? []), [view]);
@@ -119,11 +120,11 @@ export function DashboardScreen({ page, view, projectId, onProject, loading, war
           </DropdownMenuContent>
         </DropdownMenu>
       </nav>
-      <DashboardFreshness loading={loading} warning={warning} retry={retry} />
     </header>
-    {!view ? <div className="py-6 text-ui text-muted-foreground" role={warning ? "alert" : undefined}>
-      {warning ? <>Could not load Manager. <Button variant="ghost" size="sm" onClick={retry}>Try again</Button></> : "Loading tasks…"}
+    {!view ? <div className="py-6 text-ui text-muted-foreground" role={initialError ? "alert" : undefined}>
+      {initialError ? <>Could not load Manager. <Button variant="ghost" size="sm" disabled={loading} onClick={retry}>Try again</Button></> : "Loading tasks…"}
     </div> : <>
+      <DashboardFreshness loading={loading} warning={warning} retry={retry} />
       {!view.configured ? <p role="status" className="text-ui text-warning-fg">Manager is not configured. <button type="button" className="underline" onClick={() => go("diagnostics")}>Open configuration instructions</button></p> : null}
       {page === "overview" ? <Overview tasks={view.tasks} names={names} showProject={showProject} /> : null}
       {page === "tasks" || page === "history" ? <TaskList key={page} tasks={view.tasks} showProject={showProject} history={page === "history"} /> : null}
@@ -137,13 +138,16 @@ export function DashboardScreen({ page, view, projectId, onProject, loading, war
 }
 
 export function DashboardFreshness({ loading, warning, retry }: { loading: boolean; warning?: string | null; retry: () => void }) {
-  // Reserve the same header space while idle, refreshing, or showing a retry.
-  // Otherwise the right-aligned navigation shifts on every polling request.
-  return <span className="inline-flex size-6 shrink-0 items-center justify-center">
-    {loading ? <span role="status" aria-label="Refreshing dashboard" className="inline-flex text-muted-foreground"><RefreshCw className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden /></span>
-      : warning ? <Button variant="ghost" size="xs" className="size-full p-0" onClick={retry} title={`${warning} Click to retry.`} aria-label={`${warning} Retry loading dashboard.`}><TriangleAlert className="size-3.5 text-warning-fg" aria-hidden /></Button>
-      : null}
-  </span>;
+  if (!warning) return null;
+  // Keep the banner visible during retries; only recovery clears it.
+  return <Alert>
+    <TriangleAlert className="size-4 text-warning-fg" aria-hidden />
+    <AlertTitle>Unable to refresh Manager</AlertTitle>
+    <AlertDescription>
+      <p>{warning}</p>
+      <Button variant="ghost" size="sm" disabled={loading} onClick={retry}>Retry now</Button>
+    </AlertDescription>
+  </Alert>;
 }
 
 function Configuration({ view, onSaved }: { view: DashboardView; onSaved: () => void }) {
