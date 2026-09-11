@@ -15,7 +15,8 @@ describe("inline setting rows", () => {
     const changes = lifecycleChanges(next, "prepare", hook, "a");
     expect(changes).toEqual({ projects: { ...config.projects, a: { ...config.projects!.a, hooks: { prepare: hook } } } });
     const html = renderToStaticMarkup(createElement(ConfigurationFields, { config: next, disabled: false, async save() {} }));
-    expect(html).toContain("Prepare &amp; Evaluate"); expect(html).toContain("Check evidence");
+    expect(html).toContain("Lifecycle hooks"); expect(html).toContain("Completion check");
+    expect(lifecycleChanges(next, "completion", hook)).toEqual({ hooks: { ...next.hooks, completion: hook } }); expect(html).toContain("Check evidence");
     expect(html).toContain("assistant:assistant"); expect(html).toContain("textarea");
     expect(html).toContain("New tasks snapshot");
   });
@@ -32,7 +33,7 @@ describe("inline setting rows", () => {
   it("renders controls immediately in labeled rows, with no separate edit view", () => {
     const html = renderToStaticMarkup(createElement(ConfigurationFields, { config, disabled: false, async save() {} }));
     for (const text of ["Global worker limit", "Retry limit", "Legacy worker age cap", "Reuse worker sessions", "Close tasks when GitHub issues close", "Default project", "Source directory", "Repository", "Intake label", "Project label", "Issue intake", "new tasks only", "does not stop running workers", 'min="1"', 'max="20"', 'max="168"', 'role="switch"', 'aria-describedby=', 'data-setting-row']) expect(html).toContain(text);
-    expect(html.split('data-setting-row').length - 1).toBe(rows.length + (Object.keys(config.projects ?? {}).length + 1) * 2);
+    expect(html.split('data-setting-row').length - 1).toBe(rows.length + (Object.keys(config.projects ?? {}).length + 1) * 3);
     expect(html).not.toContain("Edit configuration"); expect(html).not.toContain("Save changes");
     expect(html).not.toContain(">Save<"); // Save/Cancel only appear on the row with edits.
   });

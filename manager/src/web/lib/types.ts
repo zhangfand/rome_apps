@@ -4,6 +4,7 @@ export type TaskState = "created" | "taken" | "completed" | "cancelled";
 export type Position = "working" | "waiting" | "stuck" | "reported";
 export type WorkerStatus = "running" | "returned" | "failed" | "lost";
 export type FactKind =
+  | "CompletionEnabled"
   | "Bound"
   | "Created"
   | "Taken"
@@ -23,6 +24,7 @@ export type FactKind =
   | "Reply";
 
 export const FACT_KINDS: FactKind[] = [
+  "CompletionEnabled",
   "Bound",
   "Created",
   "Taken",
@@ -55,7 +57,7 @@ export interface FactSummary {
 }
 
 export interface WorkerSummary {
-  phase?: "prepare" | "work" | "evaluate";
+  phase?: "prepare" | "work" | "evaluate" | "completion";
   projectId?: string;
   workerId: string;
   taskId: string;
@@ -88,7 +90,8 @@ export interface TaskSummary {
   liveWorkerId?: string;
   startsSinceLastPersonFact: number;
   latest: FactSummary;
-  attention?: { kind: "Question" | "Report"; text: string; evidence?: string };
+  completionStatus?: "checking" | "waiting" | "blocked";
+  attention?: { kind: "Question" | "Report"; text: string; evidence?: string; reportedAt?: string };
   workers: WorkerSummary[];
 }
 

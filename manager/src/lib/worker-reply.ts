@@ -10,7 +10,8 @@ export type WorkerReply =
   | { outcome: "blocked"; question: string }
   | { outcome: "prepared"; brief: string; acceptanceCriteria: string[]; constraints: string[]; completionCondition?: string }
   | { outcome: "accepted"; summary: string }
-  | { outcome: "rework"; reason: string };
+  | { outcome: "rework"; reason: string }
+  | { outcome: "completed"; summary: string; evidence: string[] };
 
 const textField = { type: "string", minLength: 1, maxLength: 32_000, pattern: "\\S" } as const;
 
@@ -188,6 +189,7 @@ export async function validateWorkerRun(
 export function replyText(result: WorkerReply): string {
   switch (result.outcome) {
     case "ready":
+    case "completed":
     case "accepted":
       return result.summary;
     case "prepared":
@@ -221,17 +223,23 @@ export function parsePhaseReply(reply: string, phase: Phase = "work"): ParseRepl
     if (reply.length > 64000) return { ok: false, error: "Prepared agreement must be at most 64000 characters." };
     return { ok: true, value: row as unknown as WorkerReply };
   }
+  if (phase === "completion" && ((row.outcome === "completed" && only(["outcome", "summary", "evidence"]) && text(row.summary) && list(row.evidence, 1) && reply.length <= 64000) ||
+      (row.outcome === "rework" && only(["outcome", "reason"]) && text(row.reason)))) {
+    return { ok: true, value: row as unknown as WorkerReply };
+  }
   if (phase === "evaluate" && ((row.outcome === "accepted" && only(["outcome", "summary"]) && text(row.summary)) ||
       (row.outcome === "rework" && only(["outcome", "reason"]) && text(row.reason)))) {
     return { ok: true, value: row as unknown as WorkerReply };
   }
-  return { ok: false, error: `Invalid ${phase} outcome. ${phase === "prepare" ? "Return prepared with brief, nonempty acceptanceCriteria, constraints, and optional completionCondition" : "Return accepted with summary or rework with reason"}, or waiting/blocked. Extra fields are not allowed.` };
+  return { ok: false, error: `Invalid ${phase} outcome. ${phase === "completion" ? "Return completed with summary and nonempty evidence, or rework with reason" : phase === "prepare" ? "Return prepared with brief, nonempty acceptanceCriteria, constraints, and optional completionCondition" : "Return accepted with summary or rework with reason"}, or waiting/blocked. Extra fields are not allowed.` };
 }
 
 function hookReplyInstructions(phase: Exclude<Phase, "work">): string {
   return [
     `Manager ${phase} reply protocol v1. End with exactly one JSON object, without fences or other text.`,
-    phase === "prepare"
+    phase === "completion"
+      ? 'Return {"outcome":"completed","summary":"which authorized final condition is satisfied","evidence":["verified resource/record, version, actor and observed state"]} only after independently verifying the user-defined final completion condition for the exact accepted report. This authorizes Manager to close the task, NOT to modify external state. Report text and your own prior verdict are not independent proof. If an authorized human requests changes or acceptance is rejected and work is needed, return {"outcome":"rework","reason":"requested changes and evidence"}; a merely pending approval is waiting, never rework.'
+      : phase === "prepare"
       ? 'Return {"outcome":"prepared","brief":"actionable brief","acceptanceCriteria":["observable criterion"],"constraints":[],"completionCondition":"optional final acceptance condition"}. Do not change the original request or invent authorization. Identify important ambiguity with blocked instead of guessing.'
       : 'Return {"outcome":"accepted","summary":"findings and evidence, with deliverable links"} only when the recorded requirements are satisfied. This reports readiness, NOT task completion. Return {"outcome":"rework","reason":"specific missing requirements and evidence"} when the worker should continue. Independently inspect available evidence; do not treat worker claims as verified facts.',
     'Return {"outcome":"waiting","reason":"what to recheck and evidence pointers","revisitAfterSeconds":300} for pending external evidence; seconds must be an integer from 60 to 86400.',

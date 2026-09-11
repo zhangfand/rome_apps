@@ -2,16 +2,16 @@ import type { Fact, StartedFact } from "./facts.js";
 import type { TaskView, ResumableSession } from "./fold.js";
 
 /** Controller-owned protocol; all business instructions belong to the user. */
-export type Phase = "work" | "prepare" | "evaluate";
+export type Phase = "work" | "prepare" | "evaluate" | "completion";
 export type HookPhase = Exclude<Phase, "work">;
 export interface LifecycleHook { agent: string; instructions: string }
 /** Missing inherits the global default, null explicitly disables a project hook. */
-export interface LifecycleHooks { prepare?: LifecycleHook | null; evaluate?: LifecycleHook | null }
-export interface AssessmentContext { submissionSeq: number; agreementSeq?: number }
+export interface LifecycleHooks { prepare?: LifecycleHook | null; evaluate?: LifecycleHook | null; completion?: LifecycleHook | null }
+export interface AssessmentContext { submissionSeq?: number; agreementSeq?: number; reportSeq?: number }
 export const HOOK_INSTRUCTIONS_MAX = 16_000;
 export const HOOKS_SCHEMA = {
   type: "object", additionalProperties: false,
-  properties: Object.fromEntries(["prepare", "evaluate"].map((phase) => [phase, {
+  properties: Object.fromEntries(["prepare", "evaluate", "completion"].map((phase) => [phase, {
     anyOf: [{ type: "null" }, {
       type: "object", additionalProperties: false, required: ["agent", "instructions"],
       properties: {
@@ -27,7 +27,7 @@ export function parseHooks(raw: unknown): LifecycleHooks | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("hooks must be an object");
   const hooks: LifecycleHooks = {};
   for (const [phase, value] of Object.entries(raw)) {
-    if (phase !== "prepare" && phase !== "evaluate") throw new Error(`Unknown lifecycle hook: ${phase}`);
+    if (phase !== "prepare" && phase !== "evaluate" && phase !== "completion") throw new Error(`Unknown lifecycle hook: ${phase}`);
     if (value === null) { hooks[phase] = null; continue; }
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${phase} must contain agent and instructions, or be null`);
     const row = value as Record<string, unknown>;
@@ -48,7 +48,10 @@ export function resolveHooks(defaults?: LifecycleHooks, overrides?: LifecycleHoo
 /** Only intake or an explicit human adoption is authoritative; never consult mutable config. */
 export function hooksOf(task: TaskView): LifecycleHooks {
   const adoption = task.facts.filter((f) => f.kind === "Reply" && f.payload.reassessment).at(-1);
-  return adoption?.kind === "Reply" ? adoption.payload.reassessment!.hooks : task.project?.hooks ?? {};
+  const hooks = adoption?.kind === "Reply" ? adoption.payload.reassessment!.hooks : task.project?.hooks ?? {};
+  const enabled = task.facts.filter((f) => f.kind === "CompletionEnabled").at(-1);
+  return enabled?.kind === "CompletionEnabled" && enabled.seq > (adoption?.seq ?? 0)
+    ? { ...hooks, completion: enabled.payload.hook } : hooks;
 }
 
 /** A human can explicitly ask to assess a historical submission, but later steering invalidates it. */
@@ -64,6 +67,10 @@ export function lastStart(task: TaskView): StartedFact | undefined {
 
 export function startFor(task: TaskView, workerId: string): StartedFact | undefined {
   return task.facts.find((f): f is StartedFact => f.kind === "Started" && f.payload.workerId === workerId);
+}
+
+export function latestReport(task: TaskView) {
+  return task.facts.filter((f) => f.kind === "Report").at(-1);
 }
 
 export function latestAgreement(task: TaskView) {
@@ -91,7 +98,8 @@ export function phaseAttempts(task: TaskView, phase: Phase, assessment?: Assessm
   }
   return task.facts.filter((f) => f.kind === "Started" && f.seq > since &&
     (f.payload.phase ?? "work") === phase &&
-    (phase !== "evaluate" || f.payload.assessment?.submissionSeq === assessment?.submissionSeq)).length;
+    (phase !== "evaluate" || f.payload.assessment?.submissionSeq === assessment?.submissionSeq) &&
+    (phase !== "completion" || f.payload.assessment?.reportSeq === assessment?.reportSeq)).length;
 }
 
 /** Match an assessment to the exact durable submission, never a newer worker's output. */

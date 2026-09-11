@@ -57,6 +57,14 @@ function returned(workerId = "w1") {
 function after(started: StartedFact, ms: number) { return new Date(+started.createdAt + ms); }
 
 describe("durable worker heartbeats (real SQLite migrations and connections)", () => {
+  it("cannot apply completion after human steering races the controller decision", () => {
+    start(); const result = returned()!;
+    connect().ledger.append({ taskId: "t1", kind: "Reply", by: "guardian", payload: { text: "Do not close; changed requirements" } });
+    expect(ledger.appendIfLatest({ taskId: "t1", kind: "Completed", by: "runtime", payload: {
+      reason: "Approved", completion: { workerId: "w1", agent: "assistant:assistant", reportSeq: 1, resultSeq: result.seq, evidence: ["approval record"] },
+    } }, result.seq)).toBeUndefined();
+    expect(ledger.all().at(-1)?.kind).toBe("Reply");
+  });
   it("compare-and-append prevents backfill from overriding a concurrent human change", () => {
     start(); returned();
     const report = ledger.append({ taskId: "t1", kind: "Report", by: "runtime", payload: { what: "ready", evidence: "w1" } });

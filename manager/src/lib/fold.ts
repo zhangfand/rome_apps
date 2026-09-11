@@ -168,7 +168,7 @@ export function foldTask(facts: readonly Fact[]): TaskView {
     brief: created.payload.brief,
     state,
     position: state === "taken" ? position : undefined,
-    latest: ordered.filter((f) => f.kind !== "Bound").at(-1)!,
+    latest: ordered.filter((f) => f.kind !== "Bound" && f.kind !== "CompletionEnabled").at(-1)!,
     facts: ordered,
     liveWorker,
     resumableSession,

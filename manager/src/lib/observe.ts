@@ -1,3 +1,4 @@
+import { hooksOf } from "./lifecycle.js";
 import { type ClosedIssue, GITHUB, type NewFact } from "./facts.js";
 import { isTerminal, type LedgerSnapshot, type TaskView } from "./fold.js";
 import { type IssueRef, issueRefsIn } from "./github-refs.js";
@@ -42,7 +43,7 @@ const DROPPED_REASONS = new Set(["not_planned", "duplicate"]);
 export function issuesToWatch(snapshot: LedgerSnapshot): IssueWatch[] {
   const out: IssueWatch[] = [];
   for (const task of snapshot.tasks) {
-    if (isTerminal(task.state)) continue;
+    if (isTerminal(task.state) || hooksOf(task).completion) continue;
     const refs = issueRefsIn(task.brief);
     if (refs.length === 0) continue;
     out.push({ taskId: task.id, refs });

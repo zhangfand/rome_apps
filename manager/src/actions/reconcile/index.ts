@@ -12,7 +12,7 @@ import { createWorkerHealthRepository, type WorkerHealthRepository } from "../..
 import { HEARTBEAT_PROTOCOL } from "../../lib/worker-health.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import type { ManagerConfig } from "../../lib/config.js";
-import { RUNTIME, isWorkerTerminalKind } from "../../lib/facts.js";
+import { RUNTIME, type CompletedFact, isWorkerTerminalKind } from "../../lib/facts.js";
 import { syncRepository } from "../../lib/board-sync.js";
 import { fold } from "../../lib/fold.js";
 import { issueApiPath } from "../../lib/github-refs.js";
@@ -286,6 +286,11 @@ async function apply(
     case "append": {
       if (action.fact.kind === "Started") {
         return prepareWorkerStart(action.fact, ledger, managerConfig);
+      }
+      const completion = action.fact.kind === "Completed" ? (action.fact.payload as CompletedFact["payload"]).completion : undefined;
+      if (completion) {
+        const fact = ledger.appendIfLatest(action.fact, completion.resultSeq);
+        return fact ? `${fact.kind}(${fact.taskId}) by completion check` : `skipped stale completion(${action.fact.taskId})`;
       }
       const fact = ledger.append(action.fact);
       return `${fact.kind}(${fact.taskId})`;

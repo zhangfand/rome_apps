@@ -14,8 +14,9 @@ import type { ProjectBinding } from "./projects.js";
 
 /**
  * Task state facts. A task ends on a person's word, or when the GitHub issue
- * the person named in the brief is closed — never on the runtime's own reading
- * of a worker's result.
+ * the person named in the brief is closed, or an explicitly authorized completion
+ * checker verifies the final condition with evidence. A work/assessment result
+ * alone never completes a task.
  */
 export const TASK_STATE_KINDS = ["Created", "Taken", "Completed", "Cancelled"] as const;
 
@@ -25,7 +26,7 @@ export const EXECUTION_KINDS = ["Started", "Opened", "Restarted", "Returned", "F
 /** Dialogue facts. The runtime asks and reports; a person replies. */
 export const DIALOGUE_KINDS = ["Question", "Report", "Reply"] as const;
 
-export const FACT_KINDS = [...TASK_STATE_KINDS, ...EXECUTION_KINDS, ...DIALOGUE_KINDS, "Bound"] as const;
+export const FACT_KINDS = [...TASK_STATE_KINDS, ...EXECUTION_KINDS, ...DIALOGUE_KINDS, "Bound", "CompletionEnabled"] as const;
 
 export type FactKind = (typeof FACT_KINDS)[number];
 
@@ -53,11 +54,10 @@ export function githubPerson(login: string): string {
 }
 
 /**
- * Kinds a person writes. `reconcile` has no path to any of them; the one other
- * writer of a Completed or Cancelled is the issue poll, which stamps
- * {@link GITHUB} and only ever transcribes a closed issue. That keeps "the
- * runtime never ends a task on its own judgement" mechanical rather than a
- * promise.
+ * Human-control kinds used for steering/terminal state. Completion may also be
+ * transcribed by the legacy issue poll or a user-authorized completion checker;
+ * the latter carries pinned report/agreement, agent and evidence provenance.
+ * Ordinary implementation and readiness outcomes cannot close a task.
  */
 export const PERSON_KINDS: readonly FactKind[] = ["Created", "Completed", "Cancelled", "Reply"];
 
@@ -132,10 +132,14 @@ export interface IssueOrigin {
 export type TakenFact = FactOf<"Taken", Record<string, never>>;
 /** Legacy migration metadata. Does not change scheduling, position or retry budgets. */
 export type BoundFact = FactOf<"Bound", ProjectBinding>;
+/** Human-authorized completion policy adoption; metadata only, not a worker restart. */
+export type CompletionEnabledFact = FactOf<"CompletionEnabled", { hook: LifecycleHook }>;
+
 export type CompletedFact = FactOf<
   "Completed",
   {
     reason?: string;
+    completion?: { workerId: string; agent: string; reportSeq: number; agreementSeq?: number; resultSeq: number; evidence: string[] };
     /** Set when {@link GITHUB} wrote it: the closed issues that ended the task. */
     issues?: ClosedIssue[];
   }
@@ -232,7 +236,7 @@ export type PreparedFact = FactOf<"Prepared", {
 }>;
 export type ReworkFact = FactOf<"Rework", { workerId: string; reason: string; submissionSeq: number }>;
 export type QuestionFact = FactOf<"Question", { why: string }>;
-export type ReportFact = FactOf<"Report", { what: string; evidence: string }>;
+export type ReportFact = FactOf<"Report", { what: string; evidence: string; submissionSeq?: number; agreementSeq?: number }>;
 export type ReplyFact = FactOf<"Reply", {
   text: string;
   /** Explicit human adoption only. Never supplied by worker output or ordinary reply. */
@@ -242,6 +246,7 @@ export type ReplyFact = FactOf<"Reply", {
 export type Fact =
   | CreatedFact
   | BoundFact
+  | CompletionEnabledFact
   | TakenFact
   | CompletedFact
   | CancelledFact
@@ -286,6 +291,8 @@ export function describeFact(fact: Fact): string {
         return fact.payload.brief;
       case "Taken":
         return "";
+      case "CompletionEnabled":
+        return `Completion check enabled: ${fact.payload.hook.agent}`;
       case "Bound":
         return `project ${fact.payload.projectId}: ${fact.payload.project.workingDir}`;
       case "Completed":

@@ -7,7 +7,10 @@ Tell it what you want in chat, or label an issue in a repository it watches.
 It records the task in an append-only ledger, puts a coding session on it,
 retries what fails, asks you when it is stuck, and reports when there is
 something to look at. A task ends when you say so, or when its GitHub issue is
-closed — as completed, or as not planned.
+closed — as completed, or as not planned. With an explicitly enabled user-defined
+Completion check, Manager also closes accepted deliveries after verified final
+conditions, recording evidence. That check replaces the legacy issue observer for
+its task.
 
 This is a prototype of the "long-running agent, revision 3" model. Almost all of
 it is plain TypeScript; preparation, execution, and assessment run outside the
@@ -23,12 +26,14 @@ word the fact; the app stamps who said it and cites the message. When the words
 map to none of those, the agent answers in chat and writes nothing. Its system
 prompt carries no scheduling logic — no caps, no retries, no age.
 
-**User-defined Prepare and Evaluate.** Configuration → Prepare & Evaluate lets
+**User-defined lifecycle hooks.** Configuration → Lifecycle hooks lets
 users select an installed agent and write instructions for each optional stage,
 with global defaults and per-project overrides. New tasks pin the resolved
 settings. Prepare records an actionable agreement; Evaluate checks the worker's
 submission and can accept, request rework, wait, or ask for human input. No
-business-specific acceptance or PR rule is built into the controller.
+business-specific acceptance or PR rule is built into the controller. Completion
+check runs after Report, waits or asks for input, and returns evidence-backed
+completion. Ordinary work/Evaluate agents cannot return completed.
 See [docs/lifecycle-hooks.md](docs/lifecycle-hooks.md) for configuration, examples,
 protocols, safety boundaries, and compatibility.
 

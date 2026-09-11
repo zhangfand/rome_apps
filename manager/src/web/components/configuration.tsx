@@ -31,7 +31,7 @@ export function configurationRows(config: ManagerConfig): Section[] {
       field("startCap", "Retry limit", "Starts since your last reply or a successful deferral. Lowering it can ask for your input sooner.", "number", { max: 20 }),
       field("ageCapHours", "Legacy worker age cap", "Hours. Lowering this can mark older legacy workers lost next pass. Heartbeat workers use their lease instead.", "number", { max: 168 }),
       field("reuseSessions", "Reuse worker sessions", "Future follow-ups keep session context. Turning this off retains worktrees and live sessions.", "toggle"),
-      field("closeOnIssueClosed", "Close tasks when GitHub issues close", "Applies to existing open tasks next pass: completed issues complete tasks; not-planned issues cancel them.", "toggle"),
+      field("closeOnIssueClosed", "Close tasks when GitHub issues close", "Legacy tasks without a Completion check: completed issues complete tasks; not-planned issues cancel them.", "toggle"),
     ] },
     { title: "Projects & intake", rows: [
       field("intakeLabel", "Default intake label", "Used by projects without their own intake label. Changes apply on the next pass.", "text", { max: 100 }),
@@ -184,11 +184,11 @@ export function lifecycleChanges(config: ManagerConfig, phase: HookPhase, value:
 
 function LifecycleSettings({ config, save, disabled }: { config: ManagerConfig; save: (changes: Record<string, unknown>) => Promise<void>; disabled: boolean }) {
   return <section aria-label="Task lifecycle settings" className="flex flex-col gap-4">
-    <div><h3 className="text-section">Prepare &amp; Evaluate</h3>
-      <p className="mt-1 text-aux text-muted-foreground">Optional user-defined agents and instructions. New tasks snapshot these settings; existing tasks and running sessions do not change. Evaluation reports readiness, not completion.</p></div>
+    <div><h3 className="text-section">Lifecycle hooks</h3>
+      <p className="mt-1 text-aux text-muted-foreground">Optional user-defined agents and instructions. New tasks snapshot these settings; existing tasks and running sessions do not change. Evaluation reports readiness; Completion check verifies final completion and can close tasks with evidence.</p></div>
     {[undefined, ...Object.keys(config.projects ?? {})].map((projectId) => <section key={projectId ?? "defaults"} aria-label={`${projectId ?? "Default"} lifecycle`}>
       <h4 className="text-ui font-medium">{projectId ?? "Defaults"}</h4>
-      {(["prepare", "evaluate"] as const).map((phase) => <LifecycleHookEditor key={`${projectId ?? "default"}:${phase}`} config={config} phase={phase} projectId={projectId} save={save} disabled={disabled} />)}
+      {(["prepare", "evaluate", "completion"] as const).map((phase) => <LifecycleHookEditor key={`${projectId ?? "default"}:${phase}`} config={config} phase={phase} projectId={projectId} save={save} disabled={disabled} />)}
     </section>)}
   </section>;
 }
@@ -215,7 +215,7 @@ export function LifecycleHookEditor({ config, phase, projectId, save, disabled }
   }, [dirty]);
   const change = (update: Partial<typeof draft>) => { setDraft((old) => ({ ...old, ...update })); setError(undefined); setSaved(false); };
   const blocked = disabled || pending;
-  const title = phase === "prepare" ? "Prepare" : "Evaluate";
+  const title = phase === "prepare" ? "Prepare" : phase === "evaluate" ? "Evaluate" : "Completion check";
   async function submit() {
     if (blocked || !dirty) return;
     setPending(true); setError(undefined);
@@ -228,7 +228,7 @@ export function LifecycleHookEditor({ config, phase, projectId, save, disabled }
     finally { setPending(false); }
   }
   return <form aria-label={`${projectId ?? "Default"} ${title} hook`} onSubmit={(event) => { event.preventDefault(); void submit(); }} className="border-b border-border last:border-0">
-    <SettingRow title={title} controlId={`${id}-mode`} hint={phase === "prepare" ? "Before implementation: clarify the request and record acceptance criteria and constraints." : "After submission: inspect evidence, accept, request rework, wait, or ask for input. Uses a separate session from the worker."}>
+    <SettingRow title={title} controlId={`${id}-mode`} hint={phase === "completion" ? "After delivery acceptance: verify final conditions, wait for external approval, or close the task with evidence. Does not perform the approval itself." : phase === "prepare" ? "Before implementation: clarify the request and record acceptance criteria and constraints." : "After submission: inspect evidence, accept, request rework, wait, or ask for input. Uses a separate session from the worker."}>
       <div className="flex w-full flex-col items-start gap-3 sm:w-80">
         <Select value={draft.mode} onValueChange={(mode) => change({ mode })} disabled={blocked}>
           <SelectTrigger id={`${id}-mode`} aria-describedby={`${id}-mode-hint`} className="w-full"><SelectValue /></SelectTrigger>

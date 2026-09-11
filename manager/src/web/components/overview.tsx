@@ -59,12 +59,12 @@ function OverviewPr({ task, pr, names, showProject }: { task: TaskSummary; pr: R
     {full ? <ChevronUp className="size-3" aria-hidden /> : <ChevronDown className="size-3" aria-hidden />}Details
   </button>;
   return <PullRequestCard taskId={task.id} pr={pr} compact actions={detailsButton}
-    context={showProject ? task.projectId : undefined}
+    context={[showProject ? task.projectId : undefined, task.completionStatus === "checking" ? "Checking completion" : task.completionStatus === "waiting" ? "Awaiting completion" : undefined].filter(Boolean).join(" · ") || undefined}
     details={<div id={id} hidden={!full}>
       {full ? <div className="mt-3 border-t border-border pt-3">
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
           <button type="button" className="text-left text-ui font-medium hover:underline focus-visible:ring-2 focus-visible:ring-ring" onClick={() => navigateToApp(task.id)}>{taskTitle(task)}</button>
-          <span className="text-aux text-muted-foreground">Report from {formatStamp(task.updatedAt)}</span>
+          <span className="text-aux text-muted-foreground">Report from {formatStamp(task.attention?.reportedAt ?? task.updatedAt)}</span>
         </div>
         <LightMarkdown className="text-ui" markdown={task.attention!.text} />
         {task.attention?.evidence ? <p className="mt-2 text-aux text-muted-foreground">Evidence: {humanize(task.attention.evidence, names)}</p> : null}

@@ -1,13 +1,14 @@
-# User-defined Prepare and Evaluate
+# User-defined lifecycle hooks
 
 ## Scope
 
 Manager remains the controller. This increment adds two optional agent calls
 around the existing coding worker, not a business-policy engine. Git worktrees,
 GitHub intake, issue-close observation, and explicit human completion are unchanged.
-No new completion checker registry, automatic merge, or automatic deployment.
+The optional Completion check adds evidence-backed final closure, without a
+business-specific checker registry, automatic merge, or automatic deployment.
 
-Configure **More → Configuration → Prepare & Evaluate**. Each hook has an
+Configure **More → Configuration → Lifecycle hooks**. Each hook has an
 installed `app:agent` ID and user-authored instructions. The controller supplies
 context and the strict return protocol. Users do not need to write a new action
 or TypeScript schema just to customize preparation or assessment.
@@ -107,8 +108,9 @@ Prepare:
 
 `acceptanceCriteria` must be nonempty. `constraints` may be empty.
 `completionCondition` is optional descriptive context for workers/evaluators,
-not an executable completion predicate. The existing issue-close/human-complete
-mechanisms still govern task closure. Prepared agreements have a 64,000-character
+not a controller expression or schema. The optional user-defined Completion check
+interprets it and independently verifies evidence. Without that hook, existing
+issue-close/human-complete mechanisms still govern task closure. Prepared agreements have a 64,000-character
 limit; lists are capped at 100 nonblank strings each.
 
 Evaluate:
@@ -162,7 +164,7 @@ protocol does not grant additional permissions.
 The snapshot freezes agent identity and custom instructions, not the installed
 agent implementation: upgrading an agent app may change that agent. Version-pinned
 extension bundles and explicit adoption of new policies by existing tasks are
-future work. No new system for completion detection is introduced here.
+future work. See the optional Completion check below for final-condition observation.
 
 No hooks are enabled automatically. Existing tasks—including the original two
 reported Manager tasks—are not restarted or retroactively reassessed. To change
@@ -185,3 +187,46 @@ Only an explicit rework verdict resumes implementation. Accepted still creates a
 Report, never Completed. Subsequent ordinary human steering invalidates the old
 assessment authorization but retains the explicitly adopted hooks. Backfill is not
 an automatic migration and does not change any unselected task or global setting.
+
+
+## Completion check
+
+A third optional `hooks.completion` uses the same `{agent, instructions}` configuration,
+inheritance, explicit disable and intake snapshots. A Report starts this phase in a
+fresh session, pinned to that report and agreement. The controller understands only
+these outcomes, never what a PR, issue, signature or approval means:
+
+- `{"outcome":"completed","summary":"Satisfied condition","evidence":["Verified record, version, actor and observed state"]}`:
+  controller appends Completed with checker identity, report/agreement/result references
+  and evidence. The exact result must still be current when the SQLite write commits.
+- `waiting` with reason and revisitAfterSeconds: durably recheck the SAME report;
+  implementation is not resumed. Pending approval is not a failed task or rework.
+- `blocked` with question: needs a human decision. A subsequent human Reply goes to
+  completion checking, so research sign-off does not redo research.
+- `rework` with reason: an actual requested change/rejected delivery needs further work;
+  Prepare runs again if configured, then the original work session resumes.
+
+Only the completion role may return completed; readiness/work cannot self-complete.
+No outcome grants authority to modify an external system, approve for a person, or
+perform the action being watched. Hook agents remain governed by their actual tools;
+this is not a read-only sandbox or deterministic verification of model claims. Use
+trusted, suitably restricted agents. Completion evidence is auditable text, not a
+cryptographic proof or a hard-coded provider validator.
+
+Stale human instructions, changed agreements/reports/policies and already-terminal
+tasks prevent closure. Retries use the existing capacity, heartbeat, phase failure
+budget and cadence. While completion runs or waits, the accepted report/PR stays
+visible; a completion question takes precedence. A configured Completion check
+supersedes the legacy GitHub issue-close observer for that task only.
+
+Existing tasks do NOT inherit newly saved settings. On explicit user approval,
+`manager:watch_completion` snapshots just this hook in CompletionEnabled metadata.
+Pass selected task IDs with each latest ledger sequence, configRevision and verbatim
+source. It neither rewrites old facts nor restarts a running implementation. Reports
+start checking; working tasks reach it after reporting; blocked tasks remain blocked.
+Closed tasks are skipped, matching requests are idempotent, and changed tasks require
+a fresh read. Prepare/Evaluate definitions are not changed by this operation.
+
+The old task input API still records text as Reply; no new general natural-language
+complete/cancel router is added. Once a task is in completion review, replies are
+interpreted by the user-defined checker against the approved completion policy.

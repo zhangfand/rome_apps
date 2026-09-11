@@ -1,3 +1,4 @@
+import { lastStart, latestReport } from "./lifecycle.js";
 import { replyText } from "./worker-reply.js";
 import type { WorkerWorkspace } from "./worktree.js";
 import type { ManagerConfig } from "./config.js";
@@ -71,7 +72,8 @@ export interface TaskSummary {
   /** The newest fact, rendered. */
   latest: FactSummary;
   /** Text a person needs to see: the open Question or the newest Report. */
-  attention?: { kind: "Question" | "Report"; text: string; evidence?: string };
+  completionStatus?: "checking" | "waiting" | "blocked";
+  attention?: { kind: "Question" | "Report"; text: string; evidence?: string; reportedAt?: string };
   workers: WorkerSummary[];
 }
 
@@ -237,12 +239,21 @@ export function buildView(input: BuildViewInput): DashboardView {
             kind: "Report",
             text: fact.payload.what,
             evidence: fact.payload.evidence,
+            reportedAt: fact.createdAt.toISOString(),
           };
           break;
         }
       }
     }
 
+    const completionRun = lastStart(task);
+    const report = latestReport(task);
+    const monitoring = task.state === "taken" && completionRun?.payload.phase === "completion" &&
+      completionRun.seq >= task.lastPersonFactSeq && completionRun.payload.assessment?.reportSeq === report?.seq &&
+      task.latest.kind !== "Rework";
+    if (monitoring && !attention && report && task.position !== "stuck") {
+      attention = { kind: "Report", text: report.payload.what, evidence: report.payload.evidence, reportedAt: report.createdAt.toISOString() };
+    }
     return {
       id: task.id,
       ...binding,
@@ -258,6 +269,7 @@ export function buildView(input: BuildViewInput): DashboardView {
       startsSinceLastPersonFact: task.startsSinceLastPersonFact,
       latest: summarizeFact(task.latest),
       attention,
+      completionStatus: monitoring ? task.position === "waiting" ? "waiting" : task.position === "stuck" ? "blocked" : "checking" : undefined,
       workers,
     };
   });

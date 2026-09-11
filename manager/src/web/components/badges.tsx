@@ -37,6 +37,7 @@ export type Tone = "neutral" | "brand" | "info" | "success" | "warning" | "destr
  * a row is an event or a message. Colour carries the outcome.
  */
 export const KIND: Record<FactKind, { tone: Tone; said: boolean }> = {
+  CompletionEnabled: { tone: "info", said: true },
   Bound: { tone: "muted", said: false },
   Created: { tone: "neutral", said: false },
   Taken: { tone: "brand", said: false },

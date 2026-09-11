@@ -1,0 +1,13 @@
+name: watch_completion
+type: custom
+description: >-
+  Explicitly enable the currently configured user-defined Completion check on
+  selected existing open tasks, only on the user's request. Snapshots that hook
+  without restarting implementation or changing Prepare/Evaluate. Pass exact latest
+  ledger sequences and configuration revision. Idle reports begin completion checks;
+  running tasks reach the check after delivery. Closed/changed tasks are skipped.
+entry: ./index.ts
+complexity: moderate
+speed: fast
+reliability: high
+sideEffects: write

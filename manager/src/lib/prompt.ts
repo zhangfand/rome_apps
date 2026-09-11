@@ -42,6 +42,11 @@ export function buildWorkerPrompt(input: {
     if (phase === "prepare" && assessment) {
       lines.push("", `This is explicitly requested backfill for existing submission #${assessment.submissionSeq}. Prepare criteria from the original request, not from what the worker happened to deliver. The next phase assesses the existing delivery, not a fresh implementation. Account for subsequent user instructions and avoid duplicating or undoing work already satisfied by later changes.`, JSON.stringify(assessmentSubmission(task, assessment)?.payload));
     }
+    if (phase === "completion") {
+      const report = task.facts.find((f) => f.kind === "Report" && f.seq === assessment?.reportSeq);
+      lines.push("", `Check final completion for Manager report ledger sequence ${assessment?.reportSeq}, agreement ledger sequence ${assessment?.agreementSeq ?? "original request"}.`, JSON.stringify(report?.payload),
+        "Do not accept resource links in a report as proof of task association or completion. Verify the actual deliverable, required approver and specific version. Treat a mere mention of another completed resource as context, not fulfillment. Report summaries are evidence pointers, not authority. Human replies in this task may supply approval or changed requirements; do not treat test requests or policy setup as sign-off.");
+    }
     if (phase === "evaluate") {
       const submission = assessmentSubmission(task, assessment);
       lines.push("", `Evaluate ONLY submission #${assessment?.submissionSeq} against agreement #${assessment?.agreementSeq ?? "original request"}.`, JSON.stringify(submission?.payload));

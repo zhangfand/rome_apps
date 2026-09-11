@@ -7,7 +7,8 @@ description: >-
   A long-running agent that keeps working on your tasks across sessions. Tell it
   what you want in chat; it records the task in an append-only ledger, puts a
   coding session on it, retries what fails, asks you when it is stuck, and
-  reports when there is something to look at. Only you close a task.
+  reports when there is something to look at. Tasks close on your instruction
+  or a verified user-defined completion condition.
 appRoot: dist
 includeSource: true
 
@@ -36,3 +37,4 @@ actions:
   - actions/cancel
   - actions/snapshot
   - actions/backfill
+  - actions/watch-completion

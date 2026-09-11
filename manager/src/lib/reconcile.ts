@@ -1,4 +1,4 @@
-import { authorizedHistoricalAssessment, hooksOf, lastStart, startFor, latestAgreement, assessmentSubmission, workSession, phaseAttempts, type Phase, type AssessmentContext } from "./lifecycle.js";
+import { authorizedHistoricalAssessment, latestReport, hooksOf, lastStart, startFor, latestAgreement, assessmentSubmission, workSession, phaseAttempts, type Phase, type AssessmentContext } from "./lifecycle.js";
 import { replyText } from "./worker-reply.js";
 import type { ManagerConfig } from "./config.js";
 import { type NewFact, RUNTIME } from "./facts.js";
@@ -168,6 +168,36 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
     switch (task.latest.kind) {
       case "Returned": {
         const { workerId, reply, result } = task.latest.payload;
+        const completionStart = startFor(task, workerId);
+        if (completionStart?.payload.phase === "completion") {
+          const context = completionStart.payload.assessment;
+          const report = latestReport(task);
+          if (!report || report.seq !== context?.reportSeq || context.agreementSeq !== latestAgreement(task)?.seq ||
+              completionStart.seq < task.lastPersonFactSeq ||
+              JSON.stringify(completionStart.payload.hook) !== JSON.stringify(hooksOf(task).completion)) {
+            actions.push({ type: "append", fact: { taskId: task.id, kind: "Question", by: RUNTIME,
+              payload: { why: "Completion evidence is stale or no longer matches the report, agreement, or authorized policy." } } });
+            break;
+          }
+          if (result?.outcome === "completed") {
+            actions.push({ type: "append", fact: { taskId: task.id, kind: "Completed", by: RUNTIME,
+              source: `user-defined completion check ${completionStart.payload.hook!.agent}; worker ${workerId}; report #${report.seq}`,
+              payload: { reason: result.summary, completion: { workerId, agent: completionStart.payload.hook!.agent,
+                reportSeq: report.seq, agreementSeq: context.agreementSeq, resultSeq: task.latest.seq, evidence: result.evidence } } } });
+            break;
+          }
+          if (result?.outcome === "rework") {
+            const submission = task.facts.filter((f) => f.kind === "Returned" && (startFor(task, f.payload.workerId)?.payload.phase ?? "work") === "work").at(-1);
+            if (submission) actions.push({ type: "append", fact: { taskId: task.id, kind: "Rework", by: RUNTIME,
+              payload: { workerId, reason: result.reason, submissionSeq: submission.seq } } });
+            else actions.push({ type: "append", fact: { taskId: task.id, kind: "Question", by: RUNTIME, payload: { why: result.reason } } });
+            break;
+          }
+          if (result?.outcome !== "waiting" && result?.outcome !== "blocked") {
+            actions.push({ type: "append", fact: { taskId: task.id, kind: "Question", by: RUNTIME, payload: { why: "Completion checker returned without a valid outcome." } } });
+            break;
+          }
+        }
         if (result?.outcome === "waiting") {
           // Anchor to the durable return, not this tick: replay cannot slide the deadline.
           actions.push({
@@ -224,6 +254,7 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
             const original = submission.kind === "Returned" ? (submission.payload.result ? replyText(submission.payload.result) : submission.payload.reply) : "";
             actions.push({ type: "append", fact: { taskId: task.id, kind: "Report", by: RUNTIME, payload: {
               what: `${result.summary}\n\nSubmitted result:\n${original}`,
+              submissionSeq: submission.seq, agreementSeq: context?.agreementSeq,
               evidence: `evaluation worker ${workerId}; submission #${submission.seq}; agreement ${context?.agreementSeq ?? "original request"}`,
             } } });
           } else if (result?.outcome === "rework") {
@@ -302,6 +333,10 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
               submissionSeq: task.latest.payload.reassessment.submissionSeq,
               ...(hooksOf(task).prepare ? {} : { agreementSeq: latestAgreement(task)?.seq }),
             });
+        } else if (lastStart(task)?.payload.phase === "completion" && hooksOf(task).completion && latestReport(task)) {
+          start(task, `A person replied during completion review: ${task.latest.payload.text}. Determine whether this is authorized sign-off, pending review, or a request for changed work.`, "completion", {
+            reportSeq: latestReport(task)!.seq, agreementSeq: latestAgreement(task)?.seq,
+          });
         } else start(task, `a person replied: ${task.latest.payload.text}`, hooksOf(task).prepare ? "prepare" : "work");
         break;
 
@@ -320,7 +355,8 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
         if (attempts >= config.startCap) {
           actions.push({ type: "append", fact: { taskId: task.id, kind: "Question", by: RUNTIME,
             payload: { why: `Evaluation requested more work: ${task.latest.payload.reason} (${attempts} work attempts)` } } });
-        } else start(task, `evaluation requested rework: ${task.latest.payload.reason}`);
+        } else start(task, `evaluation requested rework: ${task.latest.payload.reason}`,
+          startFor(task, task.latest.payload.workerId)?.payload.phase === "completion" && hooksOf(task).prepare ? "prepare" : "work");
         break;
       }
 
@@ -334,8 +370,13 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
         // working: a worker is running and nothing has come back yet.
         break;
 
-      case "Question":
       case "Report":
+        if (hooksOf(task).completion) start(task, "Check the user-defined final completion condition for the accepted delivery. Do not implement or modify external state.", "completion", {
+          reportSeq: task.latest.seq, agreementSeq: latestAgreement(task)?.seq,
+        });
+        break;
+
+      case "Question":
         // stuck and reported. Both wait for a person; the runtime never leaves
         // Taken on its own.
         break;
