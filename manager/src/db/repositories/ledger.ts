@@ -62,7 +62,13 @@ export class LedgerRepository {
     // write lock before reading so a Returned/Failed cannot race a Lost.
     return this.db.transaction((tx) => {
       const ledger = new LedgerRepository(tx as unknown as DrizzleDb, this.tablePrefix);
-      const closed = ledger.factsFor(fact.taskId).some(
+      const history = ledger.factsFor(fact.taskId);
+      const started = history.find((f) => f.kind === "Started" && f.payload.workerId === fact.payload.workerId);
+      // A human reply/closure may arrive before reconcile records Lost. Do not
+      // let the old worker overwrite that steering, especially a stale assessment.
+      if (started && history.some((f) => f.seq > started.seq &&
+        (f.kind === "Reply" || f.kind === "Completed" || f.kind === "Cancelled"))) return undefined;
+      const closed = history.some(
         (existing) =>
           isWorkerTerminalKind(existing.kind) &&
           (existing.payload as { workerId?: string }).workerId === fact.payload.workerId,

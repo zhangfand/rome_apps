@@ -76,6 +76,7 @@ export function WorkerTable({
                   <TableRow key={w.workerId}>
                     <TableCell className="text-ui">
                       <WorkerLink names={names} workerId={w.workerId} icon />
+                      {w.phase && w.phase !== "work" ? <span className="block text-aux text-muted-foreground">{w.phase === "prepare" ? "Prepare" : "Evaluate"}</span> : null}
                     </TableCell>
                     <TableCell>
                       <WorkerStatusBadge status={w.status} />

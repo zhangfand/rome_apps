@@ -3,7 +3,8 @@ type: custom
 description: >-
   Configure the Manager and register its recurring reconcile. Takes the absolute
   source project directory (legacy) or a projects map with per-project repo and directory,
-  plus optional global caps. Workers get isolated worktrees. Safe to run again — it updates
+  plus optional global caps and user-defined Prepare/Evaluate hooks (agent and instructions),
+  with per-project overrides. Hooks apply to new tasks only. Workers get isolated worktrees. Safe to run again — it updates
   the config and re-registers the routine only when the cadence changed.
 entry: ./index.ts
 complexity: simple

@@ -1,3 +1,5 @@
+import { hooksOf, lastStart, startFor, latestAgreement, assessmentSubmission, workSession, phaseAttempts, type Phase, type AssessmentContext } from "./lifecycle.js";
+import { replyText } from "./worker-reply.js";
 import type { ManagerConfig } from "./config.js";
 import { type NewFact, RUNTIME } from "./facts.js";
 import { isTerminal, type LedgerSnapshot, type TaskView, workerAgeMs } from "./fold.js";
@@ -60,20 +62,21 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
    * continues the task's resumable session when there is one, reuse is on,
    * and nothing this pass made it unsafe.
    */
-  const start = (task: TaskView, reason?: string): boolean => {
+  const start = (task: TaskView, reason?: string, phase: Phase = "work", assessment?: AssessmentContext): boolean => {
     if (budget <= 0) return false;
     const workerId = newWorkerId();
-    const resume = config.reuseSessions && !lostThisPass.has(task.id) ? task.resumableSession : undefined;
-    const prompt = buildWorkerPrompt({ task, config, reason, resume });
+    const hook = phase === "work" ? undefined : hooksOf(task)[phase] ?? undefined;
+    const resume = phase === "work" && config.reuseSessions && !lostThisPass.has(task.id) ? workSession(task) : undefined;
+    const prompt = buildWorkerPrompt({ task, config, reason, resume, phase, hook, assessment });
     actions.push({
       type: "append",
       fact: {
         taskId: task.id,
         kind: "Started",
         by: RUNTIME,
-        payload: resume
-          ? { workerId, prompt, resumeSessionId: resume.sessionId, replyProtocol: REPLY_PROTOCOL, heartbeatProtocol: HEARTBEAT_PROTOCOL }
-          : { workerId, prompt, replyProtocol: REPLY_PROTOCOL, heartbeatProtocol: HEARTBEAT_PROTOCOL },
+        payload: { workerId, prompt, ...(resume ? { resumeSessionId: resume.sessionId } : {}),
+          ...(phase !== "work" ? { phase, hook, assessment } : {}),
+          replyProtocol: REPLY_PROTOCOL, heartbeatProtocol: HEARTBEAT_PROTOCOL },
       },
     });
     actions.push({ type: "launch", taskId: task.id, workerId });
@@ -101,8 +104,11 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
    * waits therefore never spend the failure budget.
    */
   const afterFailure = (task: TaskView, why: string): void => {
-    if (task.startsSinceLastProgress < config.startCap) {
-      start(task, why);
+    const previous = lastStart(task);
+    const phase = previous?.payload.phase ?? "work";
+    const attempts = phaseAttempts(task, phase, previous?.payload.assessment);
+    if (attempts < config.startCap) {
+      start(task, why, phase, previous?.payload.assessment);
       return;
     }
     actions.push({
@@ -111,7 +117,7 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
         taskId: task.id,
         kind: "Question",
         by: RUNTIME,
-        payload: { why: `${why} (${task.startsSinceLastProgress} attempts)` },
+        payload: { why: `${why} (${attempts} attempts in ${phase})` },
       },
     });
   };
@@ -132,7 +138,7 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
         type: "append",
         fact: { taskId: task.id, kind: "Taken", by: RUNTIME, payload: {} },
       });
-      start(task);
+      start(task, undefined, hooksOf(task).prepare ? "prepare" : "work");
       continue;
     }
 
@@ -201,6 +207,43 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
           });
           break;
         }
+        const phase = started?.kind === "Started" ? started.payload.phase ?? "work" : "work";
+        if (phase === "prepare" && result?.outcome === "prepared") {
+          const { outcome: _outcome, ...agreement } = result;
+          actions.push({ type: "append", fact: { taskId: task.id, kind: "Prepared", by: RUNTIME, payload: { workerId, ...agreement } } });
+          break;
+        }
+        if (phase === "evaluate") {
+          const context = started?.kind === "Started" ? started.payload.assessment : undefined;
+          const submission = assessmentSubmission(task, context);
+          if (!submission || context?.agreementSeq !== latestAgreement(task)?.seq || submission.seq < task.lastPersonFactSeq) {
+            actions.push({ type: "append", fact: { taskId: task.id, kind: "Question", by: RUNTIME, payload: { why: "Evaluation no longer matches the current agreement and submission; human input is required." } } });
+            break;
+          }
+          if (result?.outcome === "accepted") {
+            const original = submission.kind === "Returned" ? (submission.payload.result ? replyText(submission.payload.result) : submission.payload.reply) : "";
+            actions.push({ type: "append", fact: { taskId: task.id, kind: "Report", by: RUNTIME, payload: {
+              what: `${result.summary}\n\nSubmitted result:\n${original}`,
+              evidence: `evaluation worker ${workerId}; submission #${submission.seq}; agreement ${context?.agreementSeq ?? "original request"}`,
+            } } });
+          } else if (result?.outcome === "rework") {
+            actions.push({ type: "append", fact: { taskId: task.id, kind: "Rework", by: RUNTIME,
+              payload: { workerId, reason: result.reason, submissionSeq: submission.seq } } });
+          } else {
+            actions.push({ type: "append", fact: { taskId: task.id, kind: "Question", by: RUNTIME, payload: { why: "Evaluator returned an invalid outcome." } } });
+          }
+          break;
+        }
+        if (phase !== "work" || (result && result.outcome !== "ready")) {
+          actions.push({ type: "append", fact: { taskId: task.id, kind: "Question", by: RUNTIME, payload: { why: "Worker outcome does not match its assigned lifecycle phase." } } });
+          break;
+        }
+        if (hooksOf(task).evaluate) {
+          start(task, "assess the submitted result against the recorded requirements", "evaluate", {
+            submissionSeq: task.latest.seq, agreementSeq: latestAgreement(task)?.seq,
+          });
+          break;
+        }
         const summary = result?.outcome === "ready" ? result.summary : reply;
         const evidence = `worker ${workerId}`;
         const verdict = judge(task, summary, evidence);
@@ -222,7 +265,8 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
 
       case "Deferred":
         if (snapshot.now.getTime() >= Date.parse(task.latest.payload.resumeAfter)) {
-          start(task, `the recorded revisit time is due: ${task.latest.payload.reason}`);
+          const previous = startFor(task, task.latest.payload.workerId);
+          start(task, `the recorded revisit time is due: ${task.latest.payload.reason}`, previous?.payload.phase ?? "work", previous?.payload.assessment);
         }
         break;
 
@@ -252,13 +296,26 @@ export function reconcile(input: ReconcileInput): ReconcileAction[] {
         // Steering. A worker started before the reply cannot read it, so it is
         // stopped and replaced by one whose brief carries the reply.
         stop(task, LOST_STOPPED);
-        start(task, `a person replied: ${task.latest.payload.text}`);
+        start(task, `a person replied: ${task.latest.payload.text}`, hooksOf(task).prepare ? "prepare" : "work");
         break;
+
+      case "Prepared":
+        start(task, "implement the recorded prepared agreement");
+        break;
+
+      case "Rework": {
+        const attempts = phaseAttempts(task, "work");
+        if (attempts >= config.startCap) {
+          actions.push({ type: "append", fact: { taskId: task.id, kind: "Question", by: RUNTIME,
+            payload: { why: `Evaluation requested more work: ${task.latest.payload.reason} (${attempts} work attempts)` } } });
+        } else start(task, `evaluation requested rework: ${task.latest.payload.reason}`);
+        break;
+      }
 
       case "Taken":
         // Taken with no Started after it. Either the first pass ended between
         // the two writes, or the last pass had no budget.
-        start(task);
+        start(task, undefined, hooksOf(task).prepare ? "prepare" : "work");
         break;
 
       case "Started":

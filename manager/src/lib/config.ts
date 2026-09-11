@@ -1,9 +1,12 @@
 import path from "node:path";
+import { parseHooks, type LifecycleHooks } from "./lifecycle.js";
 import type { ProjectConfig } from "./projects.js";
 
 /** Everything `manager:setup` stores and every action reads back. */
 export interface ManagerConfig {
   projects?: Record<string, ProjectConfig>;
+  /** User-defined optional preparation and assessment, pinned on new tasks. */
+  hooks?: LifecycleHooks;
   defaultProject?: string;
   /** Absolute source directory; workers use the same relative path in isolated Git worktrees. */
   workingDir: string;
@@ -100,6 +103,8 @@ function positiveInt(value: unknown, fallback: number, max: number): number {
  */
 export function parseConfig(raw: unknown): ParseConfigResult {
   const args = (raw ?? {}) as Record<string, unknown>;
+  let hooks: LifecycleHooks | undefined;
+  try { hooks = parseHooks(args.hooks); } catch (error) { return { ok: false, error: String(error) }; }
   let projects: Record<string, ProjectConfig> | undefined;
   let defaultProject: string | undefined;
   if (args.projects !== undefined) {
@@ -118,7 +123,9 @@ export function parseConfig(raw: unknown): ParseConfigResult {
         if (p[field] !== undefined && (typeof p[field] !== "string" || !p[field].trim() || p[field].includes(","))) return { ok: false, error: `projects.${id}.${field} must be one nonblank label (no commas)` };
       }
       if (p.intakeEnabled !== undefined && typeof p.intakeEnabled !== "boolean") return { ok: false, error: `projects.${id}.intakeEnabled must be boolean` };
-      projects[id] = { workingDir: path.normalize(p.workingDir.trim()),
+      let projectHooks: LifecycleHooks | undefined;
+      try { projectHooks = parseHooks(p.hooks); } catch (error) { return { ok: false, error: `projects.${id}: ${String(error)}` }; }
+      projects[id] = { ...(projectHooks !== undefined ? { hooks: projectHooks } : {}), workingDir: path.normalize(p.workingDir.trim()),
         ...(repo ? { repo: repo.repos[0].toLowerCase() } : {}),
         ...(p.intakeEnabled !== undefined ? { intakeEnabled: p.intakeEnabled as boolean } : {}),
         ...(p.intakeLabel ? { intakeLabel: (p.intakeLabel as string).trim() } : {}),
@@ -153,6 +160,7 @@ export function parseConfig(raw: unknown): ParseConfigResult {
     ok: true,
     config: {
       workingDir,
+      ...(hooks !== undefined ? { hooks } : {}),
       ...(projects ? { projects, defaultProject } : {}),
       workerAgent,
       startCap: positiveInt(args.startCap, DEFAULT_START_CAP, 20),

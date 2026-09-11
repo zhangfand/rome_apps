@@ -91,7 +91,8 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       log.info("worker starting", {
         taskId,
         workerId,
-        agent: managerConfig.workerAgent,
+        agent: started.payload.hook?.agent ?? managerConfig.workerAgent,
+        phase: started.payload.phase ?? "work",
         resumeSessionId,
       });
 
@@ -128,8 +129,8 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
                 if (task.state !== "taken" || task.liveWorker?.workerId !== workerId) {
                   return { ok: false, error: "Worker was stopped before reply repair." };
                 }
-                return summon(appContext, managerConfig.workerAgent, prompt, sessionId);
-              })
+                return summon(appContext, started.payload.hook?.agent ?? managerConfig.workerAgent, prompt, sessionId);
+              }, started.payload.phase ?? "work")
             : initial;
 
         if (run.ok) {
@@ -223,6 +224,7 @@ export async function summonWithFallback(input: {
   const { workerId, resumeSessionId } = started.payload;
 
   try {
+    if (started.payload.phase && started.payload.phase !== "work" && !started.payload.hook) throw new Error("Lifecycle worker has no pinned hook configuration");
     if (!started.payload.workspace) throw new Error("Worker has no isolated worktree; refusing shared-checkout launch");
     await validateWorkspace(started.payload.workspace);
   } catch (err) {
@@ -242,7 +244,7 @@ export async function summonWithFallback(input: {
 
   const first = await summon(
     appContext,
-    managerConfig.workerAgent,
+    started.payload.hook?.agent ?? managerConfig.workerAgent,
     started.payload.prompt,
     resumeSessionId,
     onSession,
@@ -259,6 +261,7 @@ export async function summonWithFallback(input: {
   }
   const prompt = bindWorkspacePrompt(buildWorkerPrompt({
     task,
+    phase: started.payload.phase, hook: started.payload.hook, assessment: started.payload.assessment,
     config: managerConfig,
     reason: `resuming session ${resumeSessionId} was rejected: ${first.error}`,
   }), started.payload.workspace, started.payload.project?.workingDir ?? task.project?.workingDir ?? managerConfig.workingDir);
@@ -277,7 +280,7 @@ export async function summonWithFallback(input: {
     error: first.error,
   });
 
-  const second = await summon(appContext, managerConfig.workerAgent, prompt, undefined, onSession);
+  const second = await summon(appContext, started.payload.hook?.agent ?? managerConfig.workerAgent, prompt, undefined, onSession);
   return { ...second, restarted: true };
 }
 

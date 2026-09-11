@@ -28,6 +28,7 @@ export interface FactSummary {
 }
 
 export interface WorkerSummary {
+  phase?: import("./lifecycle.js").Phase;
   projectId?: string;
   workerId: string;
   taskId: string;
@@ -173,6 +174,7 @@ export function workersOf(
           candidate.payload.workerId === fact.payload.workerId,
       );
     workers.push({
+      phase: fact.payload.phase,
       projectId,
       workerId: fact.payload.workerId,
       taskId,

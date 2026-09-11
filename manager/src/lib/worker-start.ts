@@ -1,6 +1,7 @@
 import type { LedgerRepository } from "../db/repositories/ledger.js";
 import type { ManagerConfig } from "./config.js";
 import type { NewFact, StartedFact } from "./facts.js";
+import { workSession } from "./lifecycle.js";
 import { foldTask } from "./fold.js";
 import { buildWorkerPrompt } from "./prompt.js";
 import { bindWorkspacePrompt, prepareWorkspace, reusableWorkspace } from "./worktree.js";
@@ -27,12 +28,12 @@ export async function prepareWorkerStart(
     });
     // A legacy session remembers the shared checkout. Migrating it requires a
     // fresh session/full brief, not a delta pretending its filesystem survived.
-    const sessionWorker = foldTask(history).resumableSession;
+    const sessionWorker = workSession(task);
     const sessionStart = history.find((f) => f.kind === "Started" && f.payload.workerId === sessionWorker?.workerId);
     const canResume = !payload.resumeSessionId || (sessionWorker?.sessionId === payload.resumeSessionId && sessionStart?.kind === "Started" &&
       sessionStart.payload.workspace?.root === workspace.root);
     const prompt = canResume ? payload.prompt : buildWorkerPrompt({
-      task: foldTask(history), config,
+      task: foldTask(history), config, phase: payload.phase, hook: payload.hook, assessment: payload.assessment,
       reason: "moving from a legacy shared checkout to an isolated worktree; recover prior work from the task history as needed",
     });
     prepared = { ...fact, payload: {

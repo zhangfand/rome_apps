@@ -52,6 +52,7 @@ export function TaskDetail({ taskId }: { taskId: string }) {
   const names = useMemo(() => (task ? nameWorkers([task]) : new Map()), [task]);
 
   const created = task?.facts[0];
+  const agreement = task?.facts.filter((f) => f.kind === "Prepared").at(-1);
   const openWord = task
     ? [...task.facts].reverse().find((f) => f.kind === "Question" || f.kind === "Report")
     : undefined;
@@ -122,6 +123,16 @@ export function TaskDetail({ taskId }: { taskId: string }) {
               </div>
             </dl>
           </header>
+
+          {agreement ? <section className="rounded-12 border border-border p-4 text-ui" aria-label="Prepared agreement">
+            <h2 className="text-section">Prepared agreement <span className="text-aux text-muted-foreground">#{agreement.seq}</span></h2>
+            <p className="mt-2 whitespace-pre-wrap">{String(agreement.payload.brief ?? "")}</p>
+            <h3 className="mt-3 font-medium">Acceptance criteria</h3>
+            <ul className="mt-1 list-disc space-y-1 pl-5">{(Array.isArray(agreement.payload.acceptanceCriteria) ? agreement.payload.acceptanceCriteria : []).map((item, i) => <li key={i}>{String(item)}</li>)}</ul>
+            {Array.isArray(agreement.payload.constraints) && agreement.payload.constraints.length ? <><h3 className="mt-3 font-medium">Constraints</h3><ul className="mt-1 list-disc space-y-1 pl-5">{agreement.payload.constraints.map((item, i) => <li key={i}>{String(item)}</li>)}</ul></> : null}
+            {agreement.payload.completionCondition ? <p className="mt-3 whitespace-pre-wrap"><span className="font-medium">Completion condition: </span>{String(agreement.payload.completionCondition)}</p> : null}
+            <p className="mt-2 text-aux text-muted-foreground">The original request and later human instructions remain authoritative. Completion conditions here are instructions, not new automatic closing rules.</p>
+          </section> : null}
 
           {task.waiting ? (
             <section className="rounded-12 border border-border p-4 text-ui">

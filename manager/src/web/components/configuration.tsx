@@ -3,6 +3,8 @@ import { fetchAppApi } from "@rome-os/app-web-sdk";
 import { Button } from "@rome-os/ui/button";
 import { FieldLabel } from "@rome-os/ui/field";
 import { Input } from "@rome-os/ui/input";
+import { Textarea } from "@rome-os/ui/textarea";
+import { HOOK_INSTRUCTIONS_MAX, type HookPhase, type LifecycleHook } from "../../lib/lifecycle";
 import { Switch } from "@rome-os/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@rome-os/ui/select";
 import type { ManagerConfig } from "../../lib/config";
@@ -43,7 +45,7 @@ export function configurationRows(config: ManagerConfig): Section[] {
     ] },
   ];
   for (const [id, project] of Object.entries(config.projects ?? {})) {
-    const projectField = (key: keyof ProjectConfig, title: string, hint: string, kind: Setting["kind"], extra: Partial<Setting> = {}): Setting => ({
+    const projectField = (key: Exclude<keyof ProjectConfig, "hooks">, title: string, hint: string, kind: Setting["kind"], extra: Partial<Setting> = {}): Setting => ({
       id: `projects.${id}.${key}`, title, hint, kind,
       value: key === "intakeEnabled" ? project.intakeEnabled !== false : project[key] ?? "",
       changes: (value) => {
@@ -112,6 +114,7 @@ export function ConfigurationFields({ config, save, disabled }: { config: Manage
         {section.rows.map((row) => <EditableSettingRow key={row.id} row={row} disabled={disabled} save={save} />)}
       </div>
     </section>)}
+    <LifecycleSettings config={config} save={save} disabled={disabled} />
   </div>;
 }
 
@@ -166,6 +169,78 @@ export function EditableSettingRow({ row, save, disabled }: { row: Setting; save
           <Button type="button" size="xs" variant="ghost" disabled={pending} onClick={() => { setValue(row.value); setBaseline(row.value); setError(undefined); setSaved(false); }}>Cancel</Button>
         </div> : saved ? <span role="status" className="text-aux text-muted-foreground">Saved</span> : null}
         {error ? <p role="alert" className="max-w-72 text-aux text-destructive-fg">{error}</p> : null}
+      </div>
+    </SettingRow>
+  </form>;
+}
+
+
+/** Undefined restores inheritance; null disables; a definition is saved atomically. */
+export function lifecycleChanges(config: ManagerConfig, phase: HookPhase, value: LifecycleHook | null | undefined, projectId?: string): Record<string, unknown> {
+  const hooks = { ...(projectId ? config.projects?.[projectId]?.hooks : config.hooks) };
+  if (value === undefined) delete hooks[phase]; else hooks[phase] = value;
+  return projectId ? { projects: { ...config.projects, [projectId]: { ...config.projects![projectId], hooks } } } : { hooks };
+}
+
+function LifecycleSettings({ config, save, disabled }: { config: ManagerConfig; save: (changes: Record<string, unknown>) => Promise<void>; disabled: boolean }) {
+  return <section aria-label="Task lifecycle settings" className="flex flex-col gap-4">
+    <div><h3 className="text-section">Prepare &amp; Evaluate</h3>
+      <p className="mt-1 text-aux text-muted-foreground">Optional user-defined agents and instructions. New tasks snapshot these settings; existing tasks and running sessions do not change. Evaluation reports readiness, not completion.</p></div>
+    {[undefined, ...Object.keys(config.projects ?? {})].map((projectId) => <section key={projectId ?? "defaults"} aria-label={`${projectId ?? "Default"} lifecycle`}>
+      <h4 className="text-ui font-medium">{projectId ?? "Defaults"}</h4>
+      {(["prepare", "evaluate"] as const).map((phase) => <LifecycleHookEditor key={`${projectId ?? "default"}:${phase}`} config={config} phase={phase} projectId={projectId} save={save} disabled={disabled} />)}
+    </section>)}
+  </section>;
+}
+
+export function LifecycleHookEditor({ config, phase, projectId, save, disabled }: {
+  config: ManagerConfig; phase: HookPhase; projectId?: string;
+  save: (changes: Record<string, unknown>) => Promise<void>; disabled: boolean;
+}) {
+  const id = useId();
+  const current = projectId ? config.projects?.[projectId]?.hooks?.[phase] : config.hooks?.[phase];
+  const savedValue = JSON.stringify({ mode: current ? "custom" : current === null || !projectId ? "off" : "inherit", agent: current?.agent ?? config.workerAgent, instructions: current?.instructions ?? "" });
+  const [baseline, setBaseline] = useState(savedValue);
+  const [draft, setDraft] = useState<{ mode: string; agent: string; instructions: string }>(() => JSON.parse(savedValue));
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string>();
+  const [saved, setSaved] = useState(false);
+  const dirty = JSON.stringify(draft) !== baseline;
+  useEffect(() => { if (!pending && !dirty) { setBaseline(savedValue); setDraft(JSON.parse(savedValue)); } }, [savedValue, pending, dirty]);
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+  const change = (update: Partial<typeof draft>) => { setDraft((old) => ({ ...old, ...update })); setError(undefined); setSaved(false); };
+  const blocked = disabled || pending;
+  const title = phase === "prepare" ? "Prepare" : "Evaluate";
+  async function submit() {
+    if (blocked || !dirty) return;
+    setPending(true); setError(undefined);
+    try {
+      const value = draft.mode === "inherit" ? undefined : draft.mode === "off" ? null : { agent: draft.agent.trim(), instructions: draft.instructions.trim() };
+      await save(lifecycleChanges(config, phase, value, projectId));
+      const normalized = { ...draft, ...(value ? value : {}) };
+      setDraft(normalized); setBaseline(JSON.stringify(normalized)); setSaved(true);
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setPending(false); }
+  }
+  return <form aria-label={`${projectId ?? "Default"} ${title} hook`} onSubmit={(event) => { event.preventDefault(); void submit(); }} className="border-b border-border last:border-0">
+    <SettingRow title={title} controlId={`${id}-mode`} hint={phase === "prepare" ? "Before implementation: clarify the request and record acceptance criteria and constraints." : "After submission: inspect evidence, accept, request rework, wait, or ask for input. Uses a separate session from the worker."}>
+      <div className="flex w-full flex-col items-start gap-3 sm:w-80">
+        <Select value={draft.mode} onValueChange={(mode) => change({ mode })} disabled={blocked}>
+          <SelectTrigger id={`${id}-mode`} aria-describedby={`${id}-mode-hint`} className="w-full"><SelectValue /></SelectTrigger>
+          <SelectContent>{projectId ? <SelectItem value="inherit">Use default</SelectItem> : null}<SelectItem value="off">Disabled</SelectItem><SelectItem value="custom">Custom agent and instructions</SelectItem></SelectContent>
+        </Select>
+        {draft.mode === "custom" ? <>
+          <div className="w-full"><FieldLabel htmlFor={`${id}-agent`}>Agent</FieldLabel><Input id={`${id}-agent`} className="mt-1" value={draft.agent} onChange={(e) => change({ agent: e.target.value })} required pattern="[a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+" placeholder="app:agent" disabled={blocked} /></div>
+          <div className="w-full"><FieldLabel htmlFor={`${id}-instructions`}>Instructions</FieldLabel><Textarea id={`${id}-instructions`} className="mt-1 min-h-36" value={draft.instructions} onChange={(e) => change({ instructions: e.target.value })} required maxLength={HOOK_INSTRUCTIONS_MAX} disabled={blocked} /></div>
+          <p className="text-aux text-muted-foreground">Use an installed agent with appropriate tools and permissions. Manager supplies the task context and reply format; write only your policy here.</p>
+        </> : null}
+        {dirty ? <div className="flex gap-1"><Button type="submit" size="xs" disabled={blocked}>{pending ? "Saving…" : "Save"}</Button><Button type="button" size="xs" variant="ghost" disabled={pending} onClick={() => { setDraft(JSON.parse(savedValue)); setBaseline(savedValue); setError(undefined); setSaved(false); }}>Cancel</Button></div> : saved ? <span role="status" className="text-aux text-muted-foreground">Saved</span> : null}
+        {error ? <p role="alert" className="text-aux text-destructive-fg">{error}</p> : null}
       </div>
     </SettingRow>
   </form>;

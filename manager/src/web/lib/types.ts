@@ -15,6 +15,8 @@ export type FactKind =
   | "Returned"
   | "Failed"
   | "Lost"
+  | "Prepared"
+  | "Rework"
   | "Deferred"
   | "Question"
   | "Report"
@@ -32,6 +34,8 @@ export const FACT_KINDS: FactKind[] = [
   "Returned",
   "Failed",
   "Lost",
+  "Prepared",
+  "Rework",
   "Deferred",
   "Question",
   "Report",
@@ -51,6 +55,7 @@ export interface FactSummary {
 }
 
 export interface WorkerSummary {
+  phase?: "prepare" | "work" | "evaluate";
   projectId?: string;
   workerId: string;
   taskId: string;

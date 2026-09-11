@@ -1,3 +1,4 @@
+import type { Phase } from "./lifecycle.js";
 /** The generic worker/runtime return protocol. No task-specific delivery rules. */
 export const REPLY_PROTOCOL = 1 as const;
 export const MIN_REVISIT_SECONDS = 60;
@@ -6,7 +7,10 @@ export const MAX_REVISIT_SECONDS = 86_400;
 export type WorkerReply =
   | { outcome: "ready"; summary: string }
   | { outcome: "waiting"; reason: string; revisitAfterSeconds: number }
-  | { outcome: "blocked"; question: string };
+  | { outcome: "blocked"; question: string }
+  | { outcome: "prepared"; brief: string; acceptanceCriteria: string[]; constraints: string[]; completionCondition?: string }
+  | { outcome: "accepted"; summary: string }
+  | { outcome: "rework"; reason: string };
 
 const textField = { type: "string", minLength: 1, maxLength: 32_000, pattern: "\\S" } as const;
 
@@ -87,7 +91,8 @@ export function parseWorkerReply(reply: string): ParseReplyResult {
   return { ok: true, value: row as WorkerReply };
 }
 
-export function replyInstructions(): string {
+export function replyInstructions(phase: Phase = "work"): string {
+  if (phase !== "work") return hookReplyInstructions(phase);
   return [
     `Worker reply protocol v${REPLY_PROTOCOL}. This replaces any earlier final-reply convention.`,
     "End your turn with exactly one JSON object matching the schema below, with no markdown fences or other text.",
@@ -129,9 +134,10 @@ export type ValidatedWorkerRun =
 export async function validateWorkerRun(
   first: WorkerRun,
   repair: (prompt: string, sessionId: string) => Promise<WorkerRun>,
+  phase: Phase = "work",
 ): Promise<ValidatedWorkerRun> {
   if (!first.ok) return first;
-  const parsed = parseWorkerReply(first.reply);
+  const parsed = parsePhaseReply(first.reply, phase);
   if (parsed.ok) return { ...first, result: parsed.value };
   const attempt = { originalReply: first.reply, error: parsed.error };
   if (!first.sessionId) {
@@ -149,7 +155,7 @@ export async function validateWorkerRun(
         "Your final reply did not match the runtime protocol. This is your single format-repair attempt.",
         `Validation error: ${parsed.error}`,
         "Do not call tools, redo work, or invent new evidence. Re-express the outcome of your last turn using the protocol.",
-        replyInstructions(),
+        replyInstructions(phase),
       ].join("\n\n"),
       first.sessionId,
     );
@@ -165,7 +171,7 @@ export async function validateWorkerRun(
       repair: attempt,
     };
   }
-  const checked = parseWorkerReply(fixed.reply);
+  const checked = parsePhaseReply(fixed.reply, phase);
   if (!checked.ok) {
     return {
       ok: false,
@@ -182,10 +188,55 @@ export async function validateWorkerRun(
 export function replyText(result: WorkerReply): string {
   switch (result.outcome) {
     case "ready":
+    case "accepted":
       return result.summary;
+    case "prepared":
+      return [result.brief, ...result.acceptanceCriteria.map((c) => `- ${c}`), ...result.constraints.map((c) => `Constraint: ${c}`), ...(result.completionCondition ? [`Completion: ${result.completionCondition}`] : [])].join("\n");
+    case "rework":
+      return result.reason;
     case "waiting":
       return result.reason;
     case "blocked":
       return result.question;
   }
+}
+
+
+/** Hook outcomes are only legal for the controller-assigned role. A work agent cannot self-approve. */
+export function parsePhaseReply(reply: string, phase: Phase = "work"): ParseReplyResult {
+  if (phase === "work") return parseWorkerReply(reply);
+  let row: Record<string, unknown>;
+  try {
+    row = JSON.parse(reply);
+    if (!row || typeof row !== "object" || Array.isArray(row)) throw new Error();
+  } catch { return { ok: false, error: "Reply must be one JSON object." }; }
+  if (row.outcome === "waiting" || row.outcome === "blocked") return parseWorkerReply(reply);
+  const text = (v: unknown): v is string => typeof v === "string" && !!v.trim() && v.length <= 32000;
+  const list = (v: unknown, min: number) => Array.isArray(v) && v.length >= min && v.length <= 100 && v.every(text);
+  const only = (keys: string[]) => Object.keys(row).every((key) => keys.includes(key));
+  if (phase === "prepare" && row.outcome === "prepared" &&
+      only(["outcome", "brief", "acceptanceCriteria", "constraints", "completionCondition"]) &&
+      text(row.brief) && list(row.acceptanceCriteria, 1) && list(row.constraints, 0) &&
+      (row.completionCondition === undefined || text(row.completionCondition))) {
+    if (reply.length > 64000) return { ok: false, error: "Prepared agreement must be at most 64000 characters." };
+    return { ok: true, value: row as unknown as WorkerReply };
+  }
+  if (phase === "evaluate" && ((row.outcome === "accepted" && only(["outcome", "summary"]) && text(row.summary)) ||
+      (row.outcome === "rework" && only(["outcome", "reason"]) && text(row.reason)))) {
+    return { ok: true, value: row as unknown as WorkerReply };
+  }
+  return { ok: false, error: `Invalid ${phase} outcome. ${phase === "prepare" ? "Return prepared with brief, nonempty acceptanceCriteria, constraints, and optional completionCondition" : "Return accepted with summary or rework with reason"}, or waiting/blocked. Extra fields are not allowed.` };
+}
+
+function hookReplyInstructions(phase: Exclude<Phase, "work">): string {
+  return [
+    `Manager ${phase} reply protocol v1. End with exactly one JSON object, without fences or other text.`,
+    phase === "prepare"
+      ? 'Return {"outcome":"prepared","brief":"actionable brief","acceptanceCriteria":["observable criterion"],"constraints":[],"completionCondition":"optional final acceptance condition"}. Do not change the original request or invent authorization. Identify important ambiguity with blocked instead of guessing.'
+      : 'Return {"outcome":"accepted","summary":"findings and evidence, with deliverable links"} only when the recorded requirements are satisfied. This reports readiness, NOT task completion. Return {"outcome":"rework","reason":"specific missing requirements and evidence"} when the worker should continue. Independently inspect available evidence; do not treat worker claims as verified facts.',
+    'Return {"outcome":"waiting","reason":"what to recheck and evidence pointers","revisitAfterSeconds":300} for pending external evidence; seconds must be an integer from 60 to 86400.',
+    'Return {"outcome":"blocked","question":"specific question"} when human input is required. Do not ask interactive questions, sleep, or schedule your own wakeup.',
+    "Do not implement the task, publish, merge, deploy, or modify external business state in this role. Inspect and report only. The selected agent's actual tool permissions still apply.",
+    "All strings must be nonblank and at most 32000 characters. Arrays contain at most 100 strings. The prepared agreement is at most 64000 characters. Do not return any other fields or outcomes.",
+  ].join("\n");
 }

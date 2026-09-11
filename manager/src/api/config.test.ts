@@ -30,6 +30,14 @@ beforeEach(() => {
 });
 afterEach(() => rs.restoreAllMocks());
 describe("guardian configuration API", () => {
+  it("saves user-defined hooks without changing the protocol of existing tasks", async () => {
+    const hooks = { prepare: { agent: "assistant:assistant", instructions: "Clarify requirements" }, evaluate: { agent: "assistant:assistant", instructions: "Check evidence" } };
+    const res = await createApiHandler(ctx).handle(patch({ hooks }));
+    expect(res.status).toBe(200);
+    expect(config?.hooks).toEqual(hooks);
+    expect(b.facts.find((f) => f.kind === "Bound")?.payload.project.hooks).toBeUndefined();
+    expect(b.facts.some((f) => f.kind === "Started")).toBe(false);
+  });
   it("GET is side-effect-free and rejects non-guardian reads/writes", async () => {
     const api = createApiHandler(ctx);
     const res = await api.handle(request());

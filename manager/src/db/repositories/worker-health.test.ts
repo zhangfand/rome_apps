@@ -57,6 +57,18 @@ function returned(workerId = "w1") {
 function after(started: StartedFact, ms: number) { return new Date(+started.createdAt + ms); }
 
 describe("durable worker heartbeats (real SQLite migrations and connections)", () => {
+  it("rejects a late assessment after human steering even before Lost is written", () => {
+    start();
+    ledger.append({ taskId: "t1", kind: "Reply", by: "guardian", payload: { text: "Changed acceptance criteria" } });
+    expect(returned()).toBeUndefined();
+    expect(ledger.all().at(-1)?.kind).toBe("Reply");
+  });
+  it("rejects late output after human completion", () => {
+    start();
+    ledger.append({ taskId: "t1", kind: "Completed", by: "guardian", payload: {} });
+    expect(returned()).toBeUndefined();
+    expect(ledger.all().at(-1)?.kind).toBe("Completed");
+  });
   it("heartbeats update one row, never append ledger facts", () => {
     const s = start(); const count = ledger.all().length;
     expect(health.claim(s, "owner", s.createdAt)).toBe(true);

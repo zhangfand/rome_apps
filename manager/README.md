@@ -10,9 +10,10 @@ something to look at. A task ends when you say so, or when its GitHub issue is
 closed — as completed, or as not planned.
 
 This is a prototype of the "long-running agent, revision 3" model. Almost all of
-it is plain TypeScript; a model runs at exactly two points.
+it is plain TypeScript; preparation, execution, and assessment run outside the
+pure reconciliation loop.
 
-## The two model call sites
+## The language boundary and task lifecycle
 
 **The language boundary.** You chat with the `manager` agent
 (`src/agents/manager.yaml`). Its only ledger-writing tools are `manager:create`,
@@ -22,12 +23,18 @@ word the fact; the app stamps who said it and cites the message. When the words
 map to none of those, the agent answers in chat and writes nothing. Its system
 prompt carries no scheduling logic — no caps, no retries, no age.
 
-**The judge.** `src/lib/judge.ts` is the optional result grader. The runtime first
-routes the validated worker outcome: `waiting` schedules a revisit, `blocked`
-asks a person, and only `ready` reaches the judge. The default judge accepts a
-nonempty summary without a legacy `BLOCKED:` line; it does not independently
-verify the task's delivery requirements. Those are the worker's responsibility.
-Swapping in a model-graded judge remains a change to that one file.
+**User-defined Prepare and Evaluate.** Configuration → Prepare & Evaluate lets
+users select an installed agent and write instructions for each optional stage,
+with global defaults and per-project overrides. New tasks pin the resolved
+settings. Prepare records an actionable agreement; Evaluate checks the worker's
+submission and can accept, request rework, wait, or ask for human input. No
+business-specific acceptance or PR rule is built into the controller.
+See [docs/lifecycle-hooks.md](docs/lifecycle-hooks.md) for configuration, examples,
+protocols, safety boundaries, and compatibility.
+
+**Legacy judge.** Tasks without an Evaluate hook retain `src/lib/judge.ts`: a
+nonempty summary without a legacy `BLOCKED:` line is reported, not independently
+verified. Installing this feature does not silently change existing tasks.
 
 **The return protocol.** Every new worker is taught the exact JSON contract in
 `src/lib/worker-reply.ts`, on fresh starts and resumes. `system:summon` returns
@@ -62,6 +69,8 @@ something somebody said.
 | `Failed` | the worker | `workerId`, `error`, `sessionId?`, `failureKind?`, `reply?`, `repair?` |
 | `Lost` | the runtime | `workerId`, `why` |
 | `Deferred` | the runtime | `workerId`, `reason`, `resumeAfter` (ISO time) |
+| `Prepared` | the runtime | `workerId`, `brief`, `acceptanceCriteria`, `constraints`, `completionCondition?` |
+| `Rework` | the runtime | `workerId`, `reason`, `submissionSeq` |
 | `Question` | the runtime | `why` |
 | `Report` | the runtime | `what`, `evidence` |
 | `Reply` | a person | `text` |

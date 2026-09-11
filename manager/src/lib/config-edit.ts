@@ -6,7 +6,7 @@ export function configRevision(config: ManagerConfig): string {
   return createHash("sha256").update(JSON.stringify(config)).digest("hex");
 }
 
-const editable = new Set(["maxWorkers", "startCap", "ageCapHours", "reuseSessions", "closeOnIssueClosed", "intakeLabel", "intakeRepos", "workingDir", "projects", "defaultProject"]);
+const editable = new Set(["maxWorkers", "startCap", "ageCapHours", "reuseSessions", "closeOnIssueClosed", "intakeLabel", "intakeRepos", "workingDir", "projects", "defaultProject", "hooks"]);
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -43,7 +43,7 @@ export function applyConfigEdit(current: ManagerConfig, changes: unknown): Manag
     if (!current.projects || !record(projects) || Object.keys(projects).sort().join("\n") !== Object.keys(current.projects).sort().join("\n")) fail("Project IDs are fixed here. Use manager:setup to add, remove, or rename projects.");
     for (const [id, project] of Object.entries(projects)) {
       if (!record(project)) fail(`Invalid project: ${id}`);
-      for (const key of Object.keys(project)) if (!["workingDir", "repo", "intakeEnabled", "intakeLabel", "projectLabel"].includes(key)) fail(`Unknown project setting: ${id}.${key}`);
+      for (const key of Object.keys(project)) if (!["workingDir", "repo", "intakeEnabled", "intakeLabel", "projectLabel", "hooks"].includes(key)) fail(`Unknown project setting: ${id}.${key}`);
       directory(project.workingDir, `${id} source directory`);
       for (const key of ["intakeLabel", "projectLabel"] as const) if (Object.hasOwn(project, key)) label(project[key], `${id}.${key}`);
     }

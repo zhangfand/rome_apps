@@ -76,6 +76,8 @@ const POSITION_BY_KIND: Partial<Record<FactKind, Position>> = {
   Deferred: "waiting",
   Question: "stuck",
   Report: "reported",
+  Prepared: "working",
+  Rework: "working",
 };
 
 /**

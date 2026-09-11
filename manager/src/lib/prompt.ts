@@ -1,3 +1,4 @@
+import { latestAgreement, assessmentSubmission, type Phase, type LifecycleHook, type AssessmentContext } from "./lifecycle.js";
 import type { ManagerConfig } from "./config.js";
 import { describeFact } from "./facts.js";
 import type { TaskView } from "./fold.js";
@@ -16,12 +17,15 @@ import { replyInstructions } from "./worker-reply.js";
 export function buildWorkerPrompt(input: {
   task: TaskView;
   config: ManagerConfig;
+  phase?: Phase;
+  hook?: LifecycleHook;
+  assessment?: AssessmentContext;
   /** What made the runtime start this worker, when it is not the first one. */
   reason?: string;
   /** The session this worker continues, when it does not start fresh. */
   resume?: { workerId: string; sessionId: string };
 }): string {
-  const { task, config, reason, resume } = input;
+  const { task, config, reason, resume, phase = "work", hook, assessment } = input;
 
   const lines = resume ? resumedHeader(task, resume) : freshHeader(task, config);
 
@@ -29,7 +33,16 @@ export function buildWorkerPrompt(input: {
     lines.push("", `Why you were started: ${reason}`);
   }
 
-  lines.push("", replyInstructions());
+  const agreement = latestAgreement(task);
+  if (agreement) lines.push("", `Recorded agreement #${agreement.seq} (the original request and subsequent human constraints still apply):`, JSON.stringify(agreement.payload));
+  if (phase !== "work") {
+    lines.push("", `Your assigned role: ${phase}. This is not an implementation run.`, "User-defined instructions:", hook?.instructions ?? "");
+    if (phase === "evaluate") {
+      const submission = assessmentSubmission(task, assessment);
+      lines.push("", `Evaluate ONLY submission #${assessment?.submissionSeq} against agreement #${assessment?.agreementSeq ?? "original request"}.`, JSON.stringify(submission?.payload));
+    }
+  }
+  lines.push("", replyInstructions(phase));
 
   return lines.join("\n");
 }

@@ -118,6 +118,32 @@ function terminal(): Fact | undefined {
 }
 
 describe("run_worker protocol wiring", () => {
+  it("uses the pinned Prepare agent and validates its role-specific result", async () => {
+    const start = b.facts.find((f) => f.kind === "Started")!;
+    start.payload.phase = "prepare";
+    start.payload.hook = { agent: "assistant:assistant", instructions: "Clarify the requirements" };
+    const result = { outcome: "prepared", brief: "Scoped task", acceptanceCriteria: ["Observable delivery"], constraints: [] };
+    const { calls } = await execute([{ reply: JSON.stringify(result) }]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].args.agentName).toBe("assistant:assistant");
+    expect(terminal()).toMatchObject({ kind: "Returned", payload: { result } });
+  });
+  it("repairs evaluator output with the evaluator agent, never the coding agent", async () => {
+    const start = b.facts.find((f) => f.kind === "Started")!;
+    start.payload.phase = "evaluate";
+    start.payload.hook = { agent: "assistant:assistant", instructions: "Inspect evidence" };
+    const { calls } = await execute([{ reply: '{"outcome":"ready","summary":"wrong role"}' }, { reply: '{"outcome":"rework","reason":"Missing deliverable"}' }]);
+    expect(calls).toHaveLength(2);
+    expect(calls.every((call) => call.args.agentName === "assistant:assistant")).toBe(true);
+    expect(calls[1].args.prompt).toContain("evaluate reply protocol");
+    expect(terminal()).toMatchObject({ kind: "Returned", payload: { result: { outcome: "rework" } } });
+  });
+  it("fails closed instead of silently falling back when the hook binding is missing", async () => {
+    b.facts.find((f) => f.kind === "Started")!.payload.phase = "evaluate";
+    const { calls } = await execute([]);
+    expect(calls).toHaveLength(0);
+    expect(terminal()).toMatchObject({ kind: "Failed", payload: { error: expect.stringContaining("pinned hook") } });
+  });
   it("receives the reply from summon, validates it, records the session, then reconciles", async () => {
     const { calls, reconciles } = await execute([{ reply: JSON.stringify(WAIT) }]);
     expect(calls).toEqual([{ name: "system:summon", args: { agentName: "coding:coding", prompt: "go" } }]);

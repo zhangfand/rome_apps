@@ -27,6 +27,8 @@ import {
   reconcileTrigger,
 } from "../../lib/config.js";
 
+import { HOOKS_SCHEMA } from "../../lib/lifecycle.js";
+
 const log = createAppLogger("manager:setup");
 
 /** What `setup` did to the routine, reported back to the guardian. */
@@ -40,12 +42,14 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
     inputSchema: {
       type: "object",
       properties: {
+        hooks: { ...HOOKS_SCHEMA, description: "Optional user-defined Prepare/Evaluate agents and instructions. New tasks only; project hooks override individual defaults, null disables." },
         projects: {
           type: "object",
           description: "Named projects. Each has workingDir, optional repo (owner/name; enables intake), intakeEnabled, intakeLabel, and projectLabel. Projects sharing a repo require distinct projectLabels. Replaces legacy workingDir/intakeRepos configuration.",
           additionalProperties: {
             type: "object", required: ["workingDir"], additionalProperties: false,
             properties: {
+              hooks: HOOKS_SCHEMA,
               workingDir: { type: "string" }, repo: { type: "string" },
               intakeEnabled: { type: "boolean" }, intakeLabel: { type: "string" }, projectLabel: { type: "string" },
             },

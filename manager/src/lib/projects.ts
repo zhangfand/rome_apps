@@ -1,9 +1,11 @@
 import path from "node:path";
+import { resolveHooks, type LifecycleHooks } from "./lifecycle.js";
 import type { ManagerConfig } from "./config.js";
 import type { Fact, NewFact } from "./facts.js";
 import { fold, type TaskView } from "./fold.js";
 
 export interface ProjectConfig {
+  hooks?: LifecycleHooks;
   workingDir: string;
   repo?: string;
   intakeEnabled?: boolean;
@@ -14,7 +16,7 @@ export interface ProjectConfig {
 /** Copied into the ledger, not a pointer to mutable settings. */
 export interface ProjectBinding {
   projectId: string;
-  project: { workingDir: string; repo?: string };
+  project: { workingDir: string; repo?: string; hooks?: LifecycleHooks };
 }
 
 export function configuredProjects(config: ManagerConfig): Record<string, ProjectConfig> {
@@ -24,8 +26,9 @@ export function configuredProjects(config: ManagerConfig): Record<string, Projec
 export function bindProject(config: ManagerConfig, projectId: string): ProjectBinding {
   const projects = configuredProjects(config);
   if (!Object.hasOwn(projects, projectId)) throw new Error(`Unknown project ${JSON.stringify(projectId)}. Choose: ${Object.keys(projects).join(", ")}`);
-  const { workingDir, repo } = projects[projectId];
-  return { projectId, project: { workingDir, ...(repo ? { repo } : {}) } };
+  const { workingDir, repo, hooks } = projects[projectId];
+  const effective = resolveHooks(config.hooks, hooks);
+  return { projectId, project: { workingDir, ...(repo ? { repo } : {}), ...(Object.keys(effective).length ? { hooks: effective } : {}) } };
 }
 
 /** Read-only compatibility until the next reconcile persists Bound. Setup migrates before changes. */
@@ -95,6 +98,8 @@ export function legacyBindingFacts(facts: readonly Fact[], config: ManagerConfig
     // Legacy tasks all used the old global directory, even when their issue belonged elsewhere.
     // If a partial binding exists, resolve that id, never a new default.
     const binding = task.projectId ? bindProject(config, task.projectId) : fallback();
+    // Historical tasks keep their old protocol even if hooks were configured later.
+    delete binding.project.hooks;
     return [{ taskId: task.id, kind: "Bound", by: "runtime",
       source: "manager: migrating legacy task to a durable project binding", payload: binding }];
   });

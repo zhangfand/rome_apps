@@ -1,3 +1,4 @@
+import type { Phase, LifecycleHook, AssessmentContext } from "./lifecycle.js";
 import { replyText, type ReplyRepair, type WorkerReply } from "./worker-reply.js";
 import type { WorkerWorkspace } from "./worktree.js";
 import type { ProjectBinding } from "./projects.js";
@@ -19,7 +20,7 @@ import type { ProjectBinding } from "./projects.js";
 export const TASK_STATE_KINDS = ["Created", "Taken", "Completed", "Cancelled"] as const;
 
 /** Execution facts. A worker writes three of them; the runtime writes the rest. */
-export const EXECUTION_KINDS = ["Started", "Opened", "Restarted", "Returned", "Failed", "Lost", "Deferred"] as const;
+export const EXECUTION_KINDS = ["Started", "Opened", "Restarted", "Returned", "Failed", "Lost", "Deferred", "Prepared", "Rework"] as const;
 
 /** Dialogue facts. The runtime asks and reports; a person replies. */
 export const DIALOGUE_KINDS = ["Question", "Report", "Reply"] as const;
@@ -68,6 +69,8 @@ export const RUNTIME_KINDS: readonly FactKind[] = [
   "Question",
   "Report",
   "Deferred",
+  "Prepared",
+  "Rework",
 ];
 
 /** Kinds that end a worker's run. A Started with none of these after it is live. */
@@ -158,6 +161,9 @@ export type StartedFact = FactOf<
   "Started",
   {
     workerId: string;
+    phase?: Phase;
+    hook?: LifecycleHook;
+    assessment?: AssessmentContext;
     prompt: string;
     projectId?: string;
     project?: ProjectBinding["project"];
@@ -221,6 +227,10 @@ export type DeferredFact = FactOf<
   "Deferred",
   { workerId: string; reason: string; resumeAfter: string }
 >;
+export type PreparedFact = FactOf<"Prepared", {
+  workerId: string; brief: string; acceptanceCriteria: string[]; constraints: string[]; completionCondition?: string;
+}>;
+export type ReworkFact = FactOf<"Rework", { workerId: string; reason: string; submissionSeq: number }>;
 export type QuestionFact = FactOf<"Question", { why: string }>;
 export type ReportFact = FactOf<"Report", { what: string; evidence: string }>;
 export type ReplyFact = FactOf<"Reply", { text: string }>;
@@ -238,6 +248,8 @@ export type Fact =
   | FailedFact
   | LostFact
   | DeferredFact
+  | PreparedFact
+  | ReworkFact
   | QuestionFact
   | ReportFact
   | ReplyFact;
@@ -278,7 +290,7 @@ export function describeFact(fact: Fact): string {
       case "Started": {
         const session = fact.payload.resumeSessionId ? `, resuming session ${fact.payload.resumeSessionId}` : "";
         const workspace = fact.payload.workspace ? ` in ${fact.payload.workspace.workingDir}` : "";
-        return `worker ${fact.payload.workerId}${session}${workspace}`;
+        return `worker ${fact.payload.workerId}${fact.payload.phase ? ` (${fact.payload.phase})` : ""}${session}${workspace}`;
       }
       case "Opened":
         return `worker ${fact.payload.workerId} runs in session ${fact.payload.romeSessionId}`;
@@ -292,6 +304,10 @@ export function describeFact(fact: Fact): string {
         return `worker ${fact.payload.workerId}: ${fact.payload.why}`;
       case "Deferred":
         return `revisit after ${fact.payload.resumeAfter}: ${fact.payload.reason}`;
+      case "Prepared":
+        return `Agreement #${fact.seq}: ${fact.payload.brief}\n${fact.payload.acceptanceCriteria.map((c) => `- ${c}`).join("\n")}`;
+      case "Rework":
+        return `submission #${fact.payload.submissionSeq}: ${fact.payload.reason}`;
       case "Question":
         return fact.payload.why;
       case "Report":

@@ -1,13 +1,24 @@
 import { describe, expect, it } from "@rstest/core";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ConfigurationFields, ConfigurationEditor, configurationRows } from "./configuration";
+import { ConfigurationFields, ConfigurationEditor, configurationRows, lifecycleChanges } from "./configuration";
 import { parseConfig } from "../../lib/config";
 const p = parseConfig({ projects: { a: { workingDir: "/a", repo: "acme/a" }, b: { workingDir: "/b", intakeEnabled: false } } });
 if (!p.ok) throw new Error(p.error);
 const config = p.config;
 const rows = configurationRows(config).flatMap((s) => s.rows);
 describe("inline setting rows", () => {
+  it("renders user-defined hooks and preserves other phases and projects when editing", () => {
+    const hook = { agent: "assistant:assistant", instructions: "Check evidence" };
+    const next = { ...config, hooks: { prepare: hook, evaluate: hook } };
+    expect(lifecycleChanges(next, "evaluate", null)).toEqual({ hooks: { prepare: hook, evaluate: null } });
+    const changes = lifecycleChanges(next, "prepare", hook, "a");
+    expect(changes).toEqual({ projects: { ...config.projects, a: { ...config.projects!.a, hooks: { prepare: hook } } } });
+    const html = renderToStaticMarkup(createElement(ConfigurationFields, { config: next, disabled: false, async save() {} }));
+    expect(html).toContain("Prepare &amp; Evaluate"); expect(html).toContain("Check evidence");
+    expect(html).toContain("assistant:assistant"); expect(html).toContain("textarea");
+    expect(html).toContain("New tasks snapshot");
+  });
   it("sends only the changed setting and exposes no infrastructure controls", () => {
     expect(rows.find((r) => r.id === "maxWorkers")!.changes(5)).toEqual({ maxWorkers: 5 });
     expect(rows.some((r) => ["workerAgent", "intervalMinutes"].includes(r.id))).toBe(false);
@@ -21,7 +32,7 @@ describe("inline setting rows", () => {
   it("renders controls immediately in labeled rows, with no separate edit view", () => {
     const html = renderToStaticMarkup(createElement(ConfigurationFields, { config, disabled: false, async save() {} }));
     for (const text of ["Global worker limit", "Retry limit", "Legacy worker age cap", "Reuse worker sessions", "Close tasks when GitHub issues close", "Default project", "Source directory", "Repository", "Intake label", "Project label", "Issue intake", "new tasks only", "does not stop running workers", 'min="1"', 'max="20"', 'max="168"', 'role="switch"', 'aria-describedby=', 'data-setting-row']) expect(html).toContain(text);
-    expect(html.split('data-setting-row').length - 1).toBe(rows.length);
+    expect(html.split('data-setting-row').length - 1).toBe(rows.length + (Object.keys(config.projects ?? {}).length + 1) * 2);
     expect(html).not.toContain("Edit configuration"); expect(html).not.toContain("Save changes");
     expect(html).not.toContain(">Save<"); // Save/Cancel only appear on the row with edits.
   });
