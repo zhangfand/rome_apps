@@ -236,7 +236,7 @@ export function LifecycleHookEditor({ config, phase, projectId, save, disabled }
         </Select>
         {draft.mode === "custom" ? <>
           <div className="w-full"><FieldLabel htmlFor={`${id}-agent`}>Agent</FieldLabel><Input id={`${id}-agent`} className="mt-1" value={draft.agent} onChange={(e) => change({ agent: e.target.value })} required pattern="[a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+" placeholder="app:agent" disabled={blocked} /></div>
-          <div className="w-full"><FieldLabel htmlFor={`${id}-instructions`}>Instructions</FieldLabel><Textarea id={`${id}-instructions`} className="mt-1 min-h-36" value={draft.instructions} onChange={(e) => change({ instructions: e.target.value })} required maxLength={HOOK_INSTRUCTIONS_MAX} disabled={blocked} /></div>
+          <div className="w-full"><FieldLabel htmlFor={`${id}-instructions`}>Instructions</FieldLabel><Textarea id={`${id}-instructions`} className="mt-1 min-h-36 max-h-80 overflow-y-auto" value={draft.instructions} onChange={(e) => change({ instructions: e.target.value })} required maxLength={HOOK_INSTRUCTIONS_MAX} disabled={blocked} /></div>
           <p className="text-aux text-muted-foreground">Use an installed agent with appropriate tools and permissions. Manager supplies the task context and reply format; write only your policy here.</p>
         </> : null}
         {dirty ? <div className="flex gap-1"><Button type="submit" size="xs" disabled={blocked}>{pending ? "Saving…" : "Save"}</Button><Button type="button" size="xs" variant="ghost" disabled={pending} onClick={() => { setDraft(JSON.parse(savedValue)); setBaseline(savedValue); setError(undefined); setSaved(false); }}>Cancel</Button></div> : saved ? <span role="status" className="text-aux text-muted-foreground">Saved</span> : null}

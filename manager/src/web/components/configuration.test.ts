@@ -17,7 +17,7 @@ describe("inline setting rows", () => {
     const html = renderToStaticMarkup(createElement(ConfigurationFields, { config: next, disabled: false, async save() {} }));
     expect(html).toContain("Lifecycle hooks"); expect(html).toContain("Completion check");
     expect(lifecycleChanges(next, "completion", hook)).toEqual({ hooks: { ...next.hooks, completion: hook } }); expect(html).toContain("Check evidence");
-    expect(html).toContain("assistant:assistant"); expect(html).toContain("textarea");
+    expect(html).toContain("assistant:assistant"); expect(html).toContain("textarea"); expect(html).toContain("max-h-80");
     expect(html).toContain("New tasks snapshot");
   });
   it("sends only the changed setting and exposes no infrastructure controls", () => {
