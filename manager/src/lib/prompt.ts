@@ -37,6 +37,8 @@ export function buildWorkerPrompt(input: {
   if (agreement) lines.push("", `Recorded agreement #${agreement.seq} (the original request and subsequent human constraints still apply):`, JSON.stringify(agreement.payload));
   if (phase !== "work") {
     lines.push("", `Your assigned role: ${phase}. This is not an implementation run.`, "User-defined instructions:", hook?.instructions ?? "");
+    lines.push("Internal submission, report, and agreement numbers are Manager ledger sequence numbers, NOT external resource identifiers. Resolve external resources only from explicit addresses or verified bindings; never substitute a ledger number.");
+    if (phase === "evaluate") lines.push("The pinned submission identifies the delivery being assessed; it does not exclude subsequent evidence or replacement deliveries when the recorded agreement explicitly requires considering them. Apply its supersession rules. Distinguish delivery acceptance from the separately recorded completion condition; do not silently turn final completion into a delivery prerequisite. If these requirements conflict, ask for clarification rather than inventing scope or repeating already satisfied work.");
     if (phase === "prepare" && assessment) {
       lines.push("", `This is explicitly requested backfill for existing submission #${assessment.submissionSeq}. Prepare criteria from the original request, not from what the worker happened to deliver. The next phase assesses the existing delivery, not a fresh implementation. Account for subsequent user instructions and avoid duplicating or undoing work already satisfied by later changes.`, JSON.stringify(assessmentSubmission(task, assessment)?.payload));
     }

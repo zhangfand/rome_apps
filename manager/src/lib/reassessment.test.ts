@@ -39,6 +39,9 @@ describe("explicit historical reassessment", () => {
     expect(lastStart(foldTask(l.facts))!.payload).toMatchObject({ phase: "prepare", assessment: { submissionSeq: 4 } });
     prepared(l);
     expect(lastStart(foldTask(l.facts))!.payload).toMatchObject({ phase: "evaluate", assessment: { submissionSeq: 4 } });
+    expect(lastStart(foldTask(l.facts))!.payload.prompt).toContain("NOT external resource identifiers");
+    expect(lastStart(foldTask(l.facts))!.payload.prompt).toContain("Apply its supersession rules");
+    expect(lastStart(foldTask(l.facts))!.payload.prompt).toContain("do not silently turn final completion into a delivery prerequisite");
     result(l, { outcome: "accepted", summary: "Verified artifact" }); tick(l);
     expect(l.facts.at(-1)).toMatchObject({ kind: "Report", payload: { what: expect.stringContaining("Files uncommitted") } });
     expect(l.facts.filter(f => f.kind === "Started" && !f.payload.phase)).toHaveLength(1);
