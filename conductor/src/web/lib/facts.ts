@@ -15,6 +15,18 @@ export const TONE_CLASS: Record<Tone, string> = {
   quiet: "bg-surface-muted text-subtle-foreground",
 };
 
+/** Tone as text colour alone, for places that carry state without a filled chip. */
+export const TONE_TEXT: Record<Tone, string> = {
+  person: "text-info-fg",
+  neutral: "text-muted-foreground",
+  question: "text-warning-fg",
+  report: "text-primary-hover",
+  success: "text-success-fg",
+  destructive: "text-destructive-fg",
+  info: "text-info-fg",
+  quiet: "text-subtle-foreground",
+};
+
 const LABELS: Record<string, string> = {
   Created: "request",
   Reply: "reply",

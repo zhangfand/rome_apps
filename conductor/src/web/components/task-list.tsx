@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { navigateToApp } from "@rome-os/app-web-sdk";
 import { SegmentedControl } from "@rome-os/ui/segmented-control";
-import { bucketTask, latestText, safeText, taskStateLabel, taskTone, type TaskBucket } from "../lib/facts";
+import { cn } from "@rome-os/ui/cn";
+import { bucketTask, latestText, safeText, taskStateLabel, taskTone, TONE_TEXT, type TaskBucket } from "../lib/facts";
 import { formatRelative } from "../lib/format";
 import type { TaskSummary } from "../lib/types";
-import { FreshEdge, StateChip, taskTitle } from "./board";
+import { FreshEdge, taskTitle } from "./board";
 
 type Filter = "All" | "Needs you" | "Running" | "Resting" | "Closed";
 const FILTER_BUCKET: Partial<Record<Filter, TaskBucket>> = {
@@ -54,7 +55,7 @@ export function TaskList({ tasks, now, freshIds }: { tasks: TaskSummary[]; now: 
                 <span className="truncate text-[13px] text-muted-foreground">{latestText(task)}</span>
               </span>
               <span className="truncate font-mono text-[11px] text-muted-foreground">{safeText(task.projectId ?? "—")}</span>
-              <StateChip label={taskStateLabel(task)} tone={taskTone(task)} />
+              <span className={cn("truncate font-mono text-[11px]", TONE_TEXT[taskTone(task)])}>{taskStateLabel(task)}</span>
               <span className="text-right font-mono text-[11px] text-subtle-foreground">{formatRelative(task.updatedAt, nowMs)}</span>
             </button>
           ))}
