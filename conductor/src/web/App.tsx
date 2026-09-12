@@ -1,8 +1,8 @@
 import "./styles.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchAppApi, getCurrentAppPath, navigateToApp, subscribeToAppPath, type RomeAppBootstrap } from "@rome-os/app-web-sdk";
-import { Button } from "@rome-os/ui/button";
 import { cn } from "@rome-os/ui/cn";
+import { ActionButton } from "./components/ui-bits";
 import { Board } from "./components/board";
 import { Configuration } from "./components/configuration";
 import { TaskDetail } from "./components/task-detail";
@@ -45,7 +45,7 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
   }, [feed.state]);
 
   return (
-    <main className="mx-auto flex w-full max-w-[1060px] flex-col gap-4 px-5 pt-7 pb-20 text-foreground sm:px-8 sm:pt-9 md:px-11 md:pt-10 md:pb-[104px]">
+    <main className="conductor-root mx-auto flex w-full max-w-[1060px] flex-col gap-4 px-5 pt-7 pb-20 text-foreground sm:px-8 sm:pt-9 md:px-11 md:pt-10 md:pb-[104px]">
       <header className="flex flex-wrap items-center justify-between gap-5">
         <h1 className="text-[19px] leading-6 font-semibold tracking-[-0.02em]">Conductor</h1>
       </header>
@@ -84,7 +84,7 @@ function NavItem({ active, onClick, children }: { active: boolean; onClick: () =
       type="button"
       onClick={onClick}
       className={cn(
-        "-mb-px inline-flex h-[35px] items-center gap-[7px] border-0 border-b-2 px-3 text-[13px] font-semibold transition-[background-color,border-color,color,transform] duration-[var(--dur-fast)] ease-[var(--ease-classical)] outline-none hover:bg-surface-hover active:translate-y-px focus-visible:border-ring focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-ring",
+        "-mb-px inline-flex h-[34px] items-center gap-[7px] border-0 border-b-2 px-3 text-[13px] font-semibold transition-[background-color,border-color,color,transform] duration-[var(--dur-fast)] ease-[var(--ease-classical)] outline-none hover:bg-surface-hover active:translate-y-px focus-visible:border-ring focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-ring",
         active ? "border-primary text-foreground" : "border-transparent text-muted-foreground",
       )}
     >
@@ -107,7 +107,7 @@ function StateGate({ feed, board = false, children }: { feed: Feed; board?: bool
       <div className="flex max-w-[70ch] flex-col gap-3 rounded-[14px] border border-destructive-border bg-destructive-bg p-5 text-foreground">
         <strong className="text-[15px] font-semibold text-destructive-fg">I couldn't read this app's history.</strong>
         <p className="text-sm leading-[1.55]">The app's database did not answer. Nothing has been removed. Try again, and if it keeps failing, check that the app is running.</p>
-        <Button variant="outline" className="w-fit border-border-strong bg-surface hover:bg-surface-hover" onClick={() => void feed.load()}>Try again</Button>
+        <ActionButton variant="outline" className="w-fit border-border-strong bg-surface hover:bg-surface-hover" onClick={() => void feed.load()}>Try again</ActionButton>
       </div>
     );
   }

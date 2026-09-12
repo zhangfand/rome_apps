@@ -5,6 +5,7 @@ import { bucketTask, latestText, safeText, taskStateLabel, taskTone, type TaskBu
 import { formatRelative } from "../lib/format";
 import type { TaskSummary } from "../lib/types";
 import { FreshEdge, StateChip, taskTitle } from "./board";
+import { filterSegmentClass } from "./ui-bits";
 
 type Filter = "All" | "Needs you" | "Running" | "Resting" | "Closed";
 const FILTER_BUCKET: Partial<Record<Filter, TaskBucket>> = {
@@ -33,7 +34,7 @@ export function TaskList({ tasks, now, freshIds }: { tasks: TaskSummary[]; now: 
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-x-auto pb-0.5">
-        <SegmentedControl options={options} value={filter} onValueChange={setFilter} size="sm" aria-label="Filter tasks" className="border border-border bg-surface-muted p-0.5" />
+        <SegmentedControl options={options} value={filter} onValueChange={setFilter} size="sm" aria-label="Filter tasks" className={filterSegmentClass} />
       </div>
       <div className="overflow-x-auto rounded-[14px] border border-border bg-surface">
         <div className="min-w-[760px]">

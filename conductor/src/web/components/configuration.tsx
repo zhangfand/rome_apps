@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { fetchAppApi } from "@rome-os/app-web-sdk";
-import { Button } from "@rome-os/ui/button";
 import { Textarea } from "@rome-os/ui/textarea";
 import { cn } from "@rome-os/ui/cn";
+import { ActionButton } from "./ui-bits";
 import { safeText } from "../lib/facts";
 import type { ConfigJson, RuntimeJson } from "../lib/types";
 
@@ -76,7 +76,7 @@ export function Configuration() {
           <span className="font-mono text-[11px] text-subtle-foreground">takes effect on every open task</span>
         </div>
         <div className="overflow-hidden rounded-[14px] border border-border bg-surface">
-          <div className="flex items-center gap-2.5 border-b border-border bg-surface-muted px-5 py-2.5">
+          <div className="flex items-center gap-2.5 border-b border-border bg-surface-muted px-3 py-[7px]">
             <span className="font-mono text-[10.5px] text-muted-foreground">global sop · markdown · {sop.length.toLocaleString()} chars</span>
             {dirty && <span className="ml-auto font-mono text-[10.5px] text-warning-fg">unsaved changes</span>}
           </div>
@@ -88,8 +88,8 @@ export function Configuration() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-[9px]">
-          <Button className="hover:bg-primary-hover" disabled={saving || !dirty} onClick={() => void updateSop(sop)}>{saving ? "Saving…" : "Save SOP"}</Button>
-          <Button variant="outline" className="border-border-strong bg-surface hover:bg-surface-hover" disabled={saving} onClick={() => void updateSop("", true)}>Revert to built-in</Button>
+          <ActionButton className="hover:bg-primary-hover" disabled={saving || !dirty} onClick={() => void updateSop(sop)}>{saving ? "Saving…" : "Save SOP"}</ActionButton>
+          <ActionButton variant="outline" className="border-border-strong bg-surface hover:bg-surface-hover" disabled={saving} onClick={() => void updateSop("", true)}>Revert to built-in</ActionButton>
           {saved && <span className="text-[11.5px] text-subtle-foreground">Saved.</span>}
           {error && <span role="alert" className="text-[11.5px] text-destructive-fg">{safeText(error)}</span>}
         </div>
