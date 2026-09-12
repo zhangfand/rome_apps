@@ -5,7 +5,6 @@ import { cn } from "@rome-os/ui/cn";
 import { SegmentedControl } from "@rome-os/ui/segmented-control";
 import { Textarea } from "@rome-os/ui/textarea";
 import { LightMarkdown } from "./light-markdown";
-import { ActionButton, viewSegmentClass } from "./ui-bits";
 import {
   attentionText,
   authorLabel,
@@ -118,7 +117,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
 
   return (
     <div className="flex flex-col gap-3.5">
-      <Button variant="ghost" size="xs" className="w-fit rounded-sm px-1.5 font-mono text-[11px] text-muted-foreground hover:bg-surface-hover" onClick={() => navigateToApp("/")}>← back to board</Button>
+      <Button variant="ghost" size="xs" className="w-fit px-1.5 font-mono text-[11px] text-muted-foreground hover:bg-surface-hover" onClick={() => navigateToApp("/")}>← back to board</Button>
 
       <section className="flex flex-col gap-[18px] rounded-[14px] border border-border bg-surface p-[26px] shadow-1">
         <div className="flex flex-wrap items-center gap-[9px]">
@@ -137,9 +136,9 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
         </div>
         {task.state === "open" && (
           <div className="flex flex-wrap gap-1.5">
-            <ActionButton className="hover:bg-primary-hover" onClick={focusComposer}>Reply</ActionButton>
-            <ActionButton variant="outline" className="border-border-strong bg-surface hover:bg-surface-hover" disabled={sending} onClick={() => void closeTask("complete")}>Mark complete</ActionButton>
-            <ActionButton variant="ghost" className="text-muted-foreground hover:bg-surface-hover" disabled={sending} onClick={() => void closeTask("cancel")}>Cancel task</ActionButton>
+            <Button className="hover:bg-primary-hover" onClick={focusComposer}>Reply</Button>
+            <Button variant="outline" className="border-border-strong bg-surface hover:bg-surface-hover" disabled={sending} onClick={() => void closeTask("complete")}>Mark complete</Button>
+            <Button variant="ghost" className="text-muted-foreground hover:bg-surface-hover" disabled={sending} onClick={() => void closeTask("cancel")}>Cancel task</Button>
           </div>
         )}
         {error && <p role="alert" className="text-xs text-destructive-fg">{safeText(error)}</p>}
@@ -155,7 +154,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
             <input type="checkbox" checked={hideRoutine} onChange={(event) => setHideRoutine(event.target.checked)} className="size-[13px] accent-primary" />
             hide routine steps
           </label>
-          <SegmentedControl options={VIEW_OPTIONS} value={historyView} onValueChange={setHistoryView} size="sm" aria-label="History view" className={viewSegmentClass} />
+          <SegmentedControl options={VIEW_OPTIONS} value={historyView} onValueChange={setHistoryView} size="sm" aria-label="History view" className="border border-border bg-surface-muted p-0.5 text-[11.5px]" />
         </div>
       </div>
 
@@ -171,11 +170,11 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
         <section className="flex flex-col gap-2 rounded-[14px] border border-border bg-surface p-3.5">
           <h3 className="font-serif text-[22px] font-medium tracking-[-0.01em]">Reply</h3>
           <div className="flex flex-wrap gap-1.5">
-            {DETAIL_REPLIES.map((text) => <Button key={text} variant="outline" size="sm" className="h-[26px] rounded-sm border-border bg-surface-muted px-[11px] font-mono text-xs font-normal text-muted-foreground hover:bg-surface-hover" onClick={() => setReply(text)}>{text}</Button>)}
+            {DETAIL_REPLIES.map((text) => <Button key={text} variant="outline" size="sm" className="h-[26px] border-border bg-surface-muted px-[11px] font-mono text-xs font-normal text-muted-foreground hover:bg-surface-hover" onClick={() => setReply(text)}>{text}</Button>)}
           </div>
-          <Textarea ref={composerRef} className="min-h-[104px] rounded-8 bg-background px-3.5 py-3 text-sm leading-[1.55]" value={reply} onChange={(event) => setReply(event.target.value)} aria-label="Reply to this task" />
+          <Textarea ref={composerRef} className="min-h-[104px] bg-background px-3.5 py-3 text-sm leading-[1.55]" value={reply} onChange={(event) => setReply(event.target.value)} aria-label="Reply to this task" />
           <div className="flex flex-wrap items-center gap-2.5">
-            <ActionButton className="w-fit hover:bg-primary-hover" onClick={() => void send()} disabled={sending || !reply.trim()}>{sending ? "Sending…" : "Send reply"}</ActionButton>
+            <Button className="w-fit hover:bg-primary-hover" onClick={() => void send()} disabled={sending || !reply.trim()}>{sending ? "Sending…" : "Send reply"}</Button>
             {error && <p role="alert" className="text-xs text-destructive-fg">{safeText(error)}</p>}
           </div>
         </section>
@@ -197,7 +196,7 @@ function StreamView({ rounds, openEntries, toggle }: { rounds: Array<{ stamp: st
             const content = factBody(item);
             const who = authorLabel(item.by, item.kind);
             return (
-              <article key={item.seq} className={cn("grid grid-cols-[80px_minmax(0,1fr)] gap-3 rounded-12 border border-border px-[22px] py-5 sm:grid-cols-[96px_minmax(0,1fr)]", isRoutine(item) ? "bg-background" : "bg-surface")}>
+              <article key={item.seq} className={cn("grid grid-cols-[80px_minmax(0,1fr)] gap-3 rounded-xl border border-border px-[22px] py-5 sm:grid-cols-[96px_minmax(0,1fr)]", isRoutine(item) ? "bg-background" : "bg-surface")}>
                 <div className="flex flex-col gap-[3px]">
                   <span className="font-mono text-[11px] text-subtle-foreground">#{item.seq} · {formatTime(item.createdAt)}</span>
                   {item.kind !== "Event" && (
@@ -212,8 +211,8 @@ function StreamView({ rounds, openEntries, toggle }: { rounds: Array<{ stamp: st
                   {content.body && <LightMarkdown markdown={content.body} className="max-w-[76ch] text-[14.5px] leading-[1.6]" />}
                   {content.extra && (
                     <div>
-                      <button type="button" className="w-fit border-0 bg-transparent p-0 font-mono text-[11px] text-muted-foreground underline transition-[color,transform] duration-[var(--dur-fast)] ease-[var(--ease-classical)] outline-none hover:text-foreground active:translate-y-px focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-ring" onClick={() => toggle(item.seq)}>{openEntries.has(item.seq) ? "hide" : "show"} {expandedTextLabel(item)}</button>
-                      {openEntries.has(item.seq) && <pre className="mt-[7px] whitespace-pre-wrap rounded-8 bg-surface-muted p-2.5 font-mono text-[11.5px] leading-[1.55] shadow-[var(--inset-soft)]">{content.extra}</pre>}
+                      <button type="button" className="w-fit border-0 bg-transparent p-0 font-mono text-xs text-muted-foreground underline transition-[color,transform] duration-[var(--dur-fast)] ease-[var(--ease-classical)] outline-none hover:text-foreground active:translate-y-px focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-ring" onClick={() => toggle(item.seq)}>{openEntries.has(item.seq) ? "hide" : "show"} {expandedTextLabel(item)}</button>
+                      {openEntries.has(item.seq) && <pre className="mt-[7px] whitespace-pre-wrap rounded-lg bg-surface-muted p-2.5 font-mono text-[11.5px] leading-[1.55] shadow-[var(--inset-soft)]">{content.extra}</pre>}
                     </div>
                   )}
                 </div>
@@ -275,7 +274,7 @@ function TableView({ entries, openEntries, toggle }: { entries: FactJson[]; open
                 <span className="truncate">{oneLine}</span>
                 <span className="text-right font-mono text-[10.5px] text-subtle-foreground">{formatTime(item.createdAt)}</span>
               </button>
-              {open && <pre className="mx-5 mb-3 whitespace-pre-wrap rounded-8 bg-surface-muted p-2.5 font-mono text-[11.5px] leading-[1.55] shadow-[var(--inset-soft)]">{content.extra || oneLine}</pre>}
+              {open && <pre className="mx-5 mb-3 whitespace-pre-wrap rounded-lg bg-surface-muted p-2.5 font-mono text-[11.5px] leading-[1.55] shadow-[var(--inset-soft)]">{content.extra || oneLine}</pre>}
             </div>
           );
         })}
@@ -337,7 +336,7 @@ function ErrorCard({ message, retry }: { message: string; retry: () => Promise<v
     <div className="flex max-w-[70ch] flex-col gap-3 rounded-[14px] border border-destructive-border bg-destructive-bg p-5">
       <strong className="text-[15px] text-destructive-fg">This task could not be read.</strong>
       <p className="text-sm">{safeText(message)}</p>
-      <ActionButton variant="outline" className="w-fit border-border-strong bg-surface hover:bg-surface-hover" onClick={() => void retry()}>Try again</ActionButton>
+      <Button variant="outline" className="w-fit border-border-strong bg-surface hover:bg-surface-hover" onClick={() => void retry()}>Try again</Button>
     </div>
   );
 }

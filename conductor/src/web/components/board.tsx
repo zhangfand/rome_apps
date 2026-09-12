@@ -3,7 +3,6 @@ import { fetchAppApi, navigateToApp } from "@rome-os/app-web-sdk";
 import { Button } from "@rome-os/ui/button";
 import { cn } from "@rome-os/ui/cn";
 import { Textarea } from "@rome-os/ui/textarea";
-import { ActionButton } from "./ui-bits";
 import {
   attentionText,
   bucketTask,
@@ -116,7 +115,7 @@ export function Board({
               {freshIds.has(task.id) && <FreshEdge />}
               <div className="flex flex-wrap items-center gap-[11px]">
                 <StateChip label={label} tone={tone} large />
-                <h3 className="text-lg leading-[normal] font-semibold tracking-[-0.015em]">{taskTitle(task)}</h3>
+                <h3 className="text-lg font-semibold tracking-[-0.015em]">{taskTitle(task)}</h3>
                 {task.projectId && <span className="font-mono text-xs text-subtle-foreground">{safeText(task.projectId)}</span>}
                 <span className="ml-auto font-mono text-xs text-muted-foreground">{formatRelative(task.updatedAt, now)}</span>
               </div>
@@ -133,31 +132,31 @@ export function Board({
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <ActionButton className="hover:bg-primary-hover" onClick={() => setReplyOpen((current) => ({ ...current, [task.id]: !open }))}>
+                <Button className="hover:bg-primary-hover" onClick={() => setReplyOpen((current) => ({ ...current, [task.id]: !open }))}>
                   {open ? "Close reply" : question ? "Answer" : "Reply"}
-                </ActionButton>
-                <ActionButton variant="outline" className="border-border-strong bg-surface hover:bg-surface-hover" disabled={busy} onClick={() => void closeTask(task, question || label === "paused" ? "cancel" : "complete")}>
+                </Button>
+                <Button variant="outline" className="border-border-strong bg-surface hover:bg-surface-hover" disabled={busy} onClick={() => void closeTask(task, question || label === "paused" ? "cancel" : "complete")}>
                   {question || label === "paused" ? "Cancel task" : "Mark complete"}
-                </ActionButton>
-                <ActionButton variant="ghost" className="text-muted-foreground hover:bg-surface-hover" onClick={() => navigateToApp(`/${task.id}`)}>Details</ActionButton>
+                </Button>
+                <Button variant="ghost" className="text-muted-foreground hover:bg-surface-hover" onClick={() => navigateToApp(`/${task.id}`)}>Details</Button>
               </div>
               {open && (
                 <div className="flex flex-col gap-3 border-t border-border pt-[18px]">
                   <div className="flex flex-wrap gap-2">
                     {replies.map((reply) => (
-                      <Button key={reply} variant="outline" size="sm" className="h-[26px] rounded-sm border-border bg-surface-muted px-[11px] font-mono text-xs font-normal text-muted-foreground hover:bg-surface-hover" onClick={() => setDrafts((current) => ({ ...current, [task.id]: reply }))}>
+                      <Button key={reply} variant="outline" size="sm" className="h-[26px] border-border bg-surface-muted px-[11px] font-mono text-xs font-normal text-muted-foreground hover:bg-surface-hover" onClick={() => setDrafts((current) => ({ ...current, [task.id]: reply }))}>
                         {reply}
                       </Button>
                     ))}
                   </div>
                   <Textarea
-                    className="min-h-24 rounded-8 bg-background px-3.5 py-3 text-sm leading-[1.55]"
+                    className="min-h-24 bg-background px-3.5 py-3 text-sm leading-[1.55]"
                     aria-label={`Reply to ${taskTitle(task)}`}
                     value={drafts[task.id] ?? ""}
                     onChange={(event) => setDrafts((current) => ({ ...current, [task.id]: event.target.value }))}
                   />
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <ActionButton className="hover:bg-primary-hover" disabled={busy || !drafts[task.id]?.trim()} onClick={() => void sendReply(task)}>{busy ? "Sending…" : "Send reply"}</ActionButton>
+                    <Button className="hover:bg-primary-hover" disabled={busy || !drafts[task.id]?.trim()} onClick={() => void sendReply(task)}>{busy ? "Sending…" : "Send reply"}</Button>
                     {errors[task.id] && <span role="alert" className="text-xs text-destructive-fg">{safeText(errors[task.id])}</span>}
                   </div>
                 </div>
@@ -214,7 +213,7 @@ export function SectionHeading({ id, children }: { id?: string; children: React.
 }
 
 export function StateChip({ label, tone, large = false }: { label: string; tone: ReturnType<typeof taskTone>; large?: boolean }) {
-  return <span className={cn("inline-flex items-center rounded-sm font-mono font-semibold", large ? "h-6 px-2.5 text-[11px] uppercase tracking-[0.08em]" : "h-5 px-2 text-[10.5px]", TONE_CLASS[tone])}>{label}</span>;
+  return <span className={cn("inline-flex items-center rounded-md font-mono font-semibold", large ? "h-6 px-2.5 text-[11px] uppercase tracking-[0.08em]" : "h-5 px-2 text-[10.5px]", TONE_CLASS[tone])}>{label}</span>;
 }
 
 export function FreshEdge() {

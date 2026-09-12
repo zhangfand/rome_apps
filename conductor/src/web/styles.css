@@ -8,17 +8,6 @@
   --ease-classical: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* The editorial base type, set once on the app root. The design is a 15px
-   system, tighter than Rome's inherited 16px body. Line-height is reset to
-   `normal` here — the prototype leaves body leading unset (so headings, row
-   titles, tabs and metadata size their own boxes) and applies 1.6 only on
-   running prose via `leading-[1.6]`. Without this reset those elements would
-   inherit Tailwind preflight's 1.5 and stand too tall. */
-.conductor-root {
-  font-size: 15px;
-  line-height: normal;
-}
-
 @keyframes afterglow {
   0% { opacity: 1; }
   100% { opacity: 0; }
