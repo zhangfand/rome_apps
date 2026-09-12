@@ -199,7 +199,9 @@ function StreamView({ rounds, openEntries, toggle }: { rounds: Array<{ stamp: st
               <article key={item.seq} className={cn("grid grid-cols-[80px_minmax(0,1fr)] gap-3 rounded-xl border border-border px-[22px] py-5 sm:grid-cols-[96px_minmax(0,1fr)]", isRoutine(item) ? "bg-background" : "bg-surface")}>
                 <div className="flex flex-col gap-[3px]">
                   <span className="font-mono text-[11px] text-subtle-foreground">#{item.seq} · {formatTime(item.createdAt)}</span>
-                  <span className={cn("font-mono text-[10.5px] font-semibold", who === "you" ? "text-info-fg" : who === "conductor" ? "text-foreground" : "text-muted-foreground")}>{who}</span>
+                  {item.kind !== "Event" && (
+                    <span className={cn("font-mono text-[10.5px] font-semibold", who === "you" ? "text-info-fg" : who === "conductor" ? "text-foreground" : "text-muted-foreground")}>{who}</span>
+                  )}
                 </div>
                 <div className="flex min-w-0 flex-col gap-[5px]">
                   <div className="flex flex-wrap items-center gap-2">

@@ -64,11 +64,11 @@ export function truncate(text: string, max = 160): string {
   return oneLine.length > max ? `${oneLine.slice(0, max - 1)}…` : oneLine;
 }
 
-/** "09:58:28 PM" — the time alone, for rows that sit under a day heading. */
+/** "21:58:28" — the time alone, for rows that sit under a day heading. */
 export function formatTime(iso: string): string {
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return iso;
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 }
 
 /** "Today" / "Yesterday" / "Sep 7" / "Sep 7, 2025" (year only when it is not this one). */
