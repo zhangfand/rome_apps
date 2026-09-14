@@ -47,3 +47,5 @@ actions:
   - actions/close
   - actions/note
   - actions/stop
+
+tagline: "Run long-lived tasks with a flexible playbook you can change anytime."
