@@ -61,13 +61,44 @@ function renderInline(text: string): ReactNode[] {
   return nodes;
 }
 
+/**
+ * Block spacing. `comfortable` is the reading column in a task's history, where
+ * each event owns its own row. `compact` is for markdown sitting inside a
+ * denser surface — a board card — where the card's padding already supplies the
+ * breathing room: margins tighten, the first and last block collapse theirs
+ * into the card edge, and type size/leading are inherited from the caller
+ * instead of being restated, so the block flows as part of the card's text.
+ */
+const SPACING = {
+  comfortable: {
+    pre: "my-2 overflow-x-auto rounded bg-surface-muted p-2 text-xs",
+    heading: "mt-3 text-sm font-semibold first:mt-0",
+    taskList: "my-2 flex flex-col gap-1",
+    bulletList: "my-2 list-disc pl-5",
+    orderedList: "my-2 list-decimal pl-5",
+    paragraph: "my-2 whitespace-pre-wrap leading-relaxed",
+  },
+  compact: {
+    pre: "my-1.5 overflow-x-auto rounded bg-surface-muted p-2 text-xs first:mt-0 last:mb-0",
+    heading: "mt-2 font-semibold first:mt-0",
+    taskList: "my-1.5 flex flex-col gap-0.5 first:mt-0 last:mb-0",
+    bulletList: "my-1.5 list-disc pl-5 first:mt-0 last:mb-0",
+    orderedList: "my-1.5 list-decimal pl-5 first:mt-0 last:mb-0",
+    paragraph: "my-1.5 whitespace-pre-wrap first:mt-0 last:mb-0",
+  },
+} as const;
+
 export function LightMarkdown({
   markdown,
   className,
+  compact = false,
 }: {
   markdown: string;
   className?: string;
+  /** Tighten block spacing for dense surfaces such as a board card. */
+  compact?: boolean;
 }) {
+  const space = SPACING[compact ? "compact" : "comfortable"];
   const lines = markdown.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
   let index = 0;
@@ -90,7 +121,7 @@ export function LightMarkdown({
       }
       if (index < lines.length) index += 1; // consume closing fence
       blocks.push(
-        <pre key={key++} className="my-2 overflow-x-auto rounded bg-surface-muted p-2 text-xs">
+        <pre key={key++} className={space.pre}>
           <code>{code.join("\n")}</code>
         </pre>,
       );
@@ -100,7 +131,7 @@ export function LightMarkdown({
     const heading = HEADING.exec(line);
     if (heading) {
       blocks.push(
-        <p key={key++} className="mt-3 text-sm font-semibold first:mt-0">
+        <p key={key++} className={space.heading}>
           {renderInline(heading[2].trim())}
         </p>,
       );
@@ -118,7 +149,7 @@ export function LightMarkdown({
         current = index < lines.length ? TASK_ITEM.exec(lines[index]) : null;
       }
       blocks.push(
-        <ul key={key++} className="my-2 flex flex-col gap-1">
+        <ul key={key++} className={space.taskList}>
           {items.map((item, i) => (
             <li key={i} className="flex items-start gap-2">
               <input type="checkbox" checked={item.checked} readOnly disabled className="mt-1 shrink-0" />
@@ -140,7 +171,7 @@ export function LightMarkdown({
         current = index < lines.length ? BULLET_ITEM.exec(lines[index]) : null;
       }
       blocks.push(
-        <ul key={key++} className="my-2 list-disc pl-5">
+        <ul key={key++} className={space.bulletList}>
           {items.map((item, i) => (
             <li key={i}>{renderInline(item)}</li>
           ))}
@@ -159,7 +190,7 @@ export function LightMarkdown({
         current = index < lines.length ? ORDERED_ITEM.exec(lines[index]) : null;
       }
       blocks.push(
-        <ol key={key++} className="my-2 list-decimal pl-5">
+        <ol key={key++} className={space.orderedList}>
           {items.map((item, i) => (
             <li key={i}>{renderInline(item)}</li>
           ))}
@@ -181,7 +212,7 @@ export function LightMarkdown({
       index += 1;
     }
     blocks.push(
-      <p key={key++} className="my-2 whitespace-pre-wrap leading-relaxed">
+      <p key={key++} className={space.paragraph}>
         {renderInline(paragraph.join("\n"))}
       </p>,
     );

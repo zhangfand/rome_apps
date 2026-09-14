@@ -14,6 +14,7 @@ import {
   TONE_CLASS,
 } from "../lib/facts";
 import { formatDuration, formatRelative, truncate } from "../lib/format";
+import { LightMarkdown } from "./light-markdown";
 import type { StateJson, TaskDetailJson, TaskSummary } from "../lib/types";
 
 const QUICK_REPLIES = {
@@ -120,7 +121,11 @@ export function Board({
                 <span className="ml-auto font-mono text-xs text-muted-foreground">{formatRelative(task.updatedAt, now)}</span>
               </div>
               <div className="flex flex-col gap-2">
-                <p className={cn("max-w-[78ch] text-[15px] leading-[1.6] text-pretty", isLong && !isExpanded && "clamp-four")}>{text}</p>
+                <LightMarkdown
+                  markdown={text}
+                  compact
+                  className={cn("max-w-[78ch] text-[15px] leading-[1.6] text-pretty", isLong && !isExpanded && "clamp-four")}
+                />
                 {isLong && (
                   <button
                     type="button"
