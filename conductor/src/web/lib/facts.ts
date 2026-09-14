@@ -1,18 +1,29 @@
+import type { ComponentProps } from "react";
+import type { Badge } from "@rome-os/ui/badge";
 import type { FactJson, TaskSummary } from "./types";
 import { formatStamp } from "./format";
 
 export type TaskBucket = "needs-you" | "running" | "resting" | "closed";
 export type Tone = "person" | "neutral" | "question" | "report" | "success" | "destructive" | "info" | "quiet";
+type BadgeVariant = NonNullable<ComponentProps<typeof Badge>["variant"]>;
 
-export const TONE_CLASS: Record<Tone, string> = {
-  person: "bg-accent text-info-fg",
-  neutral: "bg-surface-muted text-muted-foreground",
-  question: "bg-warning-bg text-warning-fg",
-  report: "bg-primary/[0.14] text-primary-hover",
-  success: "bg-success-bg text-success-fg",
-  destructive: "bg-destructive-bg text-destructive-fg",
-  info: "bg-info-bg text-info-fg",
-  quiet: "bg-surface-muted text-subtle-foreground",
+/**
+ * Tones expressed as kit Badge variants. Five land on a variant that paints the
+ * same token pair the bespoke chip did (`question`→warning, `success`,
+ * `destructive`, `info`, `neutral`→muted); `person` and `report` take the
+ * nearest kit tone rather than carrying a private tint, and `quiet` shares
+ * `muted` because the kit has no fainter step. Paint now comes from the kit, so
+ * the app no longer owns a second chip palette.
+ */
+export const TONE_BADGE: Record<Tone, BadgeVariant> = {
+  person: "info",
+  neutral: "muted",
+  question: "warning",
+  report: "brand",
+  success: "success",
+  destructive: "destructive",
+  info: "info",
+  quiet: "muted",
 };
 
 /** Tone as text colour alone, for places that carry state without a filled chip. */

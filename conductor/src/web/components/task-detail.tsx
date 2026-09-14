@@ -1,8 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { fetchAppApi, navigateToApp } from "@rome-os/app-web-sdk";
+import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
+import { Badge } from "@rome-os/ui/badge";
 import { Button } from "@rome-os/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@rome-os/ui/card";
 import { cn } from "@rome-os/ui/cn";
+import { EmptyState, EmptyStateDescription, EmptyStateTitle } from "@rome-os/ui/empty-state";
 import { SegmentedControl } from "@rome-os/ui/segmented-control";
+import { Spinner } from "@rome-os/ui/spinner";
+import { Switch } from "@rome-os/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rome-os/ui/table";
 import { Textarea } from "@rome-os/ui/textarea";
 import { LightMarkdown } from "./light-markdown";
 import {
@@ -18,7 +25,7 @@ import {
   latestText,
   safeText,
   taskTone,
-  TONE_CLASS,
+  TONE_BADGE,
 } from "../lib/facts";
 import { formatRelative, formatStamp, formatTime } from "../lib/format";
 import type { FactJson, TaskDetailJson, TaskSummary } from "../lib/types";
@@ -119,30 +126,36 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
     <div className="flex flex-col gap-3.5">
       <Button variant="ghost" size="xs" className="w-fit px-1.5 font-mono text-[11px] text-muted-foreground hover:bg-surface-hover" onClick={() => navigateToApp("/")}>← back to board</Button>
 
-      <section className="flex flex-col gap-[18px] rounded-[14px] border border-border bg-surface p-[26px] shadow-1">
-        <div className="flex flex-wrap items-center gap-[9px]">
-          <StateChip label={task.state} tone={task.state === "open" ? "info" : taskTone(task)} />
-          <h2 className="font-serif text-[26px] leading-8 font-medium tracking-[-0.015em]">{taskTitle(task)}</h2>
-          <span className="font-mono text-[11px] text-subtle-foreground">{task.id}</span>
-        </div>
-        <div className="flex flex-wrap gap-3.5 font-mono text-[11px] text-muted-foreground">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex flex-wrap items-center gap-2.5">
+            <StateChip label={task.state} tone={task.state === "open" ? "info" : taskTone(task)} />
+            {taskTitle(task)}
+            <Badge variant="outline">{task.id}</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3.5 text-aux text-muted-foreground">
           <span>{safeText(task.projectId ?? "no project")}{task.repo ? ` · ${safeText(task.repo)}` : ""}</span>
           <span>from {safeText(from)}{typeof issue?.number === "number" ? ` · issue #${issue.number}` : ""}</span>
           <span>opened {formatRelative(task.createdAt, now)}</span>
-        </div>
-        <div className="flex flex-col gap-[7px] rounded-[10px] border border-info-border bg-info-bg px-[18px] py-4">
-          <span className="font-mono text-[10px] font-semibold tracking-[0.12em] text-info-fg uppercase">where it stands</span>
-          <p className="max-w-[78ch] text-[15px] leading-[1.6]">{whereItStands(task)}</p>
-        </div>
+        </CardContent>
+        <CardContent>
+          <Alert variant="info">
+            <AlertTitle>Where it stands</AlertTitle>
+            <AlertDescription>
+              <LightMarkdown markdown={whereItStands(task)} compact className="max-w-[78ch]" />
+            </AlertDescription>
+          </Alert>
+        </CardContent>
         {task.state === "open" && (
-          <div className="flex flex-wrap gap-1.5">
-            <Button className="hover:bg-primary-hover" onClick={focusComposer}>Reply</Button>
-            <Button variant="outline" className="border-border-strong bg-surface hover:bg-surface-hover" disabled={sending} onClick={() => void closeTask("complete")}>Mark complete</Button>
-            <Button variant="ghost" className="text-muted-foreground hover:bg-surface-hover" disabled={sending} onClick={() => void closeTask("cancel")}>Cancel task</Button>
-          </div>
+          <CardFooter className="flex-wrap">
+            <Button onClick={focusComposer}>Reply</Button>
+            <Button variant="outline" disabled={sending} onClick={() => void closeTask("complete")}>Mark complete</Button>
+            <Button variant="ghost" disabled={sending} onClick={() => void closeTask("cancel")}>Cancel task</Button>
+          </CardFooter>
         )}
-        {error && <p role="alert" className="text-xs text-destructive-fg">{safeText(error)}</p>}
-      </section>
+        {error && <CardContent><DetailError message={error} /></CardContent>}
+      </Card>
 
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <div className="flex items-baseline gap-2.5">
@@ -150,11 +163,11 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
           <span className="font-mono text-[11px] text-subtle-foreground">{task.facts.length} events</span>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
-          <label className="inline-flex cursor-pointer items-center gap-1.5 text-[11.5px] text-muted-foreground">
-            <input type="checkbox" checked={hideRoutine} onChange={(event) => setHideRoutine(event.target.checked)} className="size-[13px] accent-primary" />
+          <label className="inline-flex cursor-pointer items-center gap-2 text-aux text-muted-foreground">
+            <Switch checked={hideRoutine} onCheckedChange={setHideRoutine} />
             hide routine steps
           </label>
-          <SegmentedControl options={VIEW_OPTIONS} value={historyView} onValueChange={setHistoryView} size="sm" aria-label="History view" className="border border-border bg-surface-muted p-0.5 text-[11.5px]" />
+          <SegmentedControl options={VIEW_OPTIONS} value={historyView} onValueChange={setHistoryView} size="sm" aria-label="History view" />
         </div>
       </div>
 
@@ -167,17 +180,22 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
       )}
 
       {task.state === "open" && (
-        <section className="flex flex-col gap-2 rounded-[14px] border border-border bg-surface p-3.5">
-          <h3 className="font-serif text-[22px] font-medium tracking-[-0.01em]">Reply</h3>
-          <div className="flex flex-wrap gap-1.5">
-            {DETAIL_REPLIES.map((text) => <Button key={text} variant="outline" size="sm" className="h-[26px] border-border bg-surface-muted px-[11px] font-mono text-xs font-normal text-muted-foreground hover:bg-surface-hover" onClick={() => setReply(text)}>{text}</Button>)}
-          </div>
-          <Textarea ref={composerRef} className="min-h-[104px] bg-background px-3.5 py-3 text-sm leading-[1.55]" value={reply} onChange={(event) => setReply(event.target.value)} aria-label="Reply to this task" />
-          <div className="flex flex-wrap items-center gap-2.5">
-            <Button className="w-fit hover:bg-primary-hover" onClick={() => void send()} disabled={sending || !reply.trim()}>{sending ? "Sending…" : "Send reply"}</Button>
-            {error && <p role="alert" className="text-xs text-destructive-fg">{safeText(error)}</p>}
-          </div>
-        </section>
+        <Card>
+          <CardHeader><CardTitle>Reply</CardTitle></CardHeader>
+          <CardContent className="flex flex-wrap gap-1.5">
+            {DETAIL_REPLIES.map((text) => <Button key={text} variant="outline" size="sm" onClick={() => setReply(text)}>{text}</Button>)}
+          </CardContent>
+          <CardContent>
+            <Textarea ref={composerRef} className="min-h-[104px]" value={reply} onChange={(event) => setReply(event.target.value)} aria-label="Reply to this task" />
+          </CardContent>
+          <CardFooter className="flex-col items-stretch gap-2.5">
+            <Button className="w-fit" onClick={() => void send()} disabled={sending || !reply.trim()}>
+              {sending && <Spinner />}
+              {sending ? "Sending…" : "Send reply"}
+            </Button>
+            {error && <DetailError message={error} />}
+          </CardFooter>
+        </Card>
       )}
     </div>
   );
@@ -196,7 +214,7 @@ function StreamView({ rounds, openEntries, toggle }: { rounds: Array<{ stamp: st
             const content = factBody(item);
             const who = authorLabel(item.by, item.kind);
             return (
-              <article key={item.seq} className={cn("grid grid-cols-[80px_minmax(0,1fr)] gap-3 rounded-xl border border-border px-[22px] py-5 sm:grid-cols-[96px_minmax(0,1fr)]", isRoutine(item) ? "bg-background" : "bg-surface")}>
+              <Card key={item.seq} className={cn("grid grid-cols-[80px_minmax(0,1fr)] gap-3 px-[22px] sm:grid-cols-[96px_minmax(0,1fr)]", isRoutine(item) && "bg-background")}>
                 <div className="flex flex-col gap-[3px]">
                   <span className="font-mono text-[11px] text-subtle-foreground">#{item.seq} · {formatTime(item.createdAt)}</span>
                   {item.kind !== "Event" && (
@@ -211,17 +229,24 @@ function StreamView({ rounds, openEntries, toggle }: { rounds: Array<{ stamp: st
                   {content.body && <LightMarkdown markdown={content.body} className="max-w-[76ch] text-[14.5px] leading-[1.6]" />}
                   {content.extra && (
                     <div>
-                      <button type="button" className="w-fit border-0 bg-transparent p-0 font-mono text-xs text-muted-foreground underline transition-[color,transform] duration-[var(--dur-fast)] ease-[var(--ease-classical)] outline-none hover:text-foreground active:translate-y-px focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-ring" onClick={() => toggle(item.seq)}>{openEntries.has(item.seq) ? "hide" : "show"} {expandedTextLabel(item)}</button>
+                      <Button variant="link" size="sm" className="h-auto w-fit p-0 text-muted-foreground hover:text-foreground" aria-expanded={openEntries.has(item.seq)} onClick={() => toggle(item.seq)}>{openEntries.has(item.seq) ? "hide" : "show"} {expandedTextLabel(item)}</Button>
                       {openEntries.has(item.seq) && <pre className="mt-[7px] whitespace-pre-wrap rounded-lg bg-surface-muted p-2.5 font-mono text-[11.5px] leading-[1.55] shadow-[var(--inset-soft)]">{content.extra}</pre>}
                     </div>
                   )}
                 </div>
-              </article>
+              </Card>
             );
           })}
         </section>
       ))}
-      {!rounds.length && <p className="text-sm text-muted-foreground">No events to show.</p>}
+      {!rounds.length && (
+        <Card className="py-0">
+          <EmptyState>
+            <EmptyStateTitle>No events to show</EmptyStateTitle>
+            <EmptyStateDescription>Turn off “hide routine steps” to see the full history.</EmptyStateDescription>
+          </EmptyState>
+        </Card>
+      )}
     </div>
   );
 }
@@ -229,7 +254,7 @@ function StreamView({ rounds, openEntries, toggle }: { rounds: Array<{ stamp: st
 function LanesView({ entries }: { entries: FactJson[] }) {
   const laneClass = { 1: "col-start-1", 2: "col-start-2", 3: "col-start-3", 4: "col-start-4" } as const;
   return (
-    <div className="overflow-x-auto rounded-[14px] border border-border bg-surface px-3.5 pt-3 pb-4">
+    <Card className="overflow-x-auto px-3.5">
       <div className="min-w-[760px]">
         <div className="mb-2.5 grid grid-cols-4 gap-2.5 border-b border-border pb-2 font-mono text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
           <span>you &amp; github</span><span>conductor</span><span>workers</span><span>world</span>
@@ -238,53 +263,67 @@ function LanesView({ entries }: { entries: FactJson[] }) {
           {entries.map((item) => {
             const content = factBody(item);
             return (
-              <div key={item.seq} className={cn("flex min-w-0 flex-col gap-1.5 rounded-[10px] border border-border p-[14px]", isRoutine(item) ? "bg-background" : "bg-surface", laneClass[authorLane(item)])}>
+              <Card key={item.seq} className={cn("min-w-0 gap-1.5 p-[14px]", isRoutine(item) && "bg-background", laneClass[authorLane(item)])}>
                 <div className="flex items-center gap-1.5">
                   <span className="font-mono text-[10.5px] text-subtle-foreground">#{item.seq}</span>
-                  <HistoryChip item={item} compact />
+                  <HistoryChip item={item} />
                   <span className="ml-auto font-mono text-[10px] text-subtle-foreground">{formatTime(item.createdAt)}</span>
                 </div>
                 <span className="truncate text-[12.5px] leading-[1.4] font-medium">{content.title || content.body || "Update"}</span>
-              </div>
+              </Card>
             );
           })}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
 function TableView({ entries, openEntries, toggle }: { entries: FactJson[]; openEntries: Set<number>; toggle: (seq: number) => void }) {
   return (
-    <div className="overflow-x-auto rounded-[14px] border border-border bg-surface">
-      <div className="min-w-[760px]">
-        <div className="grid grid-cols-[44px_104px_132px_minmax(0,1fr)_84px] items-center gap-2.5 border-b border-border bg-surface-muted px-5 py-2.5 font-mono text-[10px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">
-          <span /><span>what</span><span>who</span><span>what it says</span><span className="text-right">time</span>
-        </div>
-        {entries.map((item) => {
-          const content = factBody(item);
-          const oneLine = [content.title, content.body].filter(Boolean).join(" — ") || "Update";
-          const open = openEntries.has(item.seq);
-          return (
-            <div key={item.seq} className="border-b border-border-subtle last:border-b-0">
-              <button type="button" className="grid w-full grid-cols-[44px_104px_132px_minmax(0,1fr)_84px] items-center gap-2.5 px-5 py-[13px] text-left text-[12.5px] outline-none transition-[background-color,transform] duration-[var(--dur-fast)] ease-[var(--ease-classical)] hover:bg-surface-muted active:translate-y-px focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-ring" onClick={() => toggle(item.seq)} aria-expanded={open}>
-                <span className="font-mono text-[11px] text-subtle-foreground">#{item.seq}</span>
-                <HistoryChip item={item} />
-                <span className="truncate font-mono text-[11px] text-muted-foreground">{authorLabel(item.by, item.kind)}</span>
-                <span className="truncate">{oneLine}</span>
-                <span className="text-right font-mono text-[10.5px] text-subtle-foreground">{formatTime(item.createdAt)}</span>
-              </button>
-              {open && <pre className="mx-5 mb-3 whitespace-pre-wrap rounded-lg bg-surface-muted p-2.5 font-mono text-[11.5px] leading-[1.55] shadow-[var(--inset-soft)]">{content.extra || oneLine}</pre>}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <Card className="overflow-hidden py-0">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead scope="col" className="w-[64px]">#</TableHead>
+            <TableHead scope="col" className="w-[120px]">What</TableHead>
+            <TableHead scope="col" className="w-[120px]">Who</TableHead>
+            <TableHead scope="col">What it says</TableHead>
+            <TableHead scope="col" className="w-[90px] text-right">Time</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {entries.map((item) => {
+            const content = factBody(item);
+            const oneLine = [content.title, content.body].filter(Boolean).join(" — ") || "Update";
+            const open = openEntries.has(item.seq);
+            return (
+              <Fragment key={item.seq}>
+                <TableRow className="cursor-pointer" aria-expanded={open} onClick={() => toggle(item.seq)}>
+                  <TableCell className="text-aux text-muted-foreground">#{item.seq}</TableCell>
+                  <TableCell><HistoryChip item={item} /></TableCell>
+                  <TableCell className="text-aux text-muted-foreground">{authorLabel(item.by, item.kind)}</TableCell>
+                  <TableCell className="max-w-0 truncate">{oneLine}</TableCell>
+                  <TableCell className="text-right text-aux text-muted-foreground">{formatTime(item.createdAt)}</TableCell>
+                </TableRow>
+                {open && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={5} className="whitespace-normal">
+                      <pre className="whitespace-pre-wrap rounded-lg bg-surface-muted p-2.5 font-mono text-[11.5px] leading-[1.55] shadow-[var(--inset-soft)]">{content.extra || oneLine}</pre>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </Fragment>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </Card>
   );
 }
 
-function HistoryChip({ item, compact = false }: { item: FactJson; compact?: boolean }) {
-  return <span className={cn("inline-flex w-fit items-center rounded-[5px] font-mono font-semibold", compact ? "h-[18px] px-1.5 text-[10px]" : "h-[19px] px-[7px] text-[10.5px]", TONE_CLASS[factTone(item)])}>{factLabel(item.kind)}</span>;
+function HistoryChip({ item }: { item: FactJson }) {
+  return <Badge variant={TONE_BADGE[factTone(item)]} className="w-fit">{factLabel(item.kind)}</Badge>;
 }
 
 function whereItStands(task: TaskDetailJson): string {
@@ -331,12 +370,22 @@ async function responseError(response: Response): Promise<string> {
   return body.error ?? `The request did not finish (HTTP ${response.status}). Try again.`;
 }
 
+function DetailError({ message }: { message: string }) {
+  return (
+    <Alert variant="destructive">
+      <AlertDescription>{safeText(message)}</AlertDescription>
+    </Alert>
+  );
+}
+
 function ErrorCard({ message, retry }: { message: string; retry: () => Promise<void> }) {
   return (
-    <div className="flex max-w-[70ch] flex-col gap-3 rounded-[14px] border border-destructive-border bg-destructive-bg p-5">
-      <strong className="text-[15px] text-destructive-fg">This task could not be read.</strong>
-      <p className="text-sm">{safeText(message)}</p>
-      <Button variant="outline" className="w-fit border-border-strong bg-surface hover:bg-surface-hover" onClick={() => void retry()}>Try again</Button>
-    </div>
+    <Alert variant="destructive" className="max-w-[70ch]">
+      <AlertTitle>This task could not be read.</AlertTitle>
+      <AlertDescription className="flex flex-col items-start gap-3">
+        {safeText(message)}
+        <Button variant="outline" onClick={() => void retry()}>Try again</Button>
+      </AlertDescription>
+    </Alert>
   );
 }

@@ -1,7 +1,13 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { fetchAppApi, navigateToApp } from "@rome-os/app-web-sdk";
+import { Alert, AlertDescription } from "@rome-os/ui/alert";
+import { Badge } from "@rome-os/ui/badge";
 import { Button } from "@rome-os/ui/button";
+import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "@rome-os/ui/card";
 import { cn } from "@rome-os/ui/cn";
+import { EmptyState, EmptyStateDescription, EmptyStateTitle } from "@rome-os/ui/empty-state";
+import { Separator } from "@rome-os/ui/separator";
+import { Spinner } from "@rome-os/ui/spinner";
 import { Textarea } from "@rome-os/ui/textarea";
 import {
   attentionText,
@@ -11,7 +17,7 @@ import {
   safeText,
   taskStateLabel,
   taskTone,
-  TONE_CLASS,
+  TONE_BADGE,
 } from "../lib/facts";
 import { formatDuration, formatRelative, truncate } from "../lib/format";
 import { LightMarkdown } from "./light-markdown";
@@ -106,71 +112,95 @@ export function Board({
           const question = label === "question";
           const replies = QUICK_REPLIES[label === "paused" ? "paused" : question ? "question" : "report"];
           return (
-            <article
-              key={task.id}
+            <article key={task.id}>
+             <Card
               className={cn(
-                "relative flex flex-col gap-[18px] rounded-[14px] border border-l-[3px] bg-surface px-[26px] py-6 shadow-1",
+                // The tone rail is the one paint the card keeps: it is what
+                // makes a question scannable against a report in a column of
+                // otherwise identical cards.
+                "relative border-l-[3px]",
                 tone === "question" ? "border-l-warning" : tone === "destructive" ? "border-l-destructive" : "border-l-primary",
               )}
-            >
-              {freshIds.has(task.id) && <FreshEdge />}
-              <div className="flex flex-wrap items-center gap-[11px]">
-                <StateChip label={label} tone={tone} large />
-                <h3 className="text-lg font-semibold tracking-[-0.015em]">{taskTitle(task)}</h3>
-                {task.projectId && <span className="font-mono text-xs text-subtle-foreground">{safeText(task.projectId)}</span>}
-                <span className="ml-auto font-mono text-xs text-muted-foreground">{formatRelative(task.updatedAt, now)}</span>
-              </div>
-              <div className="flex flex-col gap-2">
-                <LightMarkdown
-                  markdown={text}
-                  compact
-                  className={cn("max-w-[78ch] text-[15px] leading-[1.6] text-pretty", isLong && !isExpanded && "clamp-four")}
-                />
-                {isLong && (
-                  <button
-                    type="button"
-                    className="w-fit border-0 bg-transparent p-0 font-mono text-xs text-muted-foreground underline transition-[color,transform] duration-[var(--dur-fast)] ease-[var(--ease-classical)] outline-none hover:text-foreground active:translate-y-px focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-ring"
-                    onClick={() => setExpanded((current) => toggleSet(current, task.id))}
-                  >
-                    {isExpanded ? "show less" : "show all"}
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button className="hover:bg-primary-hover" onClick={() => setReplyOpen((current) => ({ ...current, [task.id]: !open }))}>
-                  {open ? "Close reply" : question ? "Answer" : "Reply"}
-                </Button>
-                <Button variant="outline" className="border-border-strong bg-surface hover:bg-surface-hover" disabled={busy} onClick={() => void closeTask(task, question || label === "paused" ? "cancel" : "complete")}>
-                  {question || label === "paused" ? "Cancel task" : "Mark complete"}
-                </Button>
-                <Button variant="ghost" className="text-muted-foreground hover:bg-surface-hover" onClick={() => navigateToApp(`/${task.id}`)}>Details</Button>
-              </div>
-              {open && (
-                <div className="flex flex-col gap-3 border-t border-border pt-[18px]">
-                  <div className="flex flex-wrap gap-2">
-                    {replies.map((reply) => (
-                      <Button key={reply} variant="outline" size="sm" className="h-[26px] border-border bg-surface-muted px-[11px] font-mono text-xs font-normal text-muted-foreground hover:bg-surface-hover" onClick={() => setDrafts((current) => ({ ...current, [task.id]: reply }))}>
-                        {reply}
-                      </Button>
-                    ))}
-                  </div>
-                  <Textarea
-                    className="min-h-24 bg-background px-3.5 py-3 text-sm leading-[1.55]"
-                    aria-label={`Reply to ${taskTitle(task)}`}
-                    value={drafts[task.id] ?? ""}
-                    onChange={(event) => setDrafts((current) => ({ ...current, [task.id]: event.target.value }))}
+             >
+                {freshIds.has(task.id) && <FreshEdge />}
+                <CardHeader>
+                  <CardTitle className="flex flex-wrap items-center gap-2.5">
+                    <StateChip label={label} tone={tone} />
+                    {taskTitle(task)}
+                    {/* The project is a tag on the task, not a description of
+                        it: CardDescription's 16px body would outrank the 15px
+                        title sitting above it. */}
+                    {task.projectId && <Badge variant="outline">{safeText(task.projectId)}</Badge>}
+                  </CardTitle>
+                  <CardAction>
+                    <time className="text-aux text-muted-foreground" dateTime={task.updatedAt}>{formatRelative(task.updatedAt, now)}</time>
+                  </CardAction>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2">
+                  <LightMarkdown
+                    markdown={text}
+                    compact
+                    className={cn("max-w-[78ch] text-body text-pretty", isLong && !isExpanded && "clamp-four")}
                   />
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <Button className="hover:bg-primary-hover" disabled={busy || !drafts[task.id]?.trim()} onClick={() => void sendReply(task)}>{busy ? "Sending…" : "Send reply"}</Button>
-                    {errors[task.id] && <span role="alert" className="text-xs text-destructive-fg">{safeText(errors[task.id])}</span>}
-                  </div>
-                </div>
-              )}
-              {!open && errors[task.id] && <span role="alert" className="text-xs text-destructive-fg">{safeText(errors[task.id])}</span>}
+                  {isLong && (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="h-auto w-fit p-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => setExpanded((current) => toggleSet(current, task.id))}
+                    >
+                      {isExpanded ? "show less" : "show all"}
+                    </Button>
+                  )}
+                </CardContent>
+                <CardFooter className="flex-wrap">
+                  <Button onClick={() => setReplyOpen((current) => ({ ...current, [task.id]: !open }))}>
+                    {open ? "Close reply" : question ? "Answer" : "Reply"}
+                  </Button>
+                  <Button variant="outline" disabled={busy} onClick={() => void closeTask(task, question || label === "paused" ? "cancel" : "complete")}>
+                    {question || label === "paused" ? "Cancel task" : "Mark complete"}
+                  </Button>
+                  <Button variant="ghost" onClick={() => navigateToApp(`/${task.id}`)}>Details</Button>
+                </CardFooter>
+                {open && (
+                  <CardFooter className="flex-col items-stretch gap-3 border-t">
+                    <div className="flex flex-wrap gap-2">
+                      {replies.map((reply) => (
+                        <Button key={reply} variant="outline" size="sm" onClick={() => setDrafts((current) => ({ ...current, [task.id]: reply }))}>
+                          {reply}
+                        </Button>
+                      ))}
+                    </div>
+                    <Textarea
+                      className="min-h-24"
+                      aria-label={`Reply to ${taskTitle(task)}`}
+                      value={drafts[task.id] ?? ""}
+                      onChange={(event) => setDrafts((current) => ({ ...current, [task.id]: event.target.value }))}
+                    />
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <Button disabled={busy || !drafts[task.id]?.trim()} onClick={() => void sendReply(task)}>
+                        {busy && <Spinner />}
+                        {busy ? "Sending…" : "Send reply"}
+                      </Button>
+                    </div>
+                    {errors[task.id] && <ReplyError message={errors[task.id]} />}
+                  </CardFooter>
+                )}
+                {!open && errors[task.id] && (
+                  <CardContent><ReplyError message={errors[task.id]} /></CardContent>
+                )}
+             </Card>
             </article>
           );
         })}
-        {!needsYou.length && <p className="text-[15px] leading-[1.6] text-muted-foreground">Quiet. Nothing is waiting on you.</p>}
+        {!needsYou.length && (
+          <Card className="py-0">
+            <EmptyState>
+              <EmptyStateTitle>Nothing is waiting on you</EmptyStateTitle>
+              <EmptyStateDescription>Questions and reports that need an answer show up here.</EmptyStateDescription>
+            </EmptyState>
+          </Card>
+        )}
       </section>
 
       <section className="flex flex-col gap-[18px]" aria-labelledby="running-heading">
@@ -178,36 +208,50 @@ export function Board({
           <SectionHeading id="running-heading">Running</SectionHeading>
           {state.maxWorkers > 0 && <span className="font-mono text-[11px] text-subtle-foreground">{running.length} of {state.maxWorkers} at once</span>}
         </div>
-        <div className="overflow-hidden rounded-[14px] border border-border bg-surface">
-          {!running.length && <p className="px-[22px] py-5 text-sm text-muted-foreground">No worker is running.</p>}
-          {running.map((task) => {
+        <Card className="gap-0 py-0">
+          {!running.length ? (
+            <EmptyState>
+              <EmptyStateTitle>No worker is running</EmptyStateTitle>
+              <EmptyStateDescription>A task appears here while someone is carrying it out.</EmptyStateDescription>
+            </EmptyState>
+          ) : running.map((task, rowIndex) => {
             const current = task.lastDecision ? factBody(task.lastDecision) : undefined;
             const phase = current ? current.body || current.title : "Working on your request";
             return (
-              <div key={task.id} className="relative flex flex-wrap items-center gap-2.5 border-t border-border-subtle px-[22px] py-5 first:border-t-0">
-                {freshIds.has(task.id) && <FreshEdge />}
-                <button type="button" className="text-[15.5px] font-medium decoration-transparent outline-none transition-[color,transform] duration-[var(--dur-fast)] ease-[var(--ease-classical)] hover:underline hover:decoration-current active:translate-y-px focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-ring" onClick={() => navigateToApp(`/${task.id}`)}>{taskTitle(task)}</button>
-                <span className="max-w-[52ch] truncate font-mono text-[11px] text-subtle-foreground">{truncate(phase, 140)}</span>
-                <span className="ml-auto font-mono text-[11.5px]">{formatDuration(now - new Date(task.liveWorker!.since).getTime())}</span>
-              </div>
+              <Fragment key={task.id}>
+                {rowIndex > 0 && <Separator />}
+                <CardContent className="relative flex flex-wrap items-center gap-2.5 py-4">
+                  {freshIds.has(task.id) && <FreshEdge />}
+                  <Button variant="link" className="h-auto p-0 text-foreground" onClick={() => navigateToApp(`/${task.id}`)}>{taskTitle(task)}</Button>
+                  <span className="max-w-[52ch] truncate text-aux text-muted-foreground">{truncate(phase, 140)}</span>
+                  <span className="ml-auto text-aux">{formatDuration(now - new Date(task.liveWorker!.since).getTime())}</span>
+                </CardContent>
+              </Fragment>
             );
           })}
-        </div>
+        </Card>
       </section>
 
       <section className="flex flex-col gap-[18px]" aria-labelledby="resting-heading">
         <SectionHeading id="resting-heading">Resting</SectionHeading>
-        <div className="overflow-hidden rounded-[14px] border border-border bg-surface">
-          {!resting.length && <p className="px-[22px] py-[18px] text-sm text-muted-foreground">Nothing is on a timer.</p>}
-          {resting.map((task) => (
-            <div key={task.id} className="relative flex flex-wrap items-center gap-2.5 border-t border-border-subtle px-[22px] py-[18px] first:border-t-0">
-              {freshIds.has(task.id) && <FreshEdge />}
-              <button type="button" className="text-[15.5px] font-medium outline-none transition-[color,transform] duration-[var(--dur-fast)] ease-[var(--ease-classical)] hover:underline active:translate-y-px focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-ring" onClick={() => navigateToApp(`/${task.id}`)}>{taskTitle(task)}</button>
-              <span className="max-w-[56ch] truncate text-[13.5px] text-muted-foreground">{safeText(task.waiting?.reason ?? latestRestingText(task))}</span>
-              <span className="ml-auto font-mono text-[11px] text-muted-foreground">{restingWhen(task, now)}</span>
-            </div>
+        <Card className="gap-0 py-0">
+          {!resting.length ? (
+            <EmptyState>
+              <EmptyStateTitle>Nothing is on a timer</EmptyStateTitle>
+              <EmptyStateDescription>Tasks waiting on a date or an outside event rest here.</EmptyStateDescription>
+            </EmptyState>
+          ) : resting.map((task, rowIndex) => (
+            <Fragment key={task.id}>
+              {rowIndex > 0 && <Separator />}
+              <CardContent className="relative flex flex-wrap items-center gap-2.5 py-4">
+                {freshIds.has(task.id) && <FreshEdge />}
+                <Button variant="link" className="h-auto p-0 text-foreground" onClick={() => navigateToApp(`/${task.id}`)}>{taskTitle(task)}</Button>
+                <span className="max-w-[56ch] truncate text-aux text-muted-foreground">{safeText(task.waiting?.reason ?? latestRestingText(task))}</span>
+                <span className="ml-auto text-aux text-muted-foreground">{restingWhen(task, now)}</span>
+              </CardContent>
+            </Fragment>
           ))}
-        </div>
+        </Card>
       </section>
     </div>
   );
@@ -217,8 +261,16 @@ export function SectionHeading({ id, children }: { id?: string; children: React.
   return <h2 id={id} className="font-serif text-[25px] font-medium tracking-[-0.01em]">{children}</h2>;
 }
 
-export function StateChip({ label, tone, large = false }: { label: string; tone: ReturnType<typeof taskTone>; large?: boolean }) {
-  return <span className={cn("inline-flex items-center rounded-md font-mono font-semibold", large ? "h-6 px-2.5 text-[11px] uppercase tracking-[0.08em]" : "h-5 px-2 text-[10.5px]", TONE_CLASS[tone])}>{label}</span>;
+export function StateChip({ label, tone }: { label: string; tone: ReturnType<typeof taskTone> }) {
+  return <Badge variant={TONE_BADGE[tone]}>{label}</Badge>;
+}
+
+function ReplyError({ message }: { message: string }) {
+  return (
+    <Alert variant="destructive">
+      <AlertDescription>{safeText(message)}</AlertDescription>
+    </Alert>
+  );
 }
 
 export function FreshEdge() {

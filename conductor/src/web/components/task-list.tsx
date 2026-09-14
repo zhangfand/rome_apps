@@ -1,7 +1,11 @@
 import { useMemo, useState } from "react";
 import { navigateToApp } from "@rome-os/app-web-sdk";
-import { SegmentedControl } from "@rome-os/ui/segmented-control";
+import { Button } from "@rome-os/ui/button";
+import { Card } from "@rome-os/ui/card";
 import { cn } from "@rome-os/ui/cn";
+import { EmptyState, EmptyStateDescription, EmptyStateTitle } from "@rome-os/ui/empty-state";
+import { SegmentedControl } from "@rome-os/ui/segmented-control";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rome-os/ui/table";
 import { bucketTask, latestText, safeText, taskStateLabel, taskTone, TONE_TEXT, type TaskBucket } from "../lib/facts";
 import { formatRelative } from "../lib/format";
 import type { TaskSummary } from "../lib/types";
@@ -28,40 +32,66 @@ export function TaskList({ tasks, now, freshIds }: { tasks: TaskSummary[]; now: 
   const visible = tasks.filter((task) => filter === "All" || bucketTask(task) === FILTER_BUCKET[filter]);
   const options = (Object.keys(counts) as Filter[]).map((value) => ({
     value,
-    label: <span className="inline-flex items-center gap-1.5">{value}<span className="font-mono text-[10.5px] text-current/60">{counts[value]}</span></span>,
+    label: <span className="inline-flex items-center gap-1.5">{value}<span className="text-current/60">{counts[value]}</span></span>,
   }));
 
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-x-auto pb-0.5">
-        <SegmentedControl options={options} value={filter} onValueChange={setFilter} size="sm" aria-label="Filter tasks" className="border border-border bg-surface-muted p-0.5" />
+        <SegmentedControl options={options} value={filter} onValueChange={setFilter} size="sm" aria-label="Filter tasks" />
       </div>
-      <div className="overflow-x-auto rounded-[14px] border border-border bg-surface">
-        <div className="min-w-[760px]">
-          <div className="grid grid-cols-[104px_minmax(0,1fr)_96px_118px_66px] items-center gap-[18px] border-b border-border bg-surface-muted px-5 py-[11px] font-mono text-[10px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">
-            <span>task</span><span>brief · latest</span><span>project</span><span>state</span><span className="text-right">age</span>
-          </div>
-          {visible.map((task) => (
-            <button
-              key={task.id}
-              type="button"
-              className="relative grid w-full grid-cols-[104px_minmax(0,1fr)_96px_118px_66px] items-center gap-[18px] border-b border-border-subtle px-5 py-4 text-left transition-[background-color,border-color,transform] duration-[var(--dur-fast)] ease-[var(--ease-classical)] outline-none last:border-b-0 hover:bg-surface-muted active:translate-y-px focus-visible:border-ring focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-ring"
-              onClick={() => navigateToApp(`/${task.id}`)}
-            >
-              {freshIds.has(task.id) && <FreshEdge />}
-              <span className="truncate font-mono text-[11.5px] text-muted-foreground">{task.id}</span>
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="truncate text-[15px] font-medium">{taskTitle(task)}</span>
-                <span className="truncate text-[13px] text-muted-foreground">{latestText(task)}</span>
-              </span>
-              <span className="truncate font-mono text-[11px] text-muted-foreground">{safeText(task.projectId ?? "—")}</span>
-              <span className={cn("truncate font-mono text-[11px]", TONE_TEXT[taskTone(task)])}>{taskStateLabel(task)}</span>
-              <span className="text-right font-mono text-[11px] text-subtle-foreground">{formatRelative(task.updatedAt, nowMs)}</span>
-            </button>
-          ))}
-          {!visible.length && <p className="px-5 py-6 text-sm text-muted-foreground">No tasks match this filter.</p>}
-        </div>
-      </div>
+      <Card className="overflow-hidden py-0">
+        {visible.length ? (
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead scope="col" className="w-[120px]">Task</TableHead>
+                <TableHead scope="col">Brief · latest</TableHead>
+                <TableHead scope="col" className="w-[110px]">Project</TableHead>
+                <TableHead scope="col" className="w-[120px]">State</TableHead>
+                <TableHead scope="col" className="w-[80px] text-right">Age</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visible.map((task) => (
+                // The row is the mouse target; the title inside it is the real
+                // control, so the keyboard and a screen reader get a single
+                // named link per row rather than a focusable <tr> that reads as
+                // nothing. Clicks on the button bubble to the row handler, so
+                // both paths run the same navigation.
+                <TableRow
+                  key={task.id}
+                  className="relative cursor-pointer"
+                  onClick={() => navigateToApp(`/${task.id}`)}
+                >
+                  <TableCell className="text-muted-foreground">
+                    {freshIds.has(task.id) && <FreshEdge />}
+                    {task.id}
+                  </TableCell>
+                  <TableCell className="max-w-0 whitespace-normal">
+                    <Button
+                      variant="link"
+                      className="h-auto max-w-full justify-start truncate p-0 text-foreground"
+                      onClick={() => navigateToApp(`/${task.id}`)}
+                    >
+                      {taskTitle(task)}
+                    </Button>
+                    <span className="block truncate text-aux text-muted-foreground">{latestText(task)}</span>
+                  </TableCell>
+                  <TableCell className="text-aux text-muted-foreground">{safeText(task.projectId ?? "—")}</TableCell>
+                  <TableCell className={cn("text-aux", TONE_TEXT[taskTone(task)])}>{taskStateLabel(task)}</TableCell>
+                  <TableCell className="text-right text-aux text-muted-foreground">{formatRelative(task.updatedAt, nowMs)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <EmptyState>
+            <EmptyStateTitle>No tasks match this filter</EmptyStateTitle>
+            <EmptyStateDescription>Choose another filter to see the rest of the tasks.</EmptyStateDescription>
+          </EmptyState>
+        )}
+      </Card>
     </div>
   );
 }

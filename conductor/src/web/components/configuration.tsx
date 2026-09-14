@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { fetchAppApi } from "@rome-os/app-web-sdk";
+import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
+import { Badge } from "@rome-os/ui/badge";
 import { Button } from "@rome-os/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@rome-os/ui/card";
+import { Separator } from "@rome-os/ui/separator";
+import { Spinner } from "@rome-os/ui/spinner";
 import { Textarea } from "@rome-os/ui/textarea";
-import { cn } from "@rome-os/ui/cn";
 import { safeText } from "../lib/facts";
 import type { ConfigJson, RuntimeJson } from "../lib/types";
 
@@ -75,72 +79,82 @@ export function Configuration() {
           <h2 className="font-serif text-[22px] font-medium tracking-[-0.01em]">SOP · the workflow, as a prompt</h2>
           <span className="font-mono text-[11px] text-subtle-foreground">takes effect on every open task</span>
         </div>
-        <div className="overflow-hidden rounded-[14px] border border-border bg-surface">
-          <div className="flex items-center gap-2.5 border-b border-border bg-surface-muted px-5 py-2.5">
-            <span className="font-mono text-[10.5px] text-muted-foreground">global sop · markdown · {sop.length.toLocaleString()} chars</span>
-            {dirty && <span className="ml-auto font-mono text-[10.5px] text-warning-fg">unsaved changes</span>}
-          </div>
-          <Textarea
-            className="block min-h-[420px] resize-y rounded-none border-0 bg-surface px-3.5 py-3 font-mono text-xs leading-[1.65] focus-visible:outline-1"
-            value={sop}
-            onChange={(event) => { setSop(event.target.value); setSaved(false); }}
-            aria-label="Global SOP"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-[9px]">
-          <Button className="hover:bg-primary-hover" disabled={saving || !dirty} onClick={() => void updateSop(sop)}>{saving ? "Saving…" : "Save SOP"}</Button>
-          <Button variant="outline" className="border-border-strong bg-surface hover:bg-surface-hover" disabled={saving} onClick={() => void updateSop("", true)}>Revert to built-in</Button>
-          {saved && <span className="text-[11.5px] text-subtle-foreground">Saved.</span>}
-          {error && <span role="alert" className="text-[11.5px] text-destructive-fg">{safeText(error)}</span>}
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex flex-wrap items-center gap-2.5 text-aux font-normal text-muted-foreground">
+              global sop · markdown · {sop.length.toLocaleString()} chars
+              {dirty && <Badge variant="warning" className="ml-auto">unsaved changes</Badge>}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              className="block min-h-[420px] resize-y font-mono text-xs leading-[1.65]"
+              value={sop}
+              onChange={(event) => { setSop(event.target.value); setSaved(false); }}
+              aria-label="Global SOP"
+            />
+          </CardContent>
+          <CardFooter className="flex-wrap">
+            <Button disabled={saving || !dirty} onClick={() => void updateSop(sop)}>
+              {saving && <Spinner />}
+              {saving ? "Saving…" : "Save SOP"}
+            </Button>
+            <Button variant="outline" disabled={saving} onClick={() => void updateSop("", true)}>Revert to built-in</Button>
+            {saved && <span className="text-aux text-muted-foreground">Saved.</span>}
+          </CardFooter>
+          {error && <CardContent><Alert variant="destructive"><AlertDescription>{safeText(error)}</AlertDescription></Alert></CardContent>}
+        </Card>
       </section>
 
       <div className="flex min-w-0 flex-col gap-4">
         <RailSection title="Projects">
-          <div className="overflow-hidden rounded-[14px] border border-border bg-surface">
-            {Object.entries(config.projects).map(([id, project]) => {
+          <Card className="gap-0 py-0">
+            {Object.entries(config.projects).map(([id, project], rowIndex) => {
               const intakeOn = Boolean(project.repo) && project.intakeEnabled !== false;
               const labels = [project.intakeLabel ?? config.intakeLabel, project.projectLabel].filter(Boolean);
               return (
-                <div key={id} className="flex flex-col gap-[3px] border-t border-border-subtle px-3 py-2.5 first:border-t-0">
-                  <div className="flex items-center gap-[7px]">
-                    <span className="text-[13px] font-semibold">{safeText(id)}</span>
-                    {project.sop && <span className="inline-flex h-[18px] items-center rounded-[5px] bg-accent px-[7px] font-mono text-[10px] text-info-fg">own SOP</span>}
-                    <span className={cn("ml-auto inline-flex items-center gap-[5px] font-mono text-[10px]", intakeOn ? "text-success-fg" : "text-subtle-foreground")}>
-                      <span className={cn("size-[5px] rounded-full", intakeOn ? "bg-success" : "bg-subtle-foreground")} />
-                      intake {intakeOn ? "on" : "off"}
-                    </span>
-                  </div>
-                  <span className="truncate font-mono text-[11px] text-subtle-foreground">{safeText(project.workingDir)}</span>
-                  <span className="font-mono text-[11px] text-muted-foreground">{project.repo ? `${safeText(project.repo)} · ${labels.length === 1 ? "label" : "labels"} ${labels.map((label) => `“${safeText(label!)}”`).join(" + ")}` : "no repository · chat intake only"}</span>
-                </div>
+                <Fragment key={id}>
+                  {rowIndex > 0 && <Separator />}
+                  <CardContent className="flex flex-col gap-[3px] py-2.5">
+                    <div className="flex items-center gap-[7px]">
+                      <span className="text-[13px] font-semibold">{safeText(id)}</span>
+                      {project.sop && <Badge variant="info">own SOP</Badge>}
+                      <Badge variant={intakeOn ? "success" : "muted"} className="ml-auto">intake {intakeOn ? "on" : "off"}</Badge>
+                    </div>
+                    <span className="truncate font-mono text-[11px] text-subtle-foreground">{safeText(project.workingDir)}</span>
+                    <span className="font-mono text-[11px] text-muted-foreground">{project.repo ? `${safeText(project.repo)} · ${labels.length === 1 ? "label" : "labels"} ${labels.map((label) => `“${safeText(label!)}”`).join(" + ")}` : "no repository · chat intake only"}</span>
+                  </CardContent>
+                </Fragment>
               );
             })}
-          </div>
+          </Card>
         </RailSection>
 
         <RailSection title="Runtime">
-          <div className="flex flex-col gap-[7px] rounded-[14px] border border-border bg-surface p-3">
+          <Card className="gap-[7px] py-3 [&>*]:px-3">
             {runtimeRows.map(([label, value]) => (
-              <div key={label} className="flex items-baseline gap-2.5">
+              <div key={label} className="flex items-baseline gap-2.5 px-3">
                 <span className="text-[12.5px] text-muted-foreground">{label}</span>
                 <span className="relative -top-[3px] flex-1 border-b border-dotted border-border-strong" />
                 <span className="text-right font-mono text-[11.5px]">{value}</span>
               </div>
             ))}
-            <p className="mt-1 text-[11.5px] leading-[1.45] text-subtle-foreground">Change these with <code className="rounded bg-surface-muted px-1.5 font-mono">conductor:setup</code>.</p>
-          </div>
+            <p className="mt-1 px-3 text-[11.5px] leading-[1.45] text-subtle-foreground">Change these with <code className="rounded bg-surface-muted px-1.5 font-mono">conductor:setup</code>.</p>
+          </Card>
         </RailSection>
 
         <RailSection title="Worker agents">
-          <div className="overflow-hidden rounded-[14px] border border-border bg-surface">
-            {Object.entries(config.workerAgents).map(([id, description]) => (
-              <div key={id} className="flex flex-col gap-0.5 border-t border-border-subtle px-3 py-2.5 first:border-t-0">
-                <span className="font-mono text-[11.5px]">{id}</span>
-                <span className="text-xs leading-[1.45] text-muted-foreground">{safeText(description)}</span>
-              </div>
+          <Card className="gap-0 py-0">
+            {Object.entries(config.workerAgents).map(([id, description], rowIndex) => (
+              <Fragment key={id}>
+                {rowIndex > 0 && <Separator />}
+                <CardContent className="flex flex-col gap-0.5 py-2.5">
+                  <span className="font-mono text-[11.5px]">{id}</span>
+                  <span className="text-xs leading-[1.45] text-muted-foreground">{safeText(description)}</span>
+                </CardContent>
+              </Fragment>
             ))}
-          </div>
+          </Card>
         </RailSection>
       </div>
     </div>
@@ -174,10 +188,12 @@ async function responseError(response: Response): Promise<string> {
 
 function ErrorCard({ message }: { message: string }) {
   return (
-    <div className="flex max-w-[70ch] flex-col gap-3 rounded-[14px] border border-destructive-border bg-destructive-bg p-5">
-      <strong className="text-[15px] text-destructive-fg">The settings could not be read.</strong>
-      <p className="text-sm">{safeText(message)}</p>
-      <p className="text-xs text-muted-foreground">Return to this page after checking that the app is configured.</p>
-    </div>
+    <Alert variant="destructive" className="max-w-[70ch]">
+      <AlertTitle>The settings could not be read.</AlertTitle>
+      <AlertDescription className="flex flex-col gap-2">
+        {safeText(message)}
+        <span className="text-muted-foreground">Return to this page after checking that the app is configured.</span>
+      </AlertDescription>
+    </Alert>
   );
 }

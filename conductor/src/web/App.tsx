@@ -1,6 +1,7 @@
 import "./styles.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchAppApi, getCurrentAppPath, navigateToApp, subscribeToAppPath, type RomeAppBootstrap } from "@rome-os/app-web-sdk";
+import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
 import { Button } from "@rome-os/ui/button";
 import { cn } from "@rome-os/ui/cn";
 import { Board } from "./components/board";
@@ -104,11 +105,13 @@ interface Feed {
 function StateGate({ feed, board = false, children }: { feed: Feed; board?: boolean; children: (state: StateJson) => React.ReactNode }) {
   if (feed.error) {
     return (
-      <div className="flex max-w-[70ch] flex-col gap-3 rounded-[14px] border border-destructive-border bg-destructive-bg p-5 text-foreground">
-        <strong className="text-[15px] font-semibold text-destructive-fg">I couldn't read this app's history.</strong>
-        <p className="text-sm leading-[1.55]">The app's database did not answer. Nothing has been removed. Try again, and if it keeps failing, check that the app is running.</p>
-        <Button variant="outline" className="w-fit border-border-strong bg-surface hover:bg-surface-hover" onClick={() => void feed.load()}>Try again</Button>
-      </div>
+      <Alert variant="destructive" className="max-w-[70ch]">
+        <AlertTitle>I couldn't read this app's history.</AlertTitle>
+        <AlertDescription className="flex flex-col items-start gap-3">
+          The app's database did not answer. Nothing has been removed. Try again, and if it keeps failing, check that the app is running.
+          <Button variant="outline" onClick={() => void feed.load()}>Try again</Button>
+        </AlertDescription>
+      </Alert>
     );
   }
   if (!feed.state) {
