@@ -169,7 +169,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
 
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <div className="flex items-baseline gap-2.5">
-          <h3 className="font-serif text-[22px] font-medium tracking-[-0.01em]">What happened</h3>
+          <h3 className="text-title">What happened</h3>
           <span className="font-mono text-[11px] text-subtle-foreground">{task.facts.length} events</span>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">

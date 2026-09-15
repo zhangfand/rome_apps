@@ -76,7 +76,7 @@ export function Configuration() {
     <div className="grid items-start gap-[18px] md:grid-cols-[minmax(0,1.55fr)_minmax(260px,1fr)]">
       <section className="flex min-w-0 flex-col gap-[9px]">
         <div className="flex flex-wrap items-baseline gap-2.5">
-          <h2 className="font-serif text-[22px] font-medium tracking-[-0.01em]">SOP · the workflow, as a prompt</h2>
+          <h2 className="text-title">SOP · the workflow, as a prompt</h2>
           <span className="font-mono text-[11px] text-subtle-foreground">takes effect on every open task</span>
         </div>
         <Card>
@@ -163,7 +163,7 @@ export function Configuration() {
 }
 
 function RailSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return <section className="flex flex-col gap-2"><h2 className="font-serif text-[22px] font-medium tracking-[-0.01em]">{title}</h2>{children}</section>;
+  return <section className="flex flex-col gap-2"><h2 className="text-title">{title}</h2>{children}</section>;
 }
 
 function coordinatorName(value: string): string {

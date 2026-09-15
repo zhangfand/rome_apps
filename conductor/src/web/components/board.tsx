@@ -258,7 +258,7 @@ export function Board({
 }
 
 export function SectionHeading({ id, children }: { id?: string; children: React.ReactNode }) {
-  return <h2 id={id} className="font-serif text-[25px] font-medium tracking-[-0.01em]">{children}</h2>;
+  return <h2 id={id} className="text-title">{children}</h2>;
 }
 
 export function StateChip({ label, tone }: { label: string; tone: ReturnType<typeof taskTone> }) {

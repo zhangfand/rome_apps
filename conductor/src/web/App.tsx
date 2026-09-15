@@ -124,7 +124,7 @@ function StateGate({ feed, board = false, children }: { feed: Feed; board?: bool
   if (!feed.state.configured) {
     return board ? (
       <div className="flex max-w-[64ch] flex-col gap-3.5 py-10">
-        <h2 className="font-serif text-[32px] font-medium tracking-[-0.015em]">Nothing to conduct yet.</h2>
+        <h2 className="text-display">Nothing to conduct yet.</h2>
         <p className="text-[15px] leading-[1.6] text-muted-foreground">Point Conductor at a working directory and a repository, and it will take in labeled issues from there.</p>
         <pre className="overflow-x-auto rounded-[10px] border border-border bg-surface-muted px-[18px] py-4 font-mono text-[12.5px] leading-[1.7] shadow-[var(--inset-soft)]">{`conductor:setup {
   projects: { playground: {
