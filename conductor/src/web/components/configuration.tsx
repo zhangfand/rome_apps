@@ -119,9 +119,10 @@ export function Configuration() {
                     <div className="flex items-center gap-[7px]">
                       <span className="text-[13px] font-semibold">{safeText(id)}</span>
                       {project.sop && <Badge variant="info">own SOP</Badge>}
+                      {project.workspace === "none" && <Badge variant="muted">no workspace</Badge>}
                       <Badge variant={intakeOn ? "success" : "muted"} className="ml-auto">intake {intakeOn ? "on" : "off"}</Badge>
                     </div>
-                    <span className="truncate font-mono text-[11px] text-subtle-foreground">{safeText(project.workingDir)}</span>
+                    <span className="truncate font-mono text-[11px] text-subtle-foreground">{project.workingDir ? safeText(project.workingDir) : "no working directory"}</span>
                     <span className="font-mono text-[11px] text-muted-foreground">{project.repo ? `${safeText(project.repo)} · ${labels.length === 1 ? "label" : "labels"} ${labels.map((label) => `“${safeText(label!)}”`).join(" + ")}` : "no repository · chat intake only"}</span>
                   </CardContent>
                 </Fragment>

@@ -53,7 +53,7 @@ rejected; an unparseable reply is recorded as `unparsed` with the raw text.
   ledger moved, the decision is refused with the new facts and the
   orchestrator decides again.
 - **Slots and isolation**: `maxWorkers`, one live worker per task, one
-  worktree per worker, heartbeat leases.
+  workspace per worker, heartbeat leases.
 - **Safety valve**: `maxDecisionsPerTurn` decisions since a person last spoke,
   after which the runtime writes a `circuit_breaker` Event and stops waking
   the task until someone replies.
@@ -78,7 +78,10 @@ writes one fact.
 
 ```
 conductor:setup {
-  projects: { playground: { workingDir: "/abs/path", repo: "owner/name", intakeLabel: "conductor" } },
+  projects: {
+    playground: { workingDir: "/abs/path", repo: "owner/name", intakeLabel: "conductor" },
+    research:   { workspace: "none", sop: "..." },
+  },
   sop?: "...",            // omit for the built-in software-development SOP (src/lib/sop.ts)
   workerAgents?: { "coding:coding": "...", "assistant:assistant": "..." },
   maxWorkers?: 3, intervalMinutes?: 5, reuseSessions?: true, maxDecisionsPerTurn?: 25
@@ -117,6 +120,33 @@ POST /api/apps/conductor/tasks/:id/events
 
 Neither route wakes the orchestrator. The next `tick` finds the facts the way it
 finds every other one, so the loop keeps exactly one driver.
+
+## Workspaces
+
+Where a worker works is a per-project capability, not a fact of life.
+`projects[].workspace` picks one:
+
+| kind | what a worker gets | for |
+|---|---|---|
+| `git-worktree` (default) | its own worktree cut from `workingDir`, on branch `conductor/<taskId>/<workerId>`, handed on to the next worker if it ended cleanly | code |
+| `none` | nothing; the prompt says nothing about where to work | tasks whose work is not files — reading, researching, reviewing, answering |
+
+`workingDir` is required for every kind but `none`. The kind is copied into the
+ledger at `Created`, so a task runs its whole life in the world it was opened
+in, even if the project is reconfigured later.
+
+Be honest about what this is: `system:summon` takes no working directory, so a
+worker runs wherever its agent runs. A provider controls what exists on disk
+before the worker starts and what the prompt tells it. `git-worktree` is real
+isolation because the tree is real and the prompt points at it; `none` is the
+absence of both, not a sandbox.
+
+The runtime still fails closed. A `Dispatched` fact always records a workspace,
+`{ kind: "none" }` included, so a worker with no workspace *by design* never
+looks like one whose worktree went missing — the second is still refused.
+
+`src/workspaces/` holds one file per kind, the way `src/adapters/` holds one per
+source. Adding a kind is a file and a line in `src/workspaces/index.ts`.
 
 ## Source adapters
 

@@ -1,4 +1,4 @@
-import type { WorkerWorkspace } from "./worktree.js";
+import type { Workspace } from "./workspaces.js";
 import type { ProjectBinding } from "./projects.js";
 
 /**
@@ -136,7 +136,7 @@ export type DispatchedFact = FactOf<"Dispatched", {
   /** Worker whose session this one continues, if any. */
   resumeWorkerId?: string;
   resumeSessionId?: string;
-  workspace?: WorkerWorkspace;
+  workspace?: Workspace;
   projectId?: string;
   project?: ProjectBinding["project"];
 }>;

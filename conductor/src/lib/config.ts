@@ -1,5 +1,6 @@
 import type { ProjectConfig } from "./projects.js";
 import { DEFAULT_SOP } from "./sop.js";
+import { DEFAULT_WORKSPACE_KIND, WORKSPACE_KINDS, type WorkspaceKind } from "./workspaces.js";
 
 /** Everything `conductor:setup` stores and every action reads back. */
 export interface ConductorConfig {
@@ -73,11 +74,25 @@ export function parseConfig(raw: unknown): ParseConfigResult {
     if (!/^[a-z][a-z0-9_-]*$/.test(id) || ["constructor", "prototype", "__proto__"].includes(id)) return { ok: false, error: `Invalid project id: ${id}` };
     if (!rawProject || typeof rawProject !== "object" || Array.isArray(rawProject)) return { ok: false, error: `Invalid project: ${id}` };
     const p = rawProject as Record<string, unknown>;
-    if (typeof p.workingDir !== "string" || !p.workingDir.trim().startsWith("/") || p.workingDir.includes("\0")) return { ok: false, error: `projects.${id}.workingDir must be an absolute path` };
+    const workspace = p.workspace === undefined || p.workspace === ""
+      ? DEFAULT_WORKSPACE_KIND
+      : (WORKSPACE_KINDS as readonly string[]).includes(String(p.workspace)) ? String(p.workspace) as WorkspaceKind : undefined;
+    if (!workspace) return { ok: false, error: `projects.${id}.workspace must be one of: ${WORKSPACE_KINDS.join(", ")}` };
+    // A working directory is how a worker is given somewhere to work, so every
+    // kind but "none" requires one. "none" may still carry one: it is also how
+    // a chat in that directory picks the project.
+    const hasDir = typeof p.workingDir === "string" && p.workingDir.trim() !== "";
+    if (hasDir && (!(p.workingDir as string).trim().startsWith("/") || (p.workingDir as string).includes("\0"))) {
+      return { ok: false, error: `projects.${id}.workingDir must be an absolute path` };
+    }
+    if (!hasDir && workspace !== "none") {
+      return { ok: false, error: `projects.${id}.workingDir must be an absolute path (omit it only when workspace is "none")` };
+    }
     const repo = p.repo === undefined || p.repo === "" ? undefined : parseRepo(p.repo);
     if (p.repo !== undefined && p.repo !== "" && !repo) return { ok: false, error: `projects.${id}.repo must be owner/name` };
     projects[id] = {
-      workingDir: p.workingDir.trim(),
+      ...(hasDir ? { workingDir: (p.workingDir as string).trim() } : {}),
+      workspace,
       ...(repo ? { repo } : {}),
       ...(typeof p.intakeEnabled === "boolean" ? { intakeEnabled: p.intakeEnabled } : {}),
       ...(typeof p.intakeLabel === "string" && p.intakeLabel.trim() ? { intakeLabel: p.intakeLabel.trim() } : {}),

@@ -1,9 +1,13 @@
 import path from "node:path";
 import type { ConductorConfig } from "./config.js";
+import type { WorkspaceKind } from "./workspaces.js";
 
 export interface ProjectConfig {
-  workingDir: string;
+  /** Absolute path the work happens in. Not needed when `workspace` is "none". */
+  workingDir?: string;
   repo?: string;
+  /** What a worker on this project gets to work in. Defaults to a Git worktree. */
+  workspace?: WorkspaceKind;
   intakeEnabled?: boolean;
   intakeLabel?: string;
   projectLabel?: string;
@@ -11,18 +15,22 @@ export interface ProjectConfig {
   sop?: string;
 }
 
-/** Copied into the ledger at Created, not a pointer to mutable settings. */
+/**
+ * Copied into the ledger at Created, not a pointer to mutable settings — so a
+ * task keeps the workspace kind it was opened under even if the project's
+ * configuration changes later.
+ */
 export interface ProjectBinding {
   projectId: string;
-  project: { workingDir: string; repo?: string };
+  project: { workingDir?: string; repo?: string; workspace?: WorkspaceKind };
 }
 
 export function bindProject(config: ConductorConfig, projectId: string): ProjectBinding {
   if (!Object.hasOwn(config.projects, projectId)) {
     throw new Error(`Unknown project ${JSON.stringify(projectId)}. Choose: ${Object.keys(config.projects).join(", ")}`);
   }
-  const { workingDir, repo } = config.projects[projectId];
-  return { projectId, project: { workingDir, ...(repo ? { repo } : {}) } };
+  const { workingDir, repo, workspace } = config.projects[projectId];
+  return { projectId, project: { ...(workingDir ? { workingDir } : {}), ...(repo ? { repo } : {}), ...(workspace ? { workspace } : {}) } };
 }
 
 /** Explicit choice wins. A selected chat path must map exactly; never fuzzy-match. */
@@ -33,7 +41,7 @@ export function resolveHumanProject(config: ConductorConfig, input: {
   const entries = Object.entries(config.projects);
   if (input.projectPath) {
     const norm = (p: string) => path.normalize(p).replace(/\/+$/, "");
-    const matches = entries.filter(([, p]) => norm(p.workingDir) === norm(input.projectPath!));
+    const matches = entries.filter(([, p]) => p.workingDir && norm(p.workingDir) === norm(input.projectPath!));
     if (matches.length === 1) return bindProject(config, matches[0][0]);
     if (matches.length > 1) throw new Error("Selected chat directory maps to multiple projects; pass projectId explicitly.");
   }

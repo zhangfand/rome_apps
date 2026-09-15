@@ -34,7 +34,7 @@ export interface TaskDetailJson extends TaskSummary {
 export interface StateJson {
   now: string;
   configured: boolean;
-  projects: Record<string, { workingDir: string; repo?: string }>;
+  projects: Record<string, { workingDir?: string; repo?: string; workspace?: string }>;
   maxWorkers: number;
   tickRunning: boolean;
   tasks: TaskSummary[];
@@ -42,7 +42,7 @@ export interface StateJson {
 }
 
 export interface ConfigJson {
-  projects: Record<string, { workingDir: string; repo?: string; intakeLabel?: string; projectLabel?: string; intakeEnabled?: boolean; sop?: string }>;
+  projects: Record<string, { workingDir?: string; repo?: string; workspace?: string; intakeLabel?: string; projectLabel?: string; intakeEnabled?: boolean; sop?: string }>;
   defaultProject?: string;
   sop: string;
   workerAgents: Record<string, string>;

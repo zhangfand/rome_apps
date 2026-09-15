@@ -10,7 +10,8 @@ import { createWorkerHealthRepository } from "../../db/repositories/worker-healt
 import { startHeartbeatTimer } from "../../lib/worker-health.js";
 import { type DispatchedFact, isWorkerTerminalKind } from "../../lib/facts.js";
 import { parseWorkerReply } from "../../lib/worker-reply.js";
-import { validateWorkspace } from "../../lib/worktree.js";
+import { workspaceKind } from "../../lib/workspaces.js";
+import { providerFor } from "../../workspaces/index.js";
 
 interface SummonSessionStartedEvent {
   type: "rome_session_started";
@@ -122,8 +123,11 @@ async function summonWithFallback(input: {
   const { workerId, resumeSessionId, agent, prompt, workspace } = dispatched.payload;
 
   try {
-    if (!workspace) throw new Error("Worker has no isolated worktree; refusing shared-checkout launch");
-    await validateWorkspace(workspace);
+    // A workspace is always recorded, `{ kind: "none" }` included, so an absent
+    // one means the dispatch never prepared what it promised — still a refusal,
+    // never a quiet fall back to the shared checkout.
+    if (!workspace) throw new Error("Worker has no workspace recorded; refusing to launch");
+    await providerFor(workspaceKind(workspace)).validate(workspace);
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err), restarted: false };
   }

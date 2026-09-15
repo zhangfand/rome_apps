@@ -1,7 +1,7 @@
 # Portability audit: what in the runtime is still software-development-specific
 
 Date: 2026-09-11. No code was changed for this audit.
-Updated 2026-09-14: proposal 2 is done — see "Status" at the end.
+Updated 2026-09-14: proposals 2 and 1 are done — see "Status" at the end.
 
 The core loop — ledger, fold, decisions with `seenSeq`, `tick` / `orchestrate`,
 worker heartbeats, the semi-structured worker reply — knows nothing about git,
@@ -10,22 +10,21 @@ are currently baked in rather than pluggable, plus some prompt wording.
 
 | area | file(s) | status | what is dev-specific |
 |---|---|---|---|
-| Worker workspace | `actions/dispatch`, `lib/worktree.ts` | **hard dependency** | Every dispatch creates a git worktree from `project.workingDir`; a project without a git repo cannot dispatch at all. This is the one real blocker for non-dev use. |
-| Worker prompt framing | `lib/prompts.ts` → `workspaceInstructions` | dev wording in every worker prompt | Worktree / branch / LFS instructions are appended unconditionally. |
+| ~~Worker workspace~~ | ~~`actions/dispatch`, `lib/worktree.ts`~~ | **done 2026-09-14** | `projects[].workspace: "git-worktree" \| "none"`. Providers live in `src/workspaces/`; the loop asks one to prepare and validate and never learns which it got. |
+| ~~Worker prompt framing~~ | ~~`lib/prompts.ts`~~ | **done 2026-09-14** | The workspace block comes from the provider; `none` adds no section at all. |
 | ~~Task intake~~ | ~~`lib/intake.ts`, `actions/tick`~~ | **done 2026-09-14** | Any source opens a task through `lib/ingest.ts`, over HTTP or as an adapter. GitHub moved to `adapters/github/`. |
 | ~~External events~~ | ~~`lib/observe.ts`, `lib/observe-prs.ts`~~ | **done 2026-09-14** | Same seam; `POST tasks/:id/events` and adapter polls are one path. |
 | Facts | `lib/facts.ts` | neutral since 2026-09-14 | `Created.origin` (TaskOrigin) replaced the GitHub-shaped `issue`, which is still read for facts already in the ledger. `Dispatched.workspace` is still git-shaped. |
-| Config | `lib/config.ts` | dev defaults | `projects[].workingDir` required and must be an absolute path; `repo` / `intakeLabel`; default `workerAgents` are `coding:coding` + `assistant:assistant`; default SOP is software development. |
-| Orchestrator system prompt | `agents/orchestrator.yaml` | dev wording | "runs in an isolated checkout", "GitHub issue closing; on a PR … reviews, comments, checks, merge", "may have pushed a branch or opened a PR". |
+| Config | `lib/config.ts` | dev defaults | `workingDir` is now required only when the workspace kind needs one. Default `workerAgents` are still `coding:coding` + `assistant:assistant` and the default SOP is still software development. |
+| Orchestrator system prompt | `agents/orchestrator.yaml` | partly done | The checkout sentence moved to the wake prompt, emitted by the project's workspace provider. Still dev-worded: "GitHub issue closing; on a PR … reviews, comments, checks, merge", "may have pushed a branch or opened a PR" — those belong to proposal 3, where adapters emit their own notes. |
 | Front-desk agent, UI | `agents/conductor.yaml`, `web/` | dev wording | Mentions GitHub issue intake; repo badge on task rows. |
 | `create` action | `actions/create` | harmless | Duplicate check by GitHub issue URL in the brief. |
 
 ## Proposed changes (not done)
 
-1. **Workspace as a per-project capability.** `projects[].workspace:
-   "git-worktree" | "directory" | "none"`. `none`: dispatch creates nothing and
-   the worker prompt carries no workspace block. `directory`: a plain scratch
-   directory per worker, no git. `git-worktree`: today's behaviour.
+1. ~~**Workspace as a per-project capability.**~~ **Done 2026-09-14**, with two
+   kinds rather than three — see Status below. `directory` was left out until a
+   task actually needs files without Git.
 2. ~~**Generic task and event entry points.**~~ **Done 2026-09-14** — see
    Status below.
 3. **Adapter-generated runtime notes in the orchestrator prompt.** The system
@@ -80,3 +79,39 @@ Decisions taken, and their cost:
 
 Still open, unchanged by this: the git worktree hard dependency (proposal 1),
 adapter-generated prompt notes (3), and a non-development SOP run end to end (4).
+
+
+## Status 2026-09-14: workspaces as a capability (proposal 1)
+
+Built:
+
+- `src/lib/workspaces.ts` — the seam: `WorkspaceKind`, the stored `Workspace`
+  shapes, the `WorkspaceProvider` interface (`prepare` / `validate` /
+  `instructions` / `note`), and `handedOverWorkspace`, which is about the ledger
+  rather than any kind and so does not belong to a provider.
+- `src/workspaces/git-worktree.ts` — the former `lib/worktree.ts`, now the only
+  place in Conductor that runs Git. `src/workspaces/none.ts` prepares nothing.
+  `src/workspaces/index.ts` is the registry.
+- `projects[].workspace`, defaulting to `git-worktree`; `workingDir` required
+  only when the kind needs one. The kind is copied into the `Created` binding.
+- `dispatch`, `run_worker` and both prompts go through the provider. The
+  orchestrator's system prompt no longer claims every worker gets a checkout;
+  the wake says it when the project's provider does.
+
+Decisions taken, and their cost:
+
+- **Two kinds, not three.** `directory` (scratch files, no Git) was designed and
+  dropped: nothing needs it yet, and an unused third provider is a third thing
+  to keep true. The registry makes adding it later a file and a line.
+- **The kind is a snapshot, not a pointer.** A task dispatches into the world it
+  was opened in, matching how the project binding already worked. Reconfiguring
+  a project does not move tasks already running.
+- **Absent is still an error.** `{ kind: "none" }` is recorded explicitly so the
+  runtime can keep refusing a worker whose workspace went missing, rather than
+  quietly launching it in the shared checkout.
+- **Not verified end to end.** Unit tests cover the seam, the config, the
+  hand-over rules and both prompts; no non-development task has been run through
+  a `none` project yet. That run is proposal 4, still open.
+
+Still open: adapter-generated runtime notes in the orchestrator prompt (3), and
+a non-development SOP run end to end (4).

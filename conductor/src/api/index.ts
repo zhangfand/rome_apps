@@ -38,7 +38,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         return json({
           now: now.toISOString(),
           configured: Boolean(config),
-          projects: config ? Object.fromEntries(Object.entries(config.projects).map(([id, p]) => [id, { workingDir: p.workingDir, repo: p.repo }])) : {},
+          projects: config ? Object.fromEntries(Object.entries(config.projects).map(([id, p]) => [id, { workingDir: p.workingDir, repo: p.repo, workspace: p.workspace }])) : {},
           maxWorkers: config?.maxWorkers ?? 0,
           tickRunning: Boolean(lock && lock.heldUntil > now.getTime()),
           tasks: snapshot.tasks.map((task) => taskSummary(task, now)),

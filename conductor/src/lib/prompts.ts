@@ -3,7 +3,8 @@ import { sopFor } from "./config.js";
 import { describeFact } from "./facts.js";
 import type { TaskView } from "./fold.js";
 import { replyInstructions } from "./worker-reply.js";
-import { type WorkerWorkspace, workspaceInstructions } from "./worktree.js";
+import { providerFor } from "../workspaces/index.js";
+import { projectWorkspaceKind, type Workspace, workspaceKind } from "./workspaces.js";
 
 /**
  * The worker's prompt. The orchestrator writes the instructions; the runtime
@@ -13,7 +14,7 @@ import { type WorkerWorkspace, workspaceInstructions } from "./worktree.js";
 export function buildWorkerPrompt(input: {
   task: TaskView;
   instructions: string;
-  workspace: WorkerWorkspace;
+  workspace: Workspace;
   /** True when the worker continues a session that already holds the framing. */
   resuming: boolean;
 }): string {
@@ -32,9 +33,18 @@ export function buildWorkerPrompt(input: {
     );
   }
   lines.push("## Instructions from the orchestrator", instructions, "");
-  lines.push(workspaceInstructions(workspace), "");
+  // A workspace kind with nothing to say adds no section: a worker on a task
+  // that touches no files is never told about checkouts or branches.
+  const workspaceBlock = providerFor(workspaceKind(workspace)).instructions(workspace);
+  if (workspaceBlock) lines.push(workspaceBlock, "");
   lines.push(replyInstructions());
   return lines.join("\n");
+}
+
+/** What this project's workspace kind wants the orchestrator to know, if anything. */
+function workspaceNote(task: TaskView): string {
+  const note = providerFor(projectWorkspaceKind(task.project)).note();
+  return note ? ` ${note}` : "";
 }
 
 /**
@@ -57,7 +67,7 @@ export function buildOrchestratorPrompt(input: {
     "",
     `Now: ${now.toISOString()}`,
     `Why you were woken: ${why}`,
-    `Project: ${task.projectId ?? "(none)"}${task.project?.repo ? ` (GitHub ${task.project.repo})` : ""}. Workers get their own checkout; you need not tell them where.`,
+    `Project: ${task.projectId ?? "(none)"}${task.project?.repo ? ` (GitHub ${task.project.repo})` : ""}.${workspaceNote(task)}`,
     `Requested by: ${task.createdBy}`,
     `Live worker: ${task.liveWorker ? `${task.liveWorker.workerId} (${task.liveWorker.agent}, since ${task.liveWorker.startedAt.toISOString()})` : "none"}`,
     `Free worker slots: ${freeSlots} of ${config.maxWorkers}`,

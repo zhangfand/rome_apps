@@ -6,6 +6,7 @@ import {
   type AppActionRuntimeDeps,
   type RomeAppContext,
 } from "@rome-os/app-runtime";
+import { WORKSPACE_KINDS } from "../../lib/workspaces.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import { createLedgerRepository } from "../../db/repositories/ledger.js";
 import { createLockRepository, TICK_LOCK } from "../../db/repositories/lock.js";
@@ -38,11 +39,13 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       properties: {
         projects: {
           type: "object",
-          description: "Named projects. Each has workingDir (absolute, inside a Git repo), optional repo (owner/name; enables issue intake), intakeEnabled, intakeLabel, projectLabel, and sop (project-specific SOP prompt).",
+          description: "Named projects. Each has workingDir (absolute; inside a Git repo unless workspace is \"none\"), optional workspace (\"git-worktree\" default, or \"none\" for work that touches no files), repo (owner/name; enables issue intake), intakeEnabled, intakeLabel, projectLabel, and sop (project-specific SOP prompt).",
           additionalProperties: {
-            type: "object", required: ["workingDir"], additionalProperties: false,
+            type: "object", additionalProperties: false,
             properties: {
-              workingDir: { type: "string" }, repo: { type: "string" },
+              workingDir: { type: "string" },
+              workspace: { type: "string", enum: [...WORKSPACE_KINDS], description: "What a worker on this project works in. \"git-worktree\" (default) cuts an isolated checkout and needs a Git repository; \"none\" prepares nothing, for tasks whose work is not files." },
+              repo: { type: "string" },
               intakeEnabled: { type: "boolean" }, intakeLabel: { type: "string" }, projectLabel: { type: "string" },
               sop: { type: "string" },
             },

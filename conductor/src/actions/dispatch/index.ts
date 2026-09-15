@@ -5,16 +5,17 @@ import { loadOpenTask, readDecisionInput } from "../../lib/decision.js";
 import { type DispatchedFact, ORCHESTRATOR } from "../../lib/facts.js";
 import { fold, sessionLeftBy } from "../../lib/fold.js";
 import { buildWorkerPrompt } from "../../lib/prompts.js";
-import { prepareWorkspace, reusableWorkspace } from "../../lib/worktree.js";
+import { handedOverWorkspace, projectWorkspaceKind } from "../../lib/workspaces.js";
+import { providerFor } from "../../workspaces/index.js";
 
 const log = createAppLogger("conductor:dispatch");
 
 /**
  * The orchestrator starts a worker. The runtime's part is mechanical: check
- * the slot budget, prepare an isolated worktree, frame the orchestrator's
- * instructions into a worker prompt, record the Dispatched fact, and launch
- * run_worker detached. What the worker is told to do is entirely the
- * orchestrator's.
+ * the slot budget, prepare whatever workspace the project asks for, frame the
+ * orchestrator's instructions into a worker prompt, record the Dispatched
+ * fact, and launch run_worker detached. What the worker is told to do is
+ * entirely the orchestrator's; where it works is entirely the project's.
  */
 export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): Action {
   const { appContext } = deps;
@@ -54,7 +55,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       if (task.liveWorker) {
         return { status: "error", error: `worker ${task.liveWorker.workerId} is live on this task; call conductor:stop first if it must change course, or wait for it to return` };
       }
-      if (!task.project) return { status: "error", error: "task has no project binding; it cannot be given a worktree" };
+      if (!task.project) return { status: "error", error: "task has no project binding; it cannot be given a workspace" };
 
       const ledger = createLedgerRepository(appContext.db);
       const running = fold(new Date(), ledger.all()).tasks.filter((t) => t.liveWorker).length;
@@ -66,13 +67,16 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       if (resumeWorkerId && settings.reuseSessions) resumeSessionId = sessionLeftBy(task, resumeWorkerId);
 
       const workerId = `w-${crypto.randomUUID().slice(0, 8)}`;
+      // The kind comes from the binding recorded at Created, not from current
+      // settings: a task runs its whole life in the world it was opened in.
+      const kind = projectWorkspaceKind(task.project);
       let workspace;
       try {
-        workspace = await prepareWorkspace({
-          workingDir: task.project.workingDir, taskId: task.id, workerId, previous: reusableWorkspace(task.facts),
+        workspace = await providerFor(kind).prepare({
+          project: task.project, taskId: task.id, workerId, previous: handedOverWorkspace(task.facts),
         });
       } catch (err) {
-        return { status: "error", error: `Could not prepare an isolated worktree: ${err instanceof Error ? err.message : String(err)}` };
+        return { status: "error", error: `Could not prepare a ${kind} workspace: ${err instanceof Error ? err.message : String(err)}` };
       }
       const prompt = buildWorkerPrompt({ task, instructions, workspace, resuming: Boolean(resumeSessionId) });
 
@@ -87,8 +91,15 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
 
       // Detached: the worker's run is a root execution with its own lifetime.
       const receipt = await appContext.runAction("conductor:run_worker", { taskId: task.id, workerId }, { detached: true });
-      log.info("worker dispatched", { taskId: task.id, workerId, agent, resumed: Boolean(resumeSessionId), executionId: receipt.executionId });
-      return { status: "ok", data: { taskId: task.id, wrote: "Dispatched", seq: written.seq, workerId, agent, resumed: Boolean(resumeSessionId), workingDir: workspace.workingDir } };
+      log.info("worker dispatched", { taskId: task.id, workerId, agent, workspace: kind, resumed: Boolean(resumeSessionId), executionId: receipt.executionId });
+      return {
+        status: "ok",
+        data: {
+          taskId: task.id, wrote: "Dispatched", seq: written.seq, workerId, agent, workspace: kind,
+          resumed: Boolean(resumeSessionId),
+          ...(workspace.kind === "none" ? {} : { workingDir: workspace.workingDir }),
+        },
+      };
     },
   };
 }

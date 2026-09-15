@@ -3,19 +3,50 @@ import { createHash } from "node:crypto";
 import { mkdir, realpath } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { Fact } from "./facts.js";
+import {
+  type GitWorktreeWorkspace,
+  type PrepareWorkspaceInput,
+  type Workspace,
+  type WorkspaceProvider,
+} from "../lib/workspaces.js";
 
 const exec = promisify(execFile);
 
-export interface WorkerWorkspace {
-  /** Canonical shared Git metadata directory, used to verify repository identity. */
-  commonDir: string;
-  root: string;
-  workingDir: string;
-  /** Initial branch; workers may rename it when publishing their result. */
-  branch: string;
-  baseCommit: string;
-}
+/**
+ * A worktree of its own per worker, cut from the project's checkout: real
+ * isolation, because two workers editing one tree would overwrite each other
+ * and because a worker that dies must leave its work where the next one can
+ * pick it up.
+ *
+ * This provider is the only place in Conductor that runs Git.
+ */
+export const gitWorktreeProvider: WorkspaceProvider = {
+  kind: "git-worktree",
+
+  async prepare(input: PrepareWorkspaceInput): Promise<Workspace> {
+    const workingDir = input.project.workingDir;
+    if (!workingDir) throw new Error("a git-worktree project needs a workingDir");
+    return await prepareWorkspace({
+      workingDir,
+      taskId: input.taskId,
+      workerId: input.workerId,
+      previous: input.previous && input.previous.kind !== "none" ? input.previous : undefined,
+    });
+  },
+
+  async validate(workspace: Workspace): Promise<void> {
+    if (workspace.kind === "none") throw new Error("expected a git worktree, found none");
+    await validateWorkspace(workspace);
+  },
+
+  instructions(workspace: Workspace): string {
+    return workspace.kind === "none" ? "" : workspaceInstructions(workspace);
+  },
+
+  note(): string {
+    return "Workers get their own checkout; you need not tell them where.";
+  },
+};
 
 async function git(cwd: string, ...args: string[]): Promise<string> {
   const result = await exec("git", ["-C", cwd, ...args], {
@@ -35,19 +66,8 @@ async function repository(directory: string) {
   return { root, commonDir, relativeDir: path.relative(root, workingDir) };
 }
 
-/** Only the latest worker can hand over a tree. Lost means it may still write. */
-export function reusableWorkspace(facts: readonly Fact[]): WorkerWorkspace | undefined {
-  const ordered = [...facts].sort((a, b) => a.seq - b.seq);
-  const previous = ordered.filter((fact) => fact.kind === "Dispatched").at(-1);
-  if (!previous || previous.kind !== "Dispatched") return undefined;
-  const terminal = ordered.find((fact) => fact.seq > previous.seq &&
-    (fact.kind === "Returned" || fact.kind === "Failed" || fact.kind === "Lost") &&
-    fact.payload.workerId === previous.payload.workerId);
-  return terminal && terminal.kind !== "Lost" ? previous.payload.workspace : undefined;
-}
-
 /** Fail closed: never fall back to the shared checkout or recreate a missing tree. */
-export async function validateWorkspace(workspace: WorkerWorkspace): Promise<void> {
+export async function validateWorkspace(workspace: GitWorktreeWorkspace): Promise<void> {
   const actual = await repository(workspace.workingDir);
   if (actual.root !== workspace.root || actual.commonDir !== workspace.commonDir ||
       await realpath(workspace.root) !== workspace.root) {
@@ -71,8 +91,8 @@ export async function prepareWorkspace(input: {
   workingDir: string;
   taskId: string;
   workerId: string;
-  previous?: WorkerWorkspace;
-}): Promise<WorkerWorkspace> {
+  previous?: GitWorktreeWorkspace;
+}): Promise<GitWorktreeWorkspace> {
   const repo = await repository(input.workingDir);
   if (input.previous) {
     if (input.previous.commonDir !== repo.commonDir ||
@@ -106,13 +126,13 @@ export async function prepareWorkspace(input: {
   await git(repo.root,
     "-c", "filter.lfs.process=", "-c", "filter.lfs.smudge=", "-c", "filter.lfs.required=false",
     "worktree", "add", "-b", branch, root, baseCommit);
-  const workspace = { commonDir: repo.commonDir, root, workingDir: path.join(root, repo.relativeDir), branch, baseCommit };
+  const workspace: GitWorktreeWorkspace = { kind: "git-worktree", commonDir: repo.commonDir, root, workingDir: path.join(root, repo.relativeDir), branch, baseCommit };
   await validateWorkspace(workspace);
   return workspace;
 }
 
 /** This block is repeated on resumes too: a session may remember an old cwd. */
-export function workspaceInstructions(workspace: WorkerWorkspace): string {
+export function workspaceInstructions(workspace: GitWorktreeWorkspace): string {
   return [
     "Worker workspace (authoritative for this run):",
     `Working directory: ${workspace.workingDir}`,
