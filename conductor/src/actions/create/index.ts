@@ -4,8 +4,8 @@ import { writePersonFact } from "../../lib/person-fact.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import { resolveHumanProject } from "../../lib/projects.js";
 import { createLedgerRepository } from "../../db/repositories/ledger.js";
-import { trackedIssueUrls } from "../../lib/intake.js";
-import { issueRefsIn } from "../../lib/github-refs.js";
+import { trackedIssueUrls } from "../../adapters/github/intake.js";
+import { issueRefsIn } from "../../adapters/github/refs.js";
 import { fold } from "../../lib/fold.js";
 
 /** Opens a task with a Created fact. The only way a task comes into being from chat. */

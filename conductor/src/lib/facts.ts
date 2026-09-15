@@ -66,7 +66,32 @@ export interface FactHeader {
 
 type FactOf<K extends FactKind, P> = FactHeader & { kind: K; payload: P };
 
-/** The issue a task was opened from, as the intake poll saw it. */
+/**
+ * Where a task came from, when it was not a person typing in chat. Domain-free
+ * on purpose: an adapter names itself in `source` and identifies the thing it
+ * saw in `key`, and the ledger holds at most one task per `(source, key)`,
+ * ever. Everything the adapter wants to keep about that thing goes in `data`,
+ * where only that adapter has to understand it.
+ */
+export interface TaskOrigin {
+  /** Adapter slug: `github`, `email`, `orders`, … */
+  source: string;
+  /** Stable id inside that source. The intake dedupe key. */
+  key: string;
+  /** Where a person can go and look at it. */
+  url?: string;
+  title?: string;
+  /** Who asked, named inside the source system (a GitHub login, an address). */
+  actor?: string;
+  /** Whatever else the adapter needs, opaque to everyone else. */
+  data?: Record<string, unknown>;
+}
+
+/**
+ * The issue a task was opened from. Superseded by {@link TaskOrigin}; facts
+ * written before the ingest seam still carry it, and an append-only ledger
+ * cannot be rewritten, so {@link originOf} reads both.
+ */
 export interface IssueOrigin {
   url: string;
   repo: string;
@@ -82,6 +107,9 @@ export type CreatedFact = FactOf<"Created", {
   brief: string;
   projectId?: string;
   project?: ProjectBinding["project"];
+  /** Set when a source adapter opened the task rather than a person in chat. */
+  origin?: TaskOrigin;
+  /** Legacy shape of the above, kept for facts already in the ledger. */
   issue?: IssueOrigin;
 }>;
 export type ReplyFact = FactOf<"Reply", { text: string }>;
@@ -151,6 +179,25 @@ export type Fact =
   | OpenedFact | ReturnedFact | FailedFact | LostFact | EventFact;
 
 export type NewFact = Omit<Fact, "seq" | "id" | "createdAt">;
+
+/**
+ * Where a task came from, reading both the current `origin` and the legacy
+ * `issue` field. Callers that need to know "is this the same thing we already
+ * took in" ask this, never the raw payload.
+ */
+export function originOf(created: CreatedFact): TaskOrigin | undefined {
+  if (created.payload.origin) return created.payload.origin;
+  const issue = created.payload.issue;
+  if (!issue) return undefined;
+  return {
+    source: "github",
+    key: issue.url.toLowerCase(),
+    url: issue.url,
+    title: issue.title,
+    actor: issue.author,
+    data: { repo: issue.repo, number: issue.number, label: issue.label },
+  };
+}
 
 export function workerIdOf(fact: Fact): string | undefined {
   switch (fact.kind) {

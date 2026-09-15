@@ -6,10 +6,13 @@ import { createWorkerHealthRepository } from "../db/repositories/worker-health.j
 import { parseConfig } from "../lib/config.js";
 import { type Fact } from "../lib/facts.js";
 import { fold, foldTask, needsAttention, type TaskView } from "../lib/fold.js";
+import { applyIngest, type IngestRequest, planIngest } from "../lib/ingest.js";
 import { HEARTBEAT_LEASE_MS } from "../lib/worker-health.js";
 
 /**
  *   GET state              every task, folded, with its latest decision
+ *   POST tasks             a source opens a task (ingest seam)
+ *   POST tasks/:id/events  a source reports something happened (ingest seam)
  *   GET tasks/:id          one task with every fact
  *   POST tasks/:id/reply   a person's reply, through conductor:reply
  *   POST tasks/:id/complete close as done, through conductor:complete
@@ -74,6 +77,25 @@ class ConductorApiHandler implements RomeAppApiHandler {
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `cancel returned ${result.status}` }, 502);
         return refreshedTask(ledger.factsFor(taskId));
       }
+      // The ingest seam over HTTP. Any system that can reach Rome can open a
+      // task or report an event; it cannot do anything else to the ledger,
+      // because these two routes are the only ones that reach the seam and
+      // the seam writes only `Created` and `Event`. Neither route wakes the
+      // orchestrator: the next tick finds the facts, so the loop keeps one
+      // driver.
+      if (route === "tasks" && request.method === "POST") {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        const body = readJsonBody<Record<string, unknown>>(request);
+        if (!body || typeof body !== "object") return json({ error: "A JSON object is required." }, 400);
+        return this.ingest(settings, ledger, { ...body, op: "open_task" } as unknown as IngestRequest);
+      }
+      if (request.path[0] === "tasks" && request.path[2] === "events" && request.path.length === 3) {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+        const body = readJsonBody<Record<string, unknown>>(request);
+        if (!body || typeof body !== "object") return json({ error: "A JSON object is required." }, 400);
+        return this.ingest(settings, ledger, { ...body, op: "push_event", taskId: request.path[1] } as unknown as IngestRequest);
+      }
       if (route === "config") {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
         if (request.method === "GET") {
@@ -109,6 +131,35 @@ class ConductorApiHandler implements RomeAppApiHandler {
       this.ctx.log.error("conductor api failed", { route, message });
       return json({ error: message }, 500);
     }
+  }
+  /**
+   * One request through the seam. The seam owns every judgement — whether the
+   * source may write, whether this is new, which project it belongs to — so
+   * this method only chooses status codes: 400 for a request the seam refused,
+   * 200 for a fact written and for one that was already there.
+   */
+  private ingest(
+    settings: ReturnType<typeof createSettingsRepository>,
+    ledger: ReturnType<typeof createLedgerRepository>,
+    request: IngestRequest,
+  ): Response {
+    const config = settings.get();
+    if (!config) return json({ error: "Run conductor:setup first." }, 409);
+    if (!ledger.reachable()) return json({ error: "the ledger is unreachable" }, 503);
+    const plans = planIngest({ snapshot: fold(new Date(), ledger.all()), config, requests: [request] });
+    const [outcome] = applyIngest(ledger, plans);
+    if (outcome.status === "rejected") return json({ error: outcome.reason, status: "rejected" }, 400);
+    this.ctx.log.info("ingest", { ...outcome });
+    return json({
+      status: outcome.status,
+      taskId: outcome.taskId,
+      kind: outcome.kind,
+      seq: outcome.seq,
+      reason: outcome.reason,
+      // Said plainly so a caller does not sit waiting for a response that
+      // never comes: nothing happens until the next scheduled pass.
+      pickedUpBy: `the next tick, within ${config.intervalMinutes} minute${config.intervalMinutes === 1 ? "" : "s"}`,
+    });
   }
 }
 

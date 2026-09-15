@@ -115,8 +115,18 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
   const rounds = groupRounds(visible);
   const now = Date.now();
   const created = task.facts.find((item) => item.kind === "Created");
-  const issue = created?.payload.issue && typeof created.payload.issue === "object" ? created.payload.issue as Record<string, unknown> : undefined;
-  const from = task.createdBy.startsWith("github:") ? task.createdBy : "you";
+  // Where the task came from, whichever source opened it. Facts written before
+  // the ingest seam carry the older `issue` shape; both read the same here.
+  const rawOrigin = created?.payload.origin ?? created?.payload.issue;
+  const origin = rawOrigin && typeof rawOrigin === "object" ? rawOrigin as Record<string, unknown> : undefined;
+  const originSource = typeof origin?.source === "string" ? origin.source : origin ? "github" : undefined;
+  const originNumber = typeof origin?.number === "number"
+    ? origin.number
+    : typeof (origin?.data as Record<string, unknown> | undefined)?.number === "number"
+      ? (origin!.data as Record<string, number>).number
+      : undefined;
+  const originLabel = originSource ? ` · ${safeText(originSource)}${originNumber !== undefined ? ` #${originNumber}` : ""}` : "";
+  const from = origin ? task.createdBy : "you";
   const focusComposer = () => {
     composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     composerRef.current?.focus({ preventScroll: true });
@@ -136,7 +146,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3.5 text-aux text-muted-foreground">
           <span>{safeText(task.projectId ?? "no project")}{task.repo ? ` · ${safeText(task.repo)}` : ""}</span>
-          <span>from {safeText(from)}{typeof issue?.number === "number" ? ` · issue #${issue.number}` : ""}</span>
+          <span>from {safeText(from)}{originLabel}</span>
           <span>opened {formatRelative(task.createdAt, now)}</span>
         </CardContent>
         <CardContent>

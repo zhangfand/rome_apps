@@ -1,12 +1,15 @@
-import { type EventFact, type Fact, type NewFact, RUNTIME } from "./facts.js";
-import type { LedgerSnapshot, TaskView } from "./fold.js";
+import type { Fact } from "../../lib/facts.js";
+import type { LedgerSnapshot, TaskView } from "../../lib/fold.js";
+import type { PushEventRequest } from "../../lib/ingest.js";
 
 /**
  * Pull requests as a source of external events. A task that has produced a
  * PR (its URL appears in some fact) is watched: a review, a comment, a
  * completed check run, or a merge on that PR becomes one Event on the task,
- * once. As with issues, the runtime transcribes; the orchestrator decides
- * what a "changes requested" review or a red check means for the task.
+ * once. This module reports everything the poll saw and keys each observation;
+ * the ingest seam is what makes "once" true. As with issues, the adapter
+ * transcribes; the orchestrator decides what a "changes requested" review or a
+ * red check means for the task.
  */
 
 export interface PullRef {
@@ -49,15 +52,6 @@ export function pullsToWatch(snapshot: LedgerSnapshot): Array<{ taskId: string; 
   });
 }
 
-/** Keys of PR events already on the task, so each one is written once. */
-export function recordedKeys(task: TaskView): Set<string> {
-  return new Set(
-    task.facts
-      .filter((f): f is EventFact => f.kind === "Event" && f.payload.source === "github")
-      .map((f) => String(f.payload.data?.key ?? "")),
-  );
-}
-
 /** What the poll learned about one PR. Everything optional: a failed sub-request just yields fewer events. */
 export interface PullObservation {
   state?: "open" | "closed";
@@ -70,15 +64,13 @@ export interface PullObservation {
   checks?: { total: number; completed: number; runs: Array<{ name: string; status: string; conclusion?: string; url?: string }> };
 }
 
-export function pullEvents(task: TaskView, ref: PullRef, seen: PullObservation): NewFact[] {
-  const recorded = recordedKeys(task);
-  const out: NewFact[] = [];
+export function pullEvents(task: TaskView, ref: PullRef, seen: PullObservation): PushEventRequest[] {
+  const out: PushEventRequest[] = [];
   const event = (type: string, key: string, summary: string, data: Record<string, unknown>) => {
-    if (recorded.has(key)) return;
-    recorded.add(key);
     out.push({
-      taskId: task.id, kind: "Event", by: RUNTIME, source: `conductor:tick, polling ${ref.url}`,
-      payload: { source: "github", type, summary, data: { key, url: ref.url, ...data } },
+      op: "push_event", source: "github", taskId: task.id, type, key, summary,
+      cite: `conductor:tick, polling ${ref.url}`,
+      data: { url: ref.url, ...data },
     });
   };
 
@@ -132,18 +124,18 @@ export function pullApiPaths(ref: PullRef): { pull: string; reviews: string; rev
  * declared Lost, whose reply was dropped. Recording it as an Event keeps the
  * ledger honest about what exists in the repository.
  */
-export function unknownTaskPulls(task: TaskView, openPulls: ReadonlyArray<{ url: string; headRef: string }>): NewFact[] {
+export function unknownTaskPulls(task: TaskView, openPulls: ReadonlyArray<{ url: string; headRef: string }>): PushEventRequest[] {
   const known = new Set(pullRefsIn(task).map((r) => r.url));
-  const recorded = recordedKeys(task);
-  const out: NewFact[] = [];
+  const out: PushEventRequest[] = [];
   for (const pr of openPulls) {
     if (!pr.headRef.startsWith(`conductor/${task.id}/`)) continue;
-    if (known.has(pr.url) || recorded.has(`pr_opened:${pr.url}`)) continue;
+    if (known.has(pr.url)) continue;
     const workerId = pr.headRef.split("/")[2];
     out.push({
-      taskId: task.id, kind: "Event", by: RUNTIME, source: "conductor:tick, listing pull requests on the task's branches",
-      payload: { source: "github", type: "pr_opened", summary: `${pr.url} is open from this task's branch ${pr.headRef} (worker ${workerId}); no fact on this task mentioned it yet`,
-        data: { key: `pr_opened:${pr.url}`, url: pr.url, branch: pr.headRef, workerId } },
+      op: "push_event", source: "github", taskId: task.id, type: "pr_opened", key: `pr_opened:${pr.url}`,
+      summary: `${pr.url} is open from this task's branch ${pr.headRef} (worker ${workerId}); no fact on this task mentioned it yet`,
+      cite: "conductor:tick, listing pull requests on the task's branches",
+      data: { url: pr.url, branch: pr.headRef, workerId },
     });
   }
   return out;

@@ -1,25 +1,26 @@
-import { type CreatedFact, githubPerson, type NewFact } from "./facts.js";
-import type { LedgerSnapshot } from "./fold.js";
-import { issueRefsIn } from "./github-refs.js";
-import { routeIssue, type IntakeRoute } from "./projects.js";
+import { type CreatedFact, originOf } from "../../lib/facts.js";
+import type { LedgerSnapshot } from "../../lib/fold.js";
+import type { OpenTaskRequest } from "../../lib/ingest.js";
+import { type IntakeRoute, routeIssue } from "../../lib/projects.js";
+import { issueRefsIn } from "./refs.js";
 
 /**
  * Taking a task in from GitHub. A chat is not the only place a person asks
  * for work: an issue carrying the intake label in a watched repository is the
- * same ask, written down where the code lives. The runtime transcribes it —
- * the issue's title and body become the brief, its author becomes `by`, and
- * the issue is cited as `source` — exactly as `manager:create` records a chat
- * message. It decides nothing about the work.
+ * same ask, written down where the code lives. The adapter transcribes it —
+ * the issue's title and body become the brief, its author becomes the actor,
+ * and the issue is cited — and hands it to the ingest seam, which writes the
+ * `Created` fact. It decides nothing about the work.
  *
- * Everything here is pure. The reconcile action lists the labeled issues and
- * hands them in; this module decides which are new and what to write.
+ * Everything here is pure. The adapter lists the labeled issues and hands them
+ * in; this module decides what to ask for.
  *
- * - One task per issue, ever. An issue that already has a task — opened from
- *   it here, or opened in chat by a person who named it in the brief — is
- *   never taken in again, even after that task ends. Re-labeling an issue
- *   does not reopen work; a person asks in chat for that.
- * - The brief names the issue, so the existing close watch (`observe.ts`)
- *   ends the task when the issue closes. Intake and ending are one contract.
+ * - One task per issue, ever. The seam enforces that on `(github, issue url)`;
+ *   this module adds the case the seam cannot see — an issue a person named in
+ *   a brief they typed in chat, which is the same ask under another door.
+ *   Re-labeling an issue does not reopen work; a person asks in chat for that.
+ * - The brief names the issue, so the close watch (`issues.ts`) ends the task
+ *   when the issue closes. Intake and ending are one contract.
  * - Pull requests answer on the issues endpoint too; they are not asks and
  *   are skipped.
  */
@@ -41,60 +42,67 @@ export interface IntakeIssue {
 
 /**
  * Longest issue body carried into a brief. The brief is stored on every
- * Started and read by every worker; a body past this is cut with a pointer
+ * Created and read by every worker; a body past this is cut with a pointer
  * back to the issue, which the worker can read in full.
  */
 export const MAX_BODY_CHARS = 6000;
 
-/** Issue URLs that already have a task, open or closed. */
+/** The seam's origin key for an issue. */
+export function issueOriginKey(url: string): string {
+  return url.toLowerCase();
+}
+
+/**
+ * Issues that already have a task for a reason the ledger's origin keys do not
+ * record: a person opened the task in chat and named the issue in the brief.
+ * Keyed for the seam (`github:<url>`), valued with the task that holds it.
+ */
+export function claimedIssues(snapshot: LedgerSnapshot): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const task of snapshot.tasks) {
+    for (const ref of issueRefsIn(task.brief)) out.set(`github:${issueOriginKey(ref.url)}`, task.id);
+  }
+  return out;
+}
+
+/** Issue URLs that already have a task, open or closed, however it was opened. */
 export function trackedIssueUrls(snapshot: LedgerSnapshot): Set<string> {
   const urls = new Set<string>();
   for (const task of snapshot.tasks) {
     const created = task.facts.find((fact): fact is CreatedFact => fact.kind === "Created");
-    if (created?.payload.issue) urls.add(created.payload.issue.url.toLowerCase());
-    for (const ref of issueRefsIn(task.brief)) urls.add(ref.url.toLowerCase());
+    const origin = created ? originOf(created) : undefined;
+    if (origin?.source === "github") urls.add(origin.key);
+    for (const ref of issueRefsIn(task.brief)) urls.add(issueOriginKey(ref.url));
   }
   return urls;
 }
 
 /**
- * The Created facts for every labeled issue that has no task yet, in the
- * order GitHub listed them. `newTaskId` is injected so the output is a value
- * tests can compare.
+ * One request per labeled issue the poll saw. Nothing is filtered for novelty
+ * here beyond what is not an ask at all: the seam decides what is new.
  */
-export function intakeFacts(input: {
-  snapshot: LedgerSnapshot;
+export function intakeRequests(input: {
   issues: readonly IntakeIssue[];
   label: string;
   routes?: readonly IntakeRoute[];
-  newTaskId: () => string;
-}): NewFact[] {
-  const { snapshot, issues, label, newTaskId } = input;
-  const tracked = trackedIssueUrls(snapshot);
-  const out: NewFact[] = [];
-  for (const issue of issues) {
+}): OpenTaskRequest[] {
+  const out: OpenTaskRequest[] = [];
+  for (const issue of input.issues) {
     if (issue.isPullRequest || issue.state !== "open") continue;
-    if (tracked.has(issue.url.toLowerCase())) continue;
     const route = input.routes ? routeIssue(input.routes, issue.repo, issue.labels ?? []) : undefined;
     if (input.routes && !route) continue;
-    tracked.add(issue.url.toLowerCase());
+    const label = route?.labels.join(", ") ?? input.label;
     out.push({
-      taskId: newTaskId(),
-      kind: "Created",
-      by: githubPerson(issue.author),
-      source: `issue labeled "${route?.labels.join(", ") ?? label}" on GitHub: ${issue.url}`,
-      payload: {
-        brief: briefFromIssue(issue),
-        ...(route ? { projectId: route.projectId, project: route.project } : {}),
-        issue: {
-          url: issue.url,
-          repo: issue.repo,
-          number: issue.number,
-          title: issue.title,
-          author: issue.author,
-          label: route?.labels.join(", ") ?? label,
-        },
-      },
+      op: "open_task",
+      source: "github",
+      key: issueOriginKey(issue.url),
+      brief: briefFromIssue(issue),
+      actor: issue.author,
+      cite: `issue labeled "${label}" on GitHub: ${issue.url}`,
+      url: issue.url,
+      title: issue.title,
+      data: { repo: issue.repo, number: issue.number, label },
+      ...(route ? { projectId: route.projectId } : {}),
     });
   }
   return out;

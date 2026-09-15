@@ -13,17 +13,18 @@ the same app runs a different kind of work.
 ## The three parties
 
 ```
-person / GitHub ──► ledger ◄── worker (via run_worker)
-                      ▲
-                      │ reads everything, writes one decision
-                 orchestrator
+person / any source ──► ingest seam ──► ledger ◄── worker (via run_worker)
+                                          ▲
+                                          │ reads everything, writes one decision
+                                     orchestrator
 ```
 
 - **Runtime** (`tick`, `orchestrate`, `run_worker`, `dispatch`): observes and
-  transcribes. Expires silent workers (`Lost`), takes labeled issues in
-  (`Created`), records closed issues (`Event`), launches workers, records what
-  they said (`Returned` / `Failed`), and wakes the orchestrator for any open
-  task with facts it has not decided on. It decides nothing about a task.
+  transcribes. Expires silent workers (`Lost`), asks every source adapter what
+  it saw, hands the batch to the ingest seam (`Created` / `Event`), launches
+  workers, records what they said (`Returned` / `Failed`), and wakes the
+  orchestrator for any open task with facts it has not decided on. It decides
+  nothing about a task.
 - **Orchestrator** (`agents/orchestrator.yaml`): woken per task. Gets the SOP,
   every fact on the task, the agents it may use and the free worker slots.
   Records exactly one of `Dispatched / Asked / Reported / Waited / Completed /
@@ -56,6 +57,7 @@ rejected; an unparseable reply is recorded as `unparsed` with the raw text.
 - **Safety valve**: `maxDecisionsPerTurn` decisions since a person last spoke,
   after which the runtime writes a `circuit_breaker` Event and stops waking
   the task until someone replies.
+- **A narrow door** (`lib/ingest.ts`): what the outside may write, below.
 
 ## The prompts, layered
 
@@ -86,15 +88,53 @@ conductor:setup {
 The SOP is editable on the Configuration page; a project may carry its own
 `sop` to override the global one.
 
-## External events the runtime records
+## Where facts come from: the ingest seam
 
-`tick` polls GitHub and writes one `Event` per observation, once (keyed in
-`payload.data.key`): `issue_closed`; on any PR mentioned in the task's facts —
-`pr_review`, `pr_review_comment`, `pr_comment`, `checks_completed`
-(success/failure per head), `pr_merged`, `pr_closed`; and `pr_opened` for any
-open PR whose head branch is `conductor/<taskId>/…` that no fact mentions yet
-(a worker declared Lost may still have pushed). What an event means for the
-task is the orchestrator's call.
+Nothing outside Conductor appends to the ledger. A source — the GitHub poll, an
+order system, a mailbox, a person with curl — hands `lib/ingest.ts` a request,
+and the seam decides whether a fact is written and which one. Three properties
+follow, and they are why the loop can be trusted with input it did not author:
+
+| property | what it means |
+|---|---|
+| a narrower vocabulary than the ledger | a source may `open_task` (`Created`) or `push_event` (`Event`). There is no shape that produces `Dispatched`, `Reported`, `Waited` or `Completed`, so no input can make the runtime appear to have decided something. A person's `Reply` is excluded too: replies come from the guardian's own routes, not from a machine claiming to be a person. |
+| authorship is computed, never accepted | `by` is derived — `source` or `source:actor` for a `Created`, always `runtime` for an `Event`. `runtime` and `orchestrator` are reserved slugs; an Event can never read as a person speaking and reset the circuit breaker. |
+| idempotency is the seam's job | one task per `(source, key)` ever; one event per `(source, key)` per task. A retried webhook, a poll that lists the same issue twice, and two adapters watching one system all write once. |
+
+`tick` never treats a source specially — it iterates `src/adapters/`, hands the
+batch to the seam, then wakes. Over HTTP the same seam is two routes, guardian /
+loopback only for now:
+
+```
+POST /api/apps/conductor/tasks
+  { source, brief, key?, actor?, cite?, url?, title?, data?, projectId? }
+  → { status: recorded|duplicate, taskId, seq?, pickedUpBy }
+
+POST /api/apps/conductor/tasks/:id/events
+  { source, type, summary, key?, cite?, data? }
+  → { status: recorded|duplicate, taskId, seq?, pickedUpBy }
+```
+
+Neither route wakes the orchestrator. The next `tick` finds the facts the way it
+finds every other one, so the loop keeps exactly one driver.
+
+## Source adapters
+
+`src/adapters/<source>/` is one outside world. An adapter reads it and returns
+ingest requests; it holds no ledger handle, writes no fact and wakes nobody.
+Adding a source is a directory plus a line in `src/adapters/index.ts` — no
+change to the loop, the ledger or the prompts.
+
+**`github`** — everything this app knows about issues, pull requests, reviews,
+checks and branch names lives under `src/adapters/github/` and nowhere else.
+It reports, once each: a task per issue carrying the intake label
+(`Created`, author `github:<login>`); `issue_closed` on any issue an open task
+names; on any PR mentioned in the task's facts — `pr_review`,
+`pr_review_comment`, `pr_comment`, `checks_completed` (success/failure per
+head), `pr_merged`, `pr_closed`; and `pr_opened` for any open PR whose head
+branch is `conductor/<taskId>/…` that no fact mentions yet (a worker declared
+Lost may still have pushed). What an event means for the task is the
+orchestrator's call.
 
 ## Scenarios exercised on the playground repo (2026-09-11)
 
