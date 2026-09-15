@@ -134,7 +134,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
 
   return (
     <div className="flex flex-col gap-3.5">
-      <Button variant="ghost" size="xs" className="w-fit px-1.5 font-mono text-[11px] text-muted-foreground hover:bg-surface-hover" onClick={() => navigateToApp("/")}>← back to board</Button>
+      <Button variant="ghost" size="xs" className="w-fit text-muted-foreground" onClick={() => navigateToApp("/")}>← back to board</Button>
 
       <Card>
         <CardHeader>
@@ -239,7 +239,7 @@ function StreamView({ rounds, openEntries, toggle }: { rounds: Array<{ stamp: st
                   {content.body && <LightMarkdown markdown={content.body} className="max-w-[76ch] text-[14.5px] leading-[1.6]" />}
                   {content.extra && (
                     <div>
-                      <Button variant="link" size="sm" className="h-auto w-fit p-0 text-muted-foreground hover:text-foreground" aria-expanded={openEntries.has(item.seq)} onClick={() => toggle(item.seq)}>{openEntries.has(item.seq) ? "hide" : "show"} {expandedTextLabel(item)}</Button>
+                      <Button variant="link" size="xs" className="w-fit px-0 text-muted-foreground hover:text-foreground" aria-expanded={openEntries.has(item.seq)} onClick={() => toggle(item.seq)}>{openEntries.has(item.seq) ? "hide" : "show"} {expandedTextLabel(item)}</Button>
                       {openEntries.has(item.seq) && <pre className="mt-[7px] whitespace-pre-wrap rounded-lg bg-surface-muted p-2.5 font-mono text-[11.5px] leading-[1.55] shadow-[var(--inset-soft)]">{content.extra}</pre>}
                     </div>
                   )}

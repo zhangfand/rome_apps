@@ -71,7 +71,9 @@ export function TaskList({ tasks, now, freshIds }: { tasks: TaskSummary[]; now: 
                   <TableCell className="max-w-0 whitespace-normal">
                     <Button
                       variant="link"
-                      className="h-auto max-w-full justify-start truncate p-0 text-foreground"
+                      size="xs"
+                      align="start"
+                      className="max-w-full truncate px-0 text-foreground"
                       onClick={() => navigateToApp(`/${task.id}`)}
                     >
                       {taskTitle(task)}

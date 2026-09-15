@@ -145,8 +145,8 @@ export function Board({
                   {isLong && (
                     <Button
                       variant="link"
-                      size="sm"
-                      className="h-auto w-fit p-0 text-muted-foreground hover:text-foreground"
+                      size="xs"
+                      className="w-fit px-0 text-muted-foreground hover:text-foreground"
                       onClick={() => setExpanded((current) => toggleSet(current, task.id))}
                     >
                       {isExpanded ? "show less" : "show all"}
@@ -222,7 +222,7 @@ export function Board({
                 {rowIndex > 0 && <Separator />}
                 <CardContent className="relative flex flex-wrap items-center gap-2.5 py-4">
                   {freshIds.has(task.id) && <FreshEdge />}
-                  <Button variant="link" className="h-auto p-0 text-foreground" onClick={() => navigateToApp(`/${task.id}`)}>{taskTitle(task)}</Button>
+                  <Button variant="link" size="xs" className="px-0 text-foreground" onClick={() => navigateToApp(`/${task.id}`)}>{taskTitle(task)}</Button>
                   <span className="max-w-[52ch] truncate text-aux text-muted-foreground">{truncate(phase, 140)}</span>
                   <span className="ml-auto text-aux">{formatDuration(now - new Date(task.liveWorker!.since).getTime())}</span>
                 </CardContent>
@@ -245,7 +245,7 @@ export function Board({
               {rowIndex > 0 && <Separator />}
               <CardContent className="relative flex flex-wrap items-center gap-2.5 py-4">
                 {freshIds.has(task.id) && <FreshEdge />}
-                <Button variant="link" className="h-auto p-0 text-foreground" onClick={() => navigateToApp(`/${task.id}`)}>{taskTitle(task)}</Button>
+                <Button variant="link" size="xs" className="px-0 text-foreground" onClick={() => navigateToApp(`/${task.id}`)}>{taskTitle(task)}</Button>
                 <span className="max-w-[56ch] truncate text-aux text-muted-foreground">{safeText(task.waiting?.reason ?? latestRestingText(task))}</span>
                 <span className="ml-auto text-aux text-muted-foreground">{restingWhen(task, now)}</span>
               </CardContent>
