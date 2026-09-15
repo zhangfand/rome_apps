@@ -133,7 +133,7 @@ function StateGate({ feed, board = false, children }: { feed: Feed; board?: bool
     intakeLabel: "conductor" } }
 }`}</pre>
       </div>
-    ) : <p className="text-sm text-muted-foreground">Nothing to list yet. Run <code className="rounded bg-surface-muted px-1.5 font-mono">conductor:setup</code> first.</p>;
+    ) : <p className="text-ui text-muted-foreground">Nothing to list yet. Run <code className="rounded bg-surface-muted px-1.5 font-mono">conductor:setup</code> first.</p>;
   }
   return <>{children(feed.state)}</>;
 }

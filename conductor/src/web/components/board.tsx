@@ -127,9 +127,9 @@ export function Board({
                   <CardTitle className="flex flex-wrap items-center gap-2.5">
                     <StateChip label={label} tone={tone} />
                     {taskTitle(task)}
-                    {/* The project is a tag on the task, not a description of
-                        it: CardDescription's 16px body would outrank the 15px
-                        title sitting above it. */}
+                    {/* The project is a tag on the task, not a description
+                        of it: it names where the task runs, so it reads as a
+                        chip beside the title rather than as prose under it. */}
                     {task.projectId && <Badge variant="outline">{safeText(task.projectId)}</Badge>}
                   </CardTitle>
                   <CardAction>
@@ -140,7 +140,7 @@ export function Board({
                   <LightMarkdown
                     markdown={text}
                     compact
-                    className={cn("max-w-[78ch] text-body text-pretty", isLong && !isExpanded && "clamp-four")}
+                    className={cn("max-w-[78ch] text-ui text-pretty", isLong && !isExpanded && "clamp-four")}
                   />
                   {isLong && (
                     <Button
