@@ -47,7 +47,7 @@ describe("bucketTask", () => {
 });
 
 describe("user-facing label maps", () => {
-  it("maps every stored kind to the handoff label", () => {
+  it("maps every stored kind to its plain user-facing label", () => {
     expect([
       "Created", "Reply", "Dispatched", "Opened", "Returned", "Waited", "Asked",
       "Reported", "Completed", "Cancelled", "Failed", "Lost", "Event",
