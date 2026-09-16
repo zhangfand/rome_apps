@@ -1,15 +1,19 @@
-import "./styles.css";
+import "./core/styles.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchAppApi, getCurrentAppPath, navigateToApp, subscribeToAppPath, type RomeAppBootstrap } from "@rome-os/app-web-sdk";
 import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
 import { Button } from "@rome-os/ui/button";
 import { cn } from "@rome-os/ui/cn";
-import { Board } from "./components/board";
-import { Configuration } from "./components/configuration";
-import { TaskDetail } from "./components/task-detail";
-import { TaskList } from "./components/task-list";
-import { bucketTask } from "./lib/facts";
-import type { StateJson, TaskSummary } from "./lib/types";
+import { Board } from "./core/components/board";
+import { Configuration } from "./core/components/configuration";
+import { TaskDetail } from "./core/components/task-detail";
+import { TaskList } from "./core/components/task-list";
+import { bucketTask } from "./core/lib/facts";
+import type { StateJson, TaskSummary } from "./core/lib/types";
+import { configureWebDomain } from "./core/domain";
+import { githubWebDomain } from "./domain/github";
+
+configureWebDomain(githubWebDomain);
 
 const POLL_MS = 10_000;
 const FRESH_MS = 60_000;
@@ -129,8 +133,7 @@ function StateGate({ feed, board = false, children }: { feed: Feed; board?: bool
         <pre className="overflow-x-auto rounded-[10px] border border-border bg-surface-muted px-[18px] py-4 font-mono text-[12.5px] leading-[1.7] shadow-[var(--inset-soft)]">{`conductor:setup {
   projects: { playground: {
     workingDir: "/abs/path",
-    repo: "owner/name",
-    intakeLabel: "conductor" } }
+    github: { repo: "owner/name", intakeLabel: "conductor" } } }
 }`}</pre>
       </div>
     ) : <p className="text-ui text-muted-foreground">Nothing to list yet. Run <code className="rounded bg-surface-muted px-1.5 font-mono">conductor:setup</code> first.</p>;

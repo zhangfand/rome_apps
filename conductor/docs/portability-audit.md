@@ -10,17 +10,17 @@ are currently baked in rather than pluggable, plus some prompt wording.
 
 | area | file(s) | status | what is dev-specific |
 |---|---|---|---|
-| ~~Worker workspace~~ | ~~`actions/dispatch`, `lib/worktree.ts`~~ | **done 2026-09-14** | `projects[].workspace: "git-worktree" \| "none"`. Providers live in `src/workspaces/`; the loop asks one to prepare and validate and never learns which it got. |
-| ~~Worker prompt framing~~ | ~~`lib/prompts.ts`~~ | **done 2026-09-14** | The workspace block comes from the provider; `none` adds no section at all. |
-| ~~Task intake~~ | ~~`lib/intake.ts`, `actions/tick`~~ | **done 2026-09-14** | Any source opens a task through `lib/ingest.ts`, over HTTP or as an adapter. GitHub moved to `adapters/github/`. |
-| ~~External events~~ | ~~`lib/observe.ts`, `lib/observe-prs.ts`~~ | **done 2026-09-14** | Same seam; `POST tasks/:id/events` and adapter polls are one path. |
-| Facts | `lib/facts.ts` | neutral since 2026-09-14 | `Created.origin` (TaskOrigin) replaced the GitHub-shaped `issue`, which is still read for facts already in the ledger. `Dispatched.workspace` is still git-shaped. |
-| Config | `lib/config.ts` | dev defaults | `workingDir` is now required only when the workspace kind needs one. Default `workerAgents` are still `coding:coding` + `assistant:assistant` and the default SOP is still software development. |
-| Orchestrator system prompt | `agents/orchestrator.yaml` | partly done | The checkout sentence moved to the wake prompt, emitted by the project's workspace provider. Still dev-worded: "GitHub issue closing; on a PR … reviews, comments, checks, merge", "may have pushed a branch or opened a PR" — those belong to proposal 3, where adapters emit their own notes. |
+| ~~Worker workspace~~ | ~~`src/core/actions/dispatch`, old worktree helper~~ | **done 2026-09-14** | `projects[].workspace: "git-worktree" \| "none"`. Providers live in `src/domain/workspaces/`; the loop asks one to prepare and validate and never learns which it got. |
+| ~~Worker prompt framing~~ | ~~`src/core/lib/prompts.ts`~~ | **done 2026-09-14** | The workspace block comes from the provider; `none` adds no section at all. |
+| ~~Task intake~~ | ~~old intake helper, `src/core/actions/tick`~~ | **done 2026-09-14** | Any source opens a task through `src/core/lib/ingest.ts`, over HTTP or as an adapter. GitHub moved to `src/domain/adapters/github/`. |
+| ~~External events~~ | ~~old observation helpers~~ | **done 2026-09-14** | Same seam; `POST tasks/:id/events` and adapter polls are one path. |
+| Facts | `src/core/lib/facts.ts` | core | `Created.origin` is generic; the old issue payload remains a compatibility reader only. Workspaces are provider-owned opaque data. |
+| Config | `src/core/lib/config.ts`, `src/app/config.ts` | split 2026-09-16 | Core parses runtime fields through generic extension hooks; app owns the worker/SOP/workspace defaults and GitHub normalization. |
+| Orchestrator system prompt | `src/app/agents/orchestrator.yaml` | partly done | The checkout sentence moved to the wake prompt, emitted by the project's workspace provider. Still dev-worded: "GitHub issue closing; on a PR … reviews, comments, checks, merge", "may have pushed a branch or opened a PR" — those belong to proposal 3, where adapters emit their own notes. |
 | Front-desk agent, UI | `agents/conductor.yaml`, `web/` | dev wording | Mentions GitHub issue intake; repo badge on task rows. |
-| `create` action | `actions/create` | harmless | Duplicate check by GitHub issue URL in the brief. |
+| `create` action | `src/core/actions/create` | core | The source-specific URL check was dropped; source intake remains exactly deduped by `(source,key)`. |
 
-## Proposed changes (not done)
+## Historical proposed changes
 
 1. ~~**Workspace as a per-project capability.**~~ **Done 2026-09-14**, with two
    kinds rather than three — see Status below. `directory` was left out until a
@@ -44,17 +44,17 @@ the same ledger vocabulary serve every domain.
 
 Built:
 
-- `src/lib/ingest.ts` — the only door into the ledger from outside. Two request
+- `src/core/lib/ingest.ts` — the only door into the ledger from outside. Two request
   shapes (`open_task`, `push_event`), a vocabulary of two facts (`Created`,
   `Event`), `by` computed rather than accepted, `runtime` / `orchestrator`
   reserved, idempotency on `(source, key)`. Pure except for the append.
-- `src/lib/adapters.ts` + `src/adapters/` — a `SourceAdapter` reads one outside
+- `src/core/lib/adapters.ts` + `src/domain/adapters/` — a `SourceAdapter` reads one outside
   world and returns requests. It holds no ledger handle and wakes nobody.
-  `src/adapters/index.ts` is the whole registry.
-- `src/adapters/github/` — intake, issue closes, PR events and branch discovery,
-  plus the `connector_proxy` calls that used to sit in `actions/tick`. Deleting
+  `src/app/adapters/index.ts` is the whole registry.
+- `src/domain/adapters/github/` — intake, issue closes, PR events and branch discovery,
+  plus the `connector_proxy` calls that used to sit in `src/core/actions/tick`. Deleting
   this directory leaves a Conductor that still runs tasks, with no GitHub in it.
-- `actions/tick` — now three visible steps: observe (worker health, adapters),
+- `src/core/actions/tick` — now three visible steps: observe (worker health, adapters),
   ingest, wake. It no longer contains a line of GitHub.
 - `POST /api/apps/conductor/tasks` and `POST …/tasks/:id/events` — the same seam
   over HTTP.
@@ -85,13 +85,13 @@ adapter-generated prompt notes (3), and a non-development SOP run end to end (4)
 
 Built:
 
-- `src/lib/workspaces.ts` — the seam: `WorkspaceKind`, the stored `Workspace`
+- `src/core/lib/workspaces.ts` — the seam: `WorkspaceKind`, the stored `Workspace`
   shapes, the `WorkspaceProvider` interface (`prepare` / `validate` /
   `instructions` / `note`), and `handedOverWorkspace`, which is about the ledger
   rather than any kind and so does not belong to a provider.
-- `src/workspaces/git-worktree.ts` — the former `lib/worktree.ts`, now the only
-  place in Conductor that runs Git. `src/workspaces/none.ts` prepares nothing.
-  `src/workspaces/index.ts` is the registry.
+- `src/domain/workspaces/git-worktree.ts` — the former worktree helper, now the only
+  place in Conductor that runs Git. `src/core/workspaces/none.ts` prepares nothing.
+  `src/app/workspaces/index.ts` is the registry.
 - `projects[].workspace`, defaulting to `git-worktree`; `workingDir` required
   only when the kind needs one. The kind is copied into the `Created` binding.
 - `dispatch`, `run_worker` and both prompts go through the provider. The
@@ -113,5 +113,18 @@ Decisions taken, and their cost:
   hand-over rules and both prompts; no non-development task has been run through
   a `none` project yet. That run is proposal 4, still open.
 
-Still open: adapter-generated runtime notes in the orchestrator prompt (3), and
-a non-development SOP run end to end (4).
+At the time, proposals 3 and 4 remained open; the 2026-09-16 decision below
+drops both.
+
+## Decision 2026-09-16: split the app, do not generalize the product
+
+Conductor is the software-development app. Portability of this app is no longer
+a goal, so proposals 3 (adapter-generated runtime notes) and 4 (a second SOP as
+proof) are dropped. Their replacement is a physical `core` / `domain` / `app`
+split plus a source-boundary test: core is reusable runtime, domain is GitHub,
+Git worktrees and the development SOP, and app is the composition root.
+
+The first new domain feature after this restructure will be read-only pull
+request cards in phase 2. They are intentionally not part of this change.
+
+**Phase 2 done 2026-09-16:** read-only pull request cards now use the generic core domain-route and task-detail-panel seams.

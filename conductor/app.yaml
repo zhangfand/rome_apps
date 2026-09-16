@@ -19,33 +19,33 @@ web:
   navLabel: Conductor
 
 api:
-  entry: api/index
+  entry: app/api/index
 
 db:
-  migrations: db/migrations
+  migrations: core/db/migrations
   tablePrefix: conductor
 
 agents:
-  - agents/conductor.yaml
-  - agents/orchestrator.yaml
+  - app/agents/conductor.yaml
+  - app/agents/orchestrator.yaml
 
 actions:
-  - actions/setup
-  - actions/tick
-  - actions/orchestrate
-  - actions/run-worker
-  - actions/create
-  - actions/reply
-  - actions/complete
-  - actions/cancel
-  - actions/snapshot
-  - actions/ledger
-  - actions/dispatch
-  - actions/ask
-  - actions/report
-  - actions/wait
-  - actions/close
-  - actions/note
-  - actions/stop
+  - app/actions/setup
+  - app/actions/tick
+  - app/actions/orchestrate
+  - app/actions/run-worker
+  - app/actions/create
+  - app/actions/reply
+  - app/actions/complete
+  - app/actions/cancel
+  - app/actions/snapshot
+  - app/actions/ledger
+  - app/actions/dispatch
+  - app/actions/ask
+  - app/actions/report
+  - app/actions/wait
+  - app/actions/close
+  - app/actions/note
+  - app/actions/stop
 
 tagline: "Run long-lived tasks with a flexible playbook you can change anytime."

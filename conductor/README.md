@@ -10,6 +10,20 @@ workers, GitHub issue intake — and replaces the decision code with an
 operating procedure (SOP) and records one decision per wake. Change the SOP and
 the same app runs a different kind of work.
 
+## Layout and dependency rule
+
+- `src/core/` is the domain-neutral runtime: ledger, configuration parser,
+  repositories, action implementations, API implementation and generic seams.
+- `src/domain/` is Conductor's software-development domain: GitHub, Git
+  worktrees and the default software-development SOP.
+- `src/app/` is the composition root: runtime entries, registries, agents and
+  defaults. `src/web/App.tsx` plays the same role for the web app; reusable UI
+  is under `src/web/core/`.
+
+Core never imports domain or app, and domain never imports app. The boundary is
+checked by `src/core/boundary.test.ts`. A future employee app copies `src/core/`
+verbatim and supplies its own domain and app composition.
+
 ## The three parties
 
 ```
@@ -25,11 +39,11 @@ person / any source ──► ingest seam ──► ledger ◄── worker (via
   workers, records what they said (`Returned` / `Failed`), and wakes the
   orchestrator for any open task with facts it has not decided on. It decides
   nothing about a task.
-- **Orchestrator** (`agents/orchestrator.yaml`): woken per task. Gets the SOP,
+- **Orchestrator** (`src/app/agents/orchestrator.yaml`): woken per task. Gets the SOP,
   every fact on the task, the agents it may use and the free worker slots.
   Records exactly one of `Dispatched / Asked / Reported / Waited / Completed /
   Cancelled / Noted` (optionally preceded by `stop` → `Lost`).
-- **Conductor** (`agents/conductor.yaml`): the front desk in chat. Turns what a
+- **Conductor** (`src/app/agents/conductor.yaml`): the front desk in chat. Turns what a
   person says into `Created / Reply / Completed / Cancelled`.
 
 ## Ledger vocabulary
@@ -57,15 +71,15 @@ rejected; an unparseable reply is recorded as `unparsed` with the raw text.
 - **Safety valve**: `maxDecisionsPerTurn` decisions since a person last spoke,
   after which the runtime writes a `circuit_breaker` Event and stops waking
   the task until someone replies.
-- **A narrow door** (`lib/ingest.ts`): what the outside may write, below.
+- **A narrow door** (`src/core/lib/ingest.ts`): what the outside may write, below.
 
 ## The prompts, layered
 
 | layer | says | lives in |
 |---|---|---|
-| orchestrator system prompt | who it is, its responsibility and limits, how workers cooperate (what they see, what they return), what each tool means, "you only speak through the ledger" | `src/agents/orchestrator.yaml` — domain-free |
-| SOP | the goal and quality bar (not "a PR" but "a PR independently verified against the request"), what *done* means, the domain's hard lines, the shape the work usually takes | `src/lib/sop.ts` default; config / per project |
-| wake prompt | facts only: ledger, live worker, free slots, agents, `seenSeq` | built by `src/lib/prompts.ts` |
+| orchestrator system prompt | who it is, its responsibility and limits, how workers cooperate (what they see, what they return), what each tool means, "you only speak through the ledger" | `src/app/agents/orchestrator.yaml` — app-owned |
+| SOP | the goal and quality bar (not "a PR" but "a PR independently verified against the request"), what *done* means, the domain's hard lines, the shape the work usually takes | `src/domain/sop.ts` default; config / per project |
+| wake prompt | facts only: ledger, live worker, free slots, agents, `seenSeq` | built by `src/core/lib/prompts.ts` |
 
 The SOP is deliberately not a recipe. It does not enumerate what to do when
 a worker fails / blocks / waits; the ledger can hold combinations no list
@@ -79,10 +93,11 @@ writes one fact.
 ```
 conductor:setup {
   projects: {
-    playground: { workingDir: "/abs/path", repo: "owner/name", intakeLabel: "conductor" },
+    playground: { workingDir: "/abs/path", github: { repo: "owner/name", intakeLabel: "conductor" } },
     research:   { workspace: "none", sop: "..." },
   },
-  sop?: "...",            // omit for the built-in software-development SOP (src/lib/sop.ts)
+  github?: { intakeLabel: "conductor" },
+  sop?: "...",            // omit for the built-in software-development SOP (src/domain/sop.ts)
   workerAgents?: { "coding:coding": "...", "assistant:assistant": "..." },
   maxWorkers?: 3, intervalMinutes?: 5, reuseSessions?: true, maxDecisionsPerTurn?: 25
 }
@@ -94,8 +109,8 @@ The SOP is editable on the Configuration page; a project may carry its own
 ## Where facts come from: the ingest seam
 
 Nothing outside Conductor appends to the ledger. A source — the GitHub poll, an
-order system, a mailbox, a person with curl — hands `lib/ingest.ts` a request,
-and the seam decides whether a fact is written and which one. Three properties
+order system, a mailbox, a person with curl — hands `src/core/lib/ingest.ts` a
+request, and the seam decides whether a fact is written and which one. Three properties
 follow, and they are why the loop can be trusted with input it did not author:
 
 | property | what it means |
@@ -104,8 +119,8 @@ follow, and they are why the loop can be trusted with input it did not author:
 | authorship is computed, never accepted | `by` is derived — `source` or `source:actor` for a `Created`, always `runtime` for an `Event`. `runtime` and `orchestrator` are reserved slugs; an Event can never read as a person speaking and reset the circuit breaker. |
 | idempotency is the seam's job | one task per `(source, key)` ever; one event per `(source, key)` per task. A retried webhook, a poll that lists the same issue twice, and two adapters watching one system all write once. |
 
-`tick` never treats a source specially — it iterates `src/adapters/`, hands the
-batch to the seam, then wakes. Over HTTP the same seam is two routes, guardian /
+`tick` never treats a source specially — it iterates the registry in
+`src/app/adapters/index.ts`, hands the batch to the seam, then wakes. Over HTTP the same seam is two routes, guardian /
 loopback only for now:
 
 ```
@@ -145,18 +160,18 @@ The runtime still fails closed. A `Dispatched` fact always records a workspace,
 `{ kind: "none" }` included, so a worker with no workspace *by design* never
 looks like one whose worktree went missing — the second is still refused.
 
-`src/workspaces/` holds one file per kind, the way `src/adapters/` holds one per
-source. Adding a kind is a file and a line in `src/workspaces/index.ts`.
+`src/domain/workspaces/` holds domain providers such as `git-worktree`; the generic `none` provider lives in `src/core/workspaces/`. Adding a kind is an implementation plus a line in `src/app/workspaces/index.ts`.
 
 ## Source adapters
 
-`src/adapters/<source>/` is one outside world. An adapter reads it and returns
-ingest requests; it holds no ledger handle, writes no fact and wakes nobody.
-Adding a source is a directory plus a line in `src/adapters/index.ts` — no
+`src/domain/adapters/<source>/` is one outside world. An adapter reads it and
+returns ingest requests; it holds no ledger handle, writes no fact and wakes nobody.
+Adding a source is a directory plus a line in `src/app/adapters/index.ts` — no
 change to the loop, the ledger or the prompts.
 
 **`github`** — everything this app knows about issues, pull requests, reviews,
-checks and branch names lives under `src/adapters/github/` and nowhere else.
+checks and branch names lives under `src/domain/adapters/github/` and nowhere
+else.
 It reports, once each: a task per issue carrying the intake label
 (`Created`, author `github:<login>`); `issue_closed` on any issue an open task
 names; on any PR mentioned in the task's facts — `pr_review`,
@@ -165,6 +180,14 @@ head), `pr_merged`, `pr_closed`; and `pr_opened` for any open PR whose head
 branch is `conductor/<taskId>/…` that no fact mentions yet (a worker declared
 Lost may still have pushed). What an event means for the task is the
 orchestrator's call.
+
+Task detail also shows read-only cards for up to ten pull requests mentioned in
+the task. Each card reads GitHub's title and state, branches, diff and file
+counts, discussion and review-comment totals, the latest decisive review per
+reviewer, and check runs for the current head. The browser refreshes these
+cards every 60 seconds while visible. This status read never writes a fact or
+changes GitHub; if someone merges externally, the card reflects it on refresh
+and the normal adapter reports `pr_merged` to the ledger on the next tick.
 
 ## Scenarios exercised on the playground repo (2026-09-11)
 
