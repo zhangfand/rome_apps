@@ -26,8 +26,21 @@ export interface PrepareWorkspaceInput {
   previous?: Workspace;
 }
 
+/** A safe, presentation-ready description of a configured working directory. */
+export interface WorkspaceInspection {
+  exists: boolean;
+  isRepository: boolean;
+  root?: string;
+  originUrl?: string;
+  originRepo?: string;
+  defaultBranch?: string;
+  dirty?: boolean;
+  problem?: string;
+}
+
 export interface WorkspaceProvider {
   readonly kind: WorkspaceKind;
+  inspect?(workingDir: string): Promise<WorkspaceInspection>;
   prepare(input: PrepareWorkspaceInput): Promise<Workspace>;
   validate(workspace: Workspace): Promise<void>;
   instructions(workspace: Workspace): string;

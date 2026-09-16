@@ -68,16 +68,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
       const parsed = composition.parseConfig(args);
       if (!parsed.ok) return { status: "error", error: parsed.error };
 
-      const locks = createLockRepository(appContext.db);
-      if (!locks.tryAcquire(TICK_LOCK, 5 * 60_000)) return { status: "error", error: "Conductor is ticking; retry setup shortly. Configuration was not changed." };
-      let routine: Awaited<ReturnType<typeof ensureRoutine>>;
-      try {
-        const settings = createSettingsRepository(appContext.db, composition.parseConfig);
-        const ledger = createLedgerRepository(appContext.db);
-        if (!ledger.reachable()) return { status: "error", error: "Ledger unavailable; configuration was not changed." };
-        settings.put(parsed.config);
-        routine = await ensureRoutine(appContext, parsed.config);
-      } finally { locks.release(TICK_LOCK); }
+      const routine = await persistConfiguration(appContext, composition, parsed.config);
       if (!routine.ok) return { status: "error", error: routine.error };
 
       log.info("setup finished", { projects: Object.keys(parsed.config.projects), routine: routine.outcome });
@@ -86,7 +77,28 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
   };
 }
 
-async function ensureRoutine(
+/** The single setup path used by both the action and first Configuration PATCH. */
+export async function persistConfiguration(
+  appContext: RomeAppContext,
+  composition: CoreComposition,
+  config: ConductorConfig,
+): Promise<{ ok: true; outcome: RoutineOutcome } | { ok: false; error: string }> {
+  const locks = createLockRepository(appContext.db);
+  if (!locks.tryAcquire(TICK_LOCK, 5 * 60_000)) {
+    return { ok: false, error: "Conductor is ticking; retry setup shortly. Configuration was not changed." };
+  }
+  try {
+    const settings = createSettingsRepository(appContext.db, composition.parseConfig);
+    const ledger = createLedgerRepository(appContext.db);
+    if (!ledger.reachable()) return { ok: false, error: "Ledger unavailable; configuration was not changed." };
+    settings.put(config);
+    return await ensureRoutine(appContext, config);
+  } finally {
+    locks.release(TICK_LOCK);
+  }
+}
+
+export async function ensureRoutine(
   appContext: RomeAppContext,
   config: ConductorConfig,
 ): Promise<{ ok: true; outcome: RoutineOutcome } | { ok: false; error: string }> {

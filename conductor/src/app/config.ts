@@ -1,4 +1,12 @@
-import { createConfigParser, type ConductorConfig } from "../core/lib/config.js";
+import {
+  createConfigParser,
+  DEFAULT_INTERVAL_MINUTES,
+  DEFAULT_MAX_DECISIONS_PER_TURN,
+  DEFAULT_MAX_WORKERS,
+  DEFAULT_ORCHESTRATOR_AGENT,
+  DEFAULT_REUSE_SESSIONS,
+  type ConductorConfig,
+} from "../core/lib/config.js";
 import { DEFAULT_SOP } from "../domain/sop.js";
 import { DEFAULT_INTAKE_LABEL, githubConfigExtensions, githubProject, githubRepo, githubRoot } from "../domain/adapters/github/config.js";
 
@@ -11,6 +19,19 @@ export const parseAppConfig = createConfigParser(
   { sop: DEFAULT_SOP, workerAgents: DEFAULT_WORKER_AGENTS, workspaceKinds: ["git-worktree", "none"], defaultWorkspaceKind: "git-worktree" },
   githubConfigExtensions,
 );
+
+/** UI-only defaults for an install that has not persisted settings yet. */
+export const initialAppConfig: ConductorConfig = {
+  projects: {},
+  sop: DEFAULT_SOP,
+  workerAgents: DEFAULT_WORKER_AGENTS,
+  orchestratorAgent: DEFAULT_ORCHESTRATOR_AGENT,
+  maxWorkers: DEFAULT_MAX_WORKERS,
+  intervalMinutes: DEFAULT_INTERVAL_MINUTES,
+  reuseSessions: DEFAULT_REUSE_SESSIONS,
+  maxDecisionsPerTurn: DEFAULT_MAX_DECISIONS_PER_TURN,
+  github: { intakeLabel: DEFAULT_INTAKE_LABEL },
+};
 
 export const setupSchema = {
   projectDescription: "Named projects. Each has workingDir, optional workspace, optional github settings, and a project SOP override. Legacy GitHub fields at project level remain accepted for one release.",
@@ -70,6 +91,10 @@ export function mergeAppConfig(current: Record<string, unknown>, patch: Record<s
   if (patch.projects && typeof patch.projects === "object" && !Array.isArray(patch.projects)) {
     const projects = { ...(current.projects as Record<string, unknown> ?? {}) };
     for (const [id, value] of Object.entries(patch.projects as Record<string, unknown>)) {
+      if (value === null) {
+        delete projects[id];
+        continue;
+      }
       const projectPatch = objectValue(value);
       const projectCurrent = objectValue(projects[id]);
       const githubCurrent = objectValue(projectCurrent.github);
@@ -86,6 +111,7 @@ export function mergeAppConfig(current: Record<string, unknown>, patch: Record<s
       };
     }
     merged.projects = projects;
+    if (typeof merged.defaultProject === "string" && !Object.hasOwn(projects, merged.defaultProject)) delete merged.defaultProject;
   }
   return merged;
 }

@@ -3,6 +3,7 @@ import { createLedgerRepository } from "../db/repositories/ledger.js";
 import { createLockRepository, TICK_LOCK } from "../db/repositories/lock.js";
 import { createSettingsRepository } from "../db/repositories/settings.js";
 import { createWorkerHealthRepository } from "../db/repositories/worker-health.js";
+import { persistConfiguration } from "../actions/setup/index.js";
 import type { CoreComposition } from "../lib/composition.js";
 import type { ConductorConfig } from "../lib/config.js";
 import { type Fact } from "../lib/facts.js";
@@ -19,7 +20,9 @@ import { HEARTBEAT_LEASE_MS } from "../lib/worker-health.js";
  *   POST tasks/:id/reply   a person's reply, through conductor:reply
  *   POST tasks/:id/complete close as done, through conductor:complete
  *   POST tasks/:id/cancel  close as not wanted, through conductor:cancel
- *   GET|PATCH config       settings; PATCH accepts { sop?, projects.<id>.sop? , ... } and re-parses
+ *   GET|PATCH config       settings; projects.<id>: null deletes (force=1 overrides the open-task guard)
+ *   GET config/inspect     inspect one working directory through its workspace provider
+ *   POST config/<domain>   app-owned configuration operations, such as cloning
  *   POST tick              run a tick now
  */
 class ConductorApiHandler implements RomeAppApiHandler {
@@ -109,25 +112,61 @@ class ConductorApiHandler implements RomeAppApiHandler {
         if (!body || typeof body !== "object") return json({ error: "A JSON object is required." }, 400);
         return this.ingest(settings, ledger, { ...body, op: "push_event", taskId: request.path[1] } as unknown as IngestRequest);
       }
+      if (route === "config/inspect") {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);
+        const kind = request.query.get("workspace") ?? this.composition.defaultWorkspaceKind;
+        const workingDir = request.query.get("workingDir") ?? "";
+        if (!this.composition.workspaceKinds.includes(kind)) return json({ error: `Unknown workspace kind: ${kind}` }, 400);
+        if (!workingDir.startsWith("/") || workingDir.includes("\0")) return json({ error: "workingDir must be an absolute path" }, 400);
+        const inspect = this.composition.providerFor(kind).inspect;
+        if (!inspect) return json({ error: `Workspace kind ${kind} cannot be inspected.` }, 501);
+        return json(await inspect(workingDir));
+      }
+      const configRoute = request.path[0] === "config"
+        ? this.composition.configRoutes?.find((candidate) => (
+          candidate.method === request.method && samePath(candidate.path, request.path.slice(1))
+        ))
+        : undefined;
+      if (configRoute) {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        const result = await configRoute.handle(this.ctx, request);
+        return result instanceof Response ? result : json(result);
+      }
       if (route === "config") {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
         if (request.method === "GET") {
           const config = settings.get();
-          return config ? json({ config, runtime: runtimeJson(), projectPresentation: configPresentation(config, this.composition) }) : json({ error: "Run conductor:setup first." }, 409);
+          const shown = config ?? this.composition.initialConfig;
+          return json({ configured: Boolean(config), config: shown, runtime: runtimeJson(this.composition), projectPresentation: configPresentation(shown, this.composition) });
         }
         if (request.method !== "PATCH") return json({ error: "method_not_allowed" }, 405);
         const body = readJsonBody<Record<string, unknown>>(request);
         if (!body || typeof body !== "object") return json({ error: "A JSON object of changes is required." }, 400);
         const current = settings.get();
-        if (!current) return json({ error: "Run conductor:setup first." }, 409);
+        const { force: bodyForce, ...patch } = body;
+        const deletions = deletedProjects(patch);
+        const forced = request.query.get("force") === "1" || bodyForce === true;
+        if (deletions.length && !forced) {
+          const tasks = fold(new Date(), ledger.all()).tasks;
+          for (const projectId of deletions) {
+            const count = tasks.filter((task) => task.state === "open" && task.projectId === projectId).length;
+            if (count > 0) return json({ error: `${count} open task${count === 1 ? " is" : "s are"} bound to project ${projectId}.`, projectId, count }, 409);
+          }
+        }
         const merged = this.composition.mergeConfig
-          ? this.composition.mergeConfig(current, body)
-          : mergeConfig(current, body);
+          ? this.composition.mergeConfig(current ?? this.composition.initialConfig, patch)
+          : mergeConfig(current ?? this.composition.initialConfig, patch);
         const parsed = this.composition.parseConfig(merged);
         if (!parsed.ok) return json({ error: parsed.error }, 400);
-        settings.put(parsed.config);
-        this.ctx.log.info("guardian updated conductor configuration", { fields: Object.keys(body) });
-        return json({ config: parsed.config, runtime: runtimeJson(), projectPresentation: configPresentation(parsed.config, this.composition) });
+        if (current) {
+          settings.put(parsed.config);
+        } else {
+          const installed = await persistConfiguration(this.ctx, this.composition, parsed.config);
+          if (!installed.ok) return json({ error: installed.error }, 503);
+        }
+        this.ctx.log.info("guardian updated conductor configuration", { fields: Object.keys(patch) });
+        return json({ configured: true, config: parsed.config, runtime: runtimeJson(this.composition), projectPresentation: configPresentation(parsed.config, this.composition) });
       }
       if (route === "tick" && request.method === "POST") {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
@@ -184,21 +223,34 @@ function mergeConfig(current: Record<string, unknown>, patch: Record<string, unk
   if (patch.projects && typeof patch.projects === "object" && !Array.isArray(patch.projects)) {
     merged.projects = { ...(current.projects as Record<string, unknown> ?? {}) };
     for (const [id, value] of Object.entries(patch.projects as Record<string, unknown>)) {
-      (merged.projects as Record<string, unknown>)[id] = {
-        ...((merged.projects as Record<string, Record<string, unknown>>)[id] ?? {}),
-        ...(value as Record<string, unknown>),
-      };
+      if (value === null) delete (merged.projects as Record<string, unknown>)[id];
+      else (merged.projects as Record<string, unknown>)[id] = {
+          ...((merged.projects as Record<string, Record<string, unknown>>)[id] ?? {}),
+          ...(value as Record<string, unknown>),
+        };
     }
+    if (typeof merged.defaultProject === "string" && !Object.hasOwn(merged.projects as object, merged.defaultProject)) delete merged.defaultProject;
   }
   return merged;
+}
+
+function deletedProjects(patch: Record<string, unknown>): string[] {
+  if (!patch.projects || typeof patch.projects !== "object" || Array.isArray(patch.projects)) return [];
+  return Object.entries(patch.projects as Record<string, unknown>)
+    .filter(([, value]) => value === null)
+    .map(([id]) => id);
 }
 
 function configPresentation(config: ConductorConfig, composition: CoreComposition) {
   return Object.fromEntries(Object.entries(config.projects).map(([id, project]) => [id, composition.projectPresentation?.(project, config) ?? {}]));
 }
 
-function runtimeJson() {
-  return { heartbeatLeaseSeconds: HEARTBEAT_LEASE_MS / 1000 };
+function runtimeJson(composition: CoreComposition) {
+  return {
+    heartbeatLeaseSeconds: HEARTBEAT_LEASE_MS / 1000,
+    workspaceKinds: composition.workspaceKinds,
+    defaultWorkspaceKind: composition.defaultWorkspaceKind,
+  };
 }
 
 function taskSummary(task: TaskView, now: Date, composition: CoreComposition, config?: ConductorConfig) {

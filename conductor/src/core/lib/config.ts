@@ -63,7 +63,7 @@ export function parseConfig(raw: unknown, defaults: ConfigDefaults, extensions: 
   }
   const projects: Record<string, ProjectConfig> = {};
   for (const [id, rawProject] of Object.entries(args.projects)) {
-    if (!/^[a-z][a-z0-9_-]*$/.test(id) || ["constructor", "prototype", "__proto__"].includes(id)) return { ok: false, error: `Invalid project id: ${id}` };
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(id) || ["constructor", "prototype", "__proto__"].includes(id)) return { ok: false, error: `Invalid project id: ${id}` };
     if (!rawProject || typeof rawProject !== "object" || Array.isArray(rawProject)) return { ok: false, error: `Invalid project: ${id}` };
     const p = rawProject as Record<string, unknown>;
     const workspace = p.workspace === undefined || p.workspace === ""

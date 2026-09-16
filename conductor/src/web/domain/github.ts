@@ -1,5 +1,6 @@
 import type { WebDomain } from "../core/domain";
 import { PullRequestsPanel } from "./pull-requests";
+import { GitHubProjectSettings } from "./github-project-settings";
 
 function value(payload: Record<string, unknown>, key: string): string {
   const item = payload[key];
@@ -28,4 +29,5 @@ export const githubWebDomain: WebDomain = {
   },
   legacyOriginSource: "github",
   taskDetailPanels: [PullRequestsPanel],
+  projectSettingsFields: [GitHubProjectSettings],
 };

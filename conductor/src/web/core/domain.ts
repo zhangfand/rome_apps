@@ -1,6 +1,14 @@
 import type { ComponentType } from "react";
-import type { FactJson } from "./lib/types";
-import type { TaskDetailJson } from "./lib/types";
+import type { FactJson, TaskDetailJson, WorkspaceInspection } from "./lib/types";
+
+export interface ProjectSettingsFieldProps {
+  projectId: string;
+  project: Record<string, unknown>;
+  onChange(project: Record<string, unknown>): void;
+  inspection: WorkspaceInspection | null;
+  refreshInspection(): void;
+  disabled: boolean;
+}
 
 export interface WebDomain {
   externalFactLabel: string;
@@ -8,6 +16,7 @@ export interface WebDomain {
   eventTitle(fact: FactJson): string | undefined;
   legacyOriginSource: string;
   taskDetailPanels: Array<ComponentType<{ taskId: string; task: TaskDetailJson }>>;
+  projectSettingsFields: Array<ComponentType<ProjectSettingsFieldProps>>;
 }
 
 const genericDomain: WebDomain = {
@@ -19,6 +28,7 @@ const genericDomain: WebDomain = {
   eventTitle: () => undefined,
   legacyOriginSource: "external source",
   taskDetailPanels: [],
+  projectSettingsFields: [],
 };
 
 let current = genericDomain;

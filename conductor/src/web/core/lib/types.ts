@@ -58,4 +58,17 @@ export interface ProjectPresentation { repo?: string; subtitle?: string; sourceE
 
 export interface RuntimeJson {
   heartbeatLeaseSeconds: number;
+  workspaceKinds: string[];
+  defaultWorkspaceKind: string;
+}
+
+export interface WorkspaceInspection {
+  exists: boolean;
+  isRepository: boolean;
+  root?: string;
+  originUrl?: string;
+  originRepo?: string;
+  defaultBranch?: string;
+  dirty?: boolean;
+  problem?: string;
 }

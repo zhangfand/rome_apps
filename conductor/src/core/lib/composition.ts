@@ -18,6 +18,13 @@ export interface TaskDomainRoute {
   handle(ctx: RomeAppContext, task: TaskView): Promise<unknown>;
 }
 
+/** An app-owned, guardian-only route attached beneath config. */
+export interface ConfigDomainRoute {
+  method: "GET" | "POST";
+  path: readonly string[];
+  handle(ctx: RomeAppContext, request: import("@rome-os/app-runtime").RomeAppApiRequest): Promise<Response | unknown>;
+}
+
 /** Dependencies supplied by the app composition root to the generic runtime. */
 export interface CoreComposition {
   parseConfig: ConfigParser;
@@ -29,5 +36,8 @@ export interface CoreComposition {
   projectPromptNote?(task: TaskView, audience: "worker" | "orchestrator"): string;
   projectPresentation?(project: ProjectConfig | TaskView["project"] | undefined, config?: ConductorConfig): { repo?: string; subtitle?: string; sourceEnabled?: boolean; sourceLabel?: string; emptySubtitle?: string };
   mergeConfig?(current: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown>;
+  /** Defaults shown before setup. They are not persisted until a valid PATCH. */
+  initialConfig: ConductorConfig;
   taskRoutes?: readonly TaskDomainRoute[];
+  configRoutes?: readonly ConfigDomainRoute[];
 }

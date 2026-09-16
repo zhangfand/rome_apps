@@ -52,6 +52,13 @@ describe("app config composition", () => {
     expect(parsed.config.projects.app.github).toEqual({ repo: "new/repo", enabled: true, projectLabel: "app" });
   });
 
+  it("normalizes github.com repository URLs", () => {
+    const parsed = parseAppConfig({ projects: { app: { workingDir: "/repo", github: { repo: "https://github.com/owner/name.git/" } } } });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.config.projects.app.github).toEqual({ repo: "owner/name" });
+  });
+
   it("lets a legacy PATCH update normalized stored settings", () => {
     const current = parseAppConfig({ projects: { app: { workingDir: "/repo", github: { repo: "old/repo", enabled: true } } } });
     expect(current.ok).toBe(true);
@@ -74,12 +81,22 @@ describe("app config composition", () => {
     expect(parsed.config.projects.app.github).toEqual({ repo: "owner/repo", projectLabel: "one", enabled: false });
   });
 
-  it("validates normalized routes across old and new project shapes", () => {
+  it("deletes a project when its PATCH value is null", () => {
+    const merged = mergeAppConfig({ projects: { app: { workingDir: "/repo" }, keep: { workspace: "none" } }, defaultProject: "app" }, { projects: { app: null } });
+    expect(merged.projects).toEqual({ keep: { workspace: "none" } });
+    expect(merged).not.toHaveProperty("defaultProject");
+  });
+
+  it("uses the public slug grammar for project ids", () => {
+    expect(parseAppConfig({ projects: { "1-app": { workspace: "none" } } }).ok).toBe(true);
+    expect(parseAppConfig({ projects: { app_name: { workspace: "none" } } })).toEqual({ ok: false, error: "Invalid project id: app_name" });
+  });
+
+  it("allows more than one project to reference the same repository", () => {
     const parsed = parseAppConfig({ projects: {
       a: { workingDir: "/a", repo: "owner/repo" },
       b: { workingDir: "/b", github: { repo: "owner/repo" } },
     } });
-    expect(parsed.ok).toBe(false);
-    expect(!parsed.ok && parsed.error).toMatch(/distinct projectLabels/);
+    expect(parsed.ok).toBe(true);
   });
 });

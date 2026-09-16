@@ -1,13 +1,15 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, realpath } from "node:fs/promises";
+import { mkdir, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import {
   type PrepareWorkspaceInput,
   type Workspace,
   type WorkspaceProvider,
+  type WorkspaceInspection,
 } from "../../core/lib/workspaces.js";
+import { parseRepo } from "../adapters/github/config.js";
 
 const exec = promisify(execFile);
 export interface GitWorktreeWorkspace extends Workspace {
@@ -38,6 +40,8 @@ function asGitWorkspace(workspace: Workspace): GitWorktreeWorkspace {
 export const gitWorktreeProvider: WorkspaceProvider = {
   kind: "git-worktree",
 
+  inspect: inspectGitWorkspace,
+
   async prepare(input: PrepareWorkspaceInput): Promise<Workspace> {
     const workingDir = input.project.workingDir;
     if (!workingDir) throw new Error("a git-worktree project needs a workingDir");
@@ -63,15 +67,72 @@ export const gitWorktreeProvider: WorkspaceProvider = {
   },
 };
 
-async function git(cwd: string, ...args: string[]): Promise<string> {
+async function gitWithTimeout(cwd: string, timeout: number, ...args: string[]): Promise<string> {
   const result = await exec("git", ["-C", cwd, ...args], {
-    timeout: 60_000,
+    timeout,
     maxBuffer: 4 * 1024 * 1024,
     // Do not let a caller's Git context redirect operations out of this tree.
     env: Object.fromEntries(Object.entries(process.env).filter(([key]) =>
       !["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES"].includes(key))),
   });
   return result.stdout.trim();
+}
+
+async function git(cwd: string, ...args: string[]): Promise<string> {
+  return gitWithTimeout(cwd, 60_000, ...args);
+}
+
+type InspectGit = (cwd: string, ...args: string[]) => Promise<string>;
+
+/** Inspect without allowing a slow or malformed repository to break config reads. */
+export async function inspectGitWorkspace(
+  workingDir: string,
+  run: InspectGit = (cwd, ...args) => gitWithTimeout(cwd, 4_000, ...args),
+): Promise<WorkspaceInspection> {
+  try {
+    const entry = await stat(workingDir);
+    if (!entry.isDirectory()) return { exists: true, isRepository: false, problem: "Path is not a directory." };
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? String(error.code) : undefined;
+    return code === "ENOENT"
+      ? { exists: false, isRepository: false }
+      : { exists: false, isRepository: false, problem: shortProblem(error) };
+  }
+
+  let root: string;
+  try {
+    root = await run(workingDir, "rev-parse", "--show-toplevel");
+  } catch (error) {
+    try {
+      if ((await readdir(workingDir)).length === 0) return { exists: true, isRepository: false, problem: "Directory is empty." };
+    } catch { /* The stat result above is still authoritative. */ }
+    return { exists: true, isRepository: false, problem: shortProblem(error, "Not a Git repository.") };
+  }
+
+  const inspection: WorkspaceInspection = { exists: true, isRepository: true, root: root.trim() };
+  try {
+    const originUrl = (await run(workingDir, "remote", "get-url", "origin")).trim();
+    if (originUrl) {
+      inspection.originUrl = originUrl;
+      inspection.originRepo = parseRepo(originUrl);
+    }
+  } catch { /* A repository need not have an origin. */ }
+  try {
+    const originHead = (await run(workingDir, "symbolic-ref", "refs/remotes/origin/HEAD")).trim();
+    inspection.defaultBranch = originHead.replace(/^refs\/remotes\/origin\//, "") || undefined;
+  } catch { /* A repository need not know the remote default branch. */ }
+  try {
+    inspection.dirty = Boolean((await run(workingDir, "status", "--porcelain")).trim());
+  } catch { /* Dirty state is supplementary. */ }
+  return inspection;
+}
+
+function shortProblem(error: unknown, fallback?: string): string {
+  const value = error && typeof error === "object" && "stderr" in error && typeof error.stderr === "string"
+    ? error.stderr
+    : error instanceof Error ? error.message : "";
+  const tail = value.trim().split("\n").slice(-2).join(" ").slice(-300);
+  return tail || fallback || "The path could not be inspected.";
 }
 
 async function repository(directory: string) {

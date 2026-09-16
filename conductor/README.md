@@ -90,6 +90,18 @@ writes one fact.
 
 ## Setup
 
+Open **SOP & runtime** → **Projects** in the app to add, edit, inspect, or
+remove projects. The form accepts a permanent lowercase slug, an absolute
+working directory, a workspace kind, GitHub repository and intake settings,
+an optional project SOP, and the default-project choice. A GitHub repository
+may be entered as `owner/name` or a `github.com` URL. If its target directory
+is missing or empty, **Clone here** runs `gh repo clone`; existing non-empty
+directories are never replaced. Project deletion is blocked when open tasks
+are pinned to it until the UI's explicit force confirmation. Existing tasks
+keep the project snapshot recorded when they were created.
+
+The same settings remain available programmatically:
+
 ```
 conductor:setup {
   projects: {

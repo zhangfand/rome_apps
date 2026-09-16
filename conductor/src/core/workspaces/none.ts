@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import type { Workspace, WorkspaceProvider } from "../lib/workspaces.js";
 
 /**
@@ -12,6 +13,18 @@ import type { Workspace, WorkspaceProvider } from "../lib/workspaces.js";
  */
 export const noWorkspaceProvider: WorkspaceProvider = {
   kind: "none",
+  async inspect(workingDir) {
+    if (!workingDir) return { exists: false, isRepository: false };
+    try {
+      const entry = await stat(workingDir);
+      return { exists: true, isRepository: false, problem: entry.isDirectory() ? undefined : "Path is not a directory." };
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error ? String(error.code) : undefined;
+      return code === "ENOENT"
+        ? { exists: false, isRepository: false }
+        : { exists: false, isRepository: false, problem: error instanceof Error ? error.message : String(error) };
+    }
+  },
   async prepare(): Promise<Workspace> {
     return { kind: "none" };
   },

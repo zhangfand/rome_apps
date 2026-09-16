@@ -15,11 +15,16 @@ export interface GitHubRootConfig {
   intakeLabel: string;
 }
 
-const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
+const REPO_RE = /^(?!\.{1,2}\/)(?!.*\/\.{1,2}$)[\w.-]+\/[\w.-]+$/;
 
 export function parseRepo(raw: unknown): string | undefined {
   if (typeof raw !== "string") return undefined;
-  const repo = raw.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/+$/, "");
+  const repo = raw.trim()
+    .replace(/^https?:\/\/github\.com\//i, "")
+    .replace(/^ssh:\/\/git@github\.com\//i, "")
+    .replace(/^git@github\.com:/i, "")
+    .replace(/\/+$/, "")
+    .replace(/\.git$/i, "");
   return REPO_RE.test(repo) ? repo : undefined;
 }
 
@@ -85,17 +90,6 @@ export const githubConfigExtensions: ConfigExtensions = {
     }
     const g = (nested ?? {}) as Record<string, unknown>;
     return { ok: true, values: { github: { intakeLabel: stringValue(g.intakeLabel ?? raw.intakeLabel) ?? DEFAULT_INTAKE_LABEL } satisfies GitHubRootConfig } };
-  },
-  validate(config) {
-    const routes = new Map<string, string>();
-    for (const [id, project] of Object.entries(config.projects)) {
-      const github = githubProject(project);
-      if (!github) continue;
-      const key = `${github.repo.toLowerCase()}|${github.projectLabel ?? ""}`;
-      if (routes.has(key)) return `projects sharing repo ${github.repo} need distinct projectLabels (${id})`;
-      routes.set(key, id);
-    }
-    return undefined;
   },
 };
 
