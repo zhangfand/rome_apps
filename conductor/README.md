@@ -118,6 +118,13 @@ conductor:setup {
 The SOP is editable on the Configuration page; a project may carry its own
 `sop` to override the global one.
 
+> **Dependency note:** `@rome-os/ui` is temporarily linked to a local
+> unpublished build (`"@rome-os/ui": "link:/app/packages/ui"`, version 0.3.1)
+> for the new page/layout-form/list-row components the settings rework uses.
+> `link:` symlinks the package's prebuilt `dist/` and skips its `prepare` build,
+> so a `--prod` install does not try to recompile it. Switch it back to `^0.3.1`
+> once that release is published to the registry.
+
 ## Where facts come from: the ingest seam
 
 Nothing outside Conductor appends to the ledger. A source — the GitHub poll, an

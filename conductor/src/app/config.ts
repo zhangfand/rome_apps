@@ -62,7 +62,7 @@ export const setupSchema = {
   },
 };
 
-export function githubPresentation(project: Parameters<typeof githubProject>[0], config?: ConductorConfig): { repo?: string; subtitle?: string; sourceEnabled?: boolean; sourceLabel?: string; emptySubtitle?: string } {
+export function githubPresentation(project: Parameters<typeof githubProject>[0], config?: ConductorConfig): { repo?: string; subtitle?: string; sourceEnabled?: boolean; sourceLabel?: string; sourceValue?: string; emptySubtitle?: string } {
   const github = githubProject(project);
   const repo = githubRepo(project);
   if (!repo) return { sourceLabel: "intake", emptySubtitle: "no repository · chat intake only" };
@@ -72,6 +72,7 @@ export function githubPresentation(project: Parameters<typeof githubProject>[0],
     subtitle: `${repo} · ${labels.length === 1 ? "label" : "labels"} ${labels.map((label) => `“${label}”`).join(" + ")}`,
     sourceEnabled: github?.enabled !== false,
     sourceLabel: "intake",
+    sourceValue: labels.join(" + "),
     emptySubtitle: "no repository · chat intake only",
   };
 }

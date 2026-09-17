@@ -54,10 +54,11 @@ export interface ConfigJson {
   maxDecisionsPerTurn: number;
 }
 
-export interface ProjectPresentation { repo?: string; subtitle?: string; sourceEnabled?: boolean; sourceLabel?: string; emptySubtitle?: string }
+export interface ProjectPresentation { repo?: string; subtitle?: string; sourceEnabled?: boolean; sourceLabel?: string; sourceValue?: string; emptySubtitle?: string }
 
 export interface RuntimeJson {
   heartbeatLeaseSeconds: number;
+  sopBuiltIn: boolean;
   workspaceKinds: string[];
   defaultWorkspaceKind: string;
 }

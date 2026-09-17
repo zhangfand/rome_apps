@@ -34,7 +34,7 @@ export interface CoreComposition {
   providerFor(kind: WorkspaceKind): WorkspaceProvider;
   setupSchema?: SetupSchemaExtension;
   projectPromptNote?(task: TaskView, audience: "worker" | "orchestrator"): string;
-  projectPresentation?(project: ProjectConfig | TaskView["project"] | undefined, config?: ConductorConfig): { repo?: string; subtitle?: string; sourceEnabled?: boolean; sourceLabel?: string; emptySubtitle?: string };
+  projectPresentation?(project: ProjectConfig | TaskView["project"] | undefined, config?: ConductorConfig): { repo?: string; subtitle?: string; sourceEnabled?: boolean; sourceLabel?: string; sourceValue?: string; emptySubtitle?: string };
   mergeConfig?(current: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown>;
   /** Defaults shown before setup. They are not persisted until a valid PATCH. */
   initialConfig: ConductorConfig;

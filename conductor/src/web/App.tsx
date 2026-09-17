@@ -4,8 +4,11 @@ import { fetchAppApi, getCurrentAppPath, navigateToApp, subscribeToAppPath, type
 import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
 import { Button } from "@rome-os/ui/button";
 import { cn } from "@rome-os/ui/cn";
+import { IconButton } from "@rome-os/ui/icon-button";
+import { Settings } from "lucide-react";
 import { Board } from "./core/components/board";
-import { Configuration } from "./core/components/configuration";
+import { Runtime } from "./core/components/runtime";
+import { SettingsDialog, type SettingsView } from "./core/components/settings-dialog";
 import { TaskDetail } from "./core/components/task-detail";
 import { TaskList } from "./core/components/task-list";
 import { bucketTask } from "./core/lib/facts";
@@ -17,29 +20,47 @@ configureWebDomain(githubWebDomain);
 
 const POLL_MS = 10_000;
 const FRESH_MS = 60_000;
-type Page = "board" | "tasks" | "config" | "detail";
+type Route =
+  | { page: "board" }
+  | { page: "tasks" }
+  | { page: "config" }
+  | { page: "runtime" }
+  | { page: "project"; projectId: string }
+  | { page: "detail"; taskId: string };
 
-function route(path: string): { page: Page; taskId: string | null } {
+function route(path: string): Route {
   const segment = path.replace(/^\/+|\/+$/g, "");
-  if (!segment) return { page: "board", taskId: null };
-  if (segment === "tasks") return { page: "tasks", taskId: null };
-  if (segment === "config") return { page: "config", taskId: null };
+  if (!segment) return { page: "board" };
+  const parts = segment.split("/");
+  if (segment === "tasks") return { page: "tasks" };
+  if (segment === "runtime") return { page: "runtime" };
+  if (parts[0] === "config") {
+    if (parts[1] === "projects" && parts[2]) return { page: "project", projectId: parts[2] };
+    return { page: "config" };
+  }
   return { page: "detail", taskId: segment };
 }
 
 export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBootstrap }) {
   const [path, setPath] = useState(() => getCurrentAppPath());
-  const { page, taskId } = route(path);
+  const current = route(path);
+  const page = current.page;
   const feed = useStateFeed();
   const [clock, setClock] = useState(() => Date.now());
 
+  const settingsView: SettingsView | null =
+    current.page === "config" ? { view: "overview" }
+    : current.page === "project" ? { view: "project", id: current.projectId }
+    : null;
+  const showsBoard = page === "board" || settingsView !== null;
+
   useEffect(() => subscribeToAppPath(setPath), []);
   useEffect(() => {
-    if (page !== "board") return;
+    if (!showsBoard) return;
     setClock(Date.now());
     const timer = window.setInterval(() => setClock(Date.now()), 1_000);
     return () => window.clearInterval(timer);
-  }, [page]);
+  }, [showsBoard]);
 
   const counts = useMemo(() => {
     const tasks = feed.state?.tasks ?? [];
@@ -52,7 +73,10 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
   return (
     <main className="mx-auto flex w-full max-w-[1060px] flex-col gap-4 px-5 pt-7 pb-20 text-foreground sm:px-8 sm:pt-9 md:px-11 md:pt-10 md:pb-[104px]">
       <header className="flex flex-wrap items-center justify-between gap-5">
-        <h1 className="text-[19px] leading-6 font-semibold tracking-[-0.02em]">Conductor</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-[19px] leading-6 font-semibold tracking-[-0.02em]">Conductor</h1>
+          <IconButton label="Settings" size="sm" icon={<Settings />} onClick={() => navigateToApp("/config")} />
+        </div>
       </header>
       <nav className="flex items-stretch gap-0.5 border-b border-border" aria-label="Conductor pages">
         <NavItem active={page === "board"} onClick={() => navigateToApp("/")}>
@@ -63,13 +87,16 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
           Tasks
           <span className="font-mono text-[10.5px] text-subtle-foreground">{counts.total}</span>
         </NavItem>
-        <NavItem active={page === "config"} onClick={() => navigateToApp("/config")}>SOP &amp; runtime</NavItem>
+        <NavItem active={page === "runtime"} onClick={() => navigateToApp("/runtime")}>
+          Runtime
+          {feed.state && feed.state.workers.length > 0 && <span className="font-mono text-[10.5px] text-subtle-foreground">{feed.state.workers.length}</span>}
+        </NavItem>
       </nav>
 
-      {page === "detail" && taskId ? (
-        <TaskDetail key={taskId} taskId={taskId} onTaskChanged={feed.updateTask} />
-      ) : page === "config" ? (
-        <Configuration />
+      {current.page === "detail" ? (
+        <TaskDetail key={current.taskId} taskId={current.taskId} onTaskChanged={feed.updateTask} />
+      ) : page === "runtime" ? (
+        <Runtime state={feed.state} />
       ) : page === "tasks" ? (
         <StateGate feed={feed}>
           {(state) => <TaskList tasks={state.tasks} now={state.now} freshIds={feed.freshIds} />}
@@ -79,6 +106,7 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
           {(state) => <Board state={state} now={clock} freshIds={feed.freshIds} reload={feed.load} updateTask={feed.updateTask} />}
         </StateGate>
       )}
+      {settingsView && <SettingsDialog open initialView={settingsView} onClose={() => navigateToApp("/")} />}
     </main>
   );
 }
@@ -130,11 +158,8 @@ function StateGate({ feed, board = false, children }: { feed: Feed; board?: bool
       <div className="flex max-w-[64ch] flex-col gap-3.5 py-10">
         <h2 className="text-display">Nothing to conduct yet.</h2>
         <p className="text-[15px] leading-[1.6] text-muted-foreground">Point Conductor at a working directory and a repository, and it will take in labeled issues from there.</p>
-        <pre className="overflow-x-auto rounded-[10px] border border-border bg-surface-muted px-[18px] py-4 font-mono text-[12.5px] leading-[1.7] shadow-[var(--inset-soft)]">{`conductor:setup {
-  projects: { playground: {
-    workingDir: "/abs/path",
-    github: { repo: "owner/name", intakeLabel: "conductor" } } }
-}`}</pre>
+        <div><Button onClick={() => navigateToApp("/config")}>Open settings</Button></div>
+        <p className="text-ui text-muted-foreground">Or set it up in one step with <code className="rounded bg-surface-muted px-1.5 font-mono">conductor:setup</code>.</p>
       </div>
     ) : <p className="text-ui text-muted-foreground">Nothing to list yet. Run <code className="rounded bg-surface-muted px-1.5 font-mono">conductor:setup</code> first.</p>;
   }

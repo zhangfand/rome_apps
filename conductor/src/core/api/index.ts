@@ -138,7 +138,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         if (request.method === "GET") {
           const config = settings.get();
           const shown = config ?? this.composition.initialConfig;
-          return json({ configured: Boolean(config), config: shown, runtime: runtimeJson(this.composition), projectPresentation: configPresentation(shown, this.composition) });
+          return json({ configured: Boolean(config), config: shown, runtime: runtimeJson(this.composition, shown), projectPresentation: configPresentation(shown, this.composition) });
         }
         if (request.method !== "PATCH") return json({ error: "method_not_allowed" }, 405);
         const body = readJsonBody<Record<string, unknown>>(request);
@@ -166,7 +166,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
           if (!installed.ok) return json({ error: installed.error }, 503);
         }
         this.ctx.log.info("guardian updated conductor configuration", { fields: Object.keys(patch) });
-        return json({ configured: true, config: parsed.config, runtime: runtimeJson(this.composition), projectPresentation: configPresentation(parsed.config, this.composition) });
+        return json({ configured: true, config: parsed.config, runtime: runtimeJson(this.composition, parsed.config), projectPresentation: configPresentation(parsed.config, this.composition) });
       }
       if (route === "tick" && request.method === "POST") {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
@@ -245,9 +245,11 @@ function configPresentation(config: ConductorConfig, composition: CoreCompositio
   return Object.fromEntries(Object.entries(config.projects).map(([id, project]) => [id, composition.projectPresentation?.(project, config) ?? {}]));
 }
 
-function runtimeJson(composition: CoreComposition) {
+function runtimeJson(composition: CoreComposition, config?: ConductorConfig) {
   return {
     heartbeatLeaseSeconds: HEARTBEAT_LEASE_MS / 1000,
+    /** Whether the global SOP is still the app's built-in one. */
+    sopBuiltIn: (config ?? composition.initialConfig).sop === composition.initialConfig.sop,
     workspaceKinds: composition.workspaceKinds,
     defaultWorkspaceKind: composition.defaultWorkspaceKind,
   };
