@@ -73,3 +73,10 @@ export interface WorkspaceInspection {
   dirty?: boolean;
   problem?: string;
 }
+
+export interface DirectoryBrowserListing {
+  path: string;
+  parent?: string;
+  entries: Array<{ name: string; path: string }>;
+  shortcuts: Array<{ label: string; path: string }>;
+}

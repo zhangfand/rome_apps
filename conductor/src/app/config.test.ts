@@ -15,6 +15,20 @@ describe("app config composition", () => {
     expect(parsed.config.github).toEqual({ intakeLabel: DEFAULT_INTAKE_LABEL });
   });
 
+  it("adds the PM worker to the exact pre-PM worker defaults without changing custom allowlists", () => {
+    const legacy = {
+      "coding:coding": "Writes code in the task's worktree: implements, tests, commits, pushes, opens pull requests. Has a shell and git.",
+      "assistant:assistant": "General assistant with web and shell access. Good for research, reading external state (e.g. a PR's review/CI status), reviewing, and writing summaries.",
+    };
+    const migrated = parseAppConfig({ ...base, workerAgents: legacy });
+    expect(migrated.ok).toBe(true);
+    if (migrated.ok) expect(migrated.config.workerAgents).toEqual(DEFAULT_WORKER_AGENTS);
+
+    const custom = parseAppConfig({ ...base, workerAgents: { "coding:coding": "Only this worker" } });
+    expect(custom.ok).toBe(true);
+    if (custom.ok) expect(custom.config.workerAgents).toEqual({ "coding:coding": "Only this worker" });
+  });
+
   it("normalizes the legacy stored GitHub shape on read", () => {
     const parsed = parseAppConfig({
       ...base,
@@ -28,6 +42,7 @@ describe("app config composition", () => {
       workingDir: "/repo",
       workspace: "git-worktree",
       github: { repo: "owner/name", intakeLabel: "project", projectLabel: "backend", enabled: false },
+      workRepo: { repo: "owner/app-work", workingDir: "/app-work" },
     });
     expect(parsed.config.projects.app).not.toHaveProperty("repo");
     expect(parsed.config).not.toHaveProperty("intakeLabel");
@@ -79,6 +94,43 @@ describe("app config composition", () => {
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
     expect(parsed.config.projects.app.github).toEqual({ repo: "owner/repo", projectLabel: "one", enabled: false });
+  });
+
+  it("derives one work repository per project and accepts an explicit override", () => {
+    const derived = parseAppConfig({ projects: { product: { workingDir: "/projects/product", github: { repo: "owner/code" } } } });
+    expect(derived.ok).toBe(true);
+    if (!derived.ok) return;
+    expect(derived.config.projects.product.workRepo).toEqual({ repo: "owner/product-work", workingDir: "/projects/product-work" });
+
+    const overridden = parseAppConfig({ projects: { product: {
+      workingDir: "/projects/product",
+      github: { repo: "owner/code" },
+      workRepo: { repo: "team/shared-work", workingDir: "/coordination/product" },
+    } } });
+    expect(overridden.ok).toBe(true);
+    if (!overridden.ok) return;
+    expect(overridden.config.projects.product.workRepo).toEqual({ repo: "team/shared-work", workingDir: "/coordination/product" });
+  });
+
+  it("derives work repositories under the configured coordination owner", () => {
+    const parsed = parseAppConfig({
+      workRepoOwner: "zhangfand",
+      projects: { rome: { workingDir: "/projects/rome", github: { repo: "rome-os/rome" } } },
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.config.workRepoOwner).toBe("zhangfand");
+    expect(parsed.config.projects.rome.workRepo).toEqual({ repo: "zhangfand/rome-work", workingDir: "/projects/rome-work" });
+  });
+
+  it("deep-merges a work repository PATCH", () => {
+    const current = parseAppConfig({ projects: { app: { workingDir: "/repo", github: { repo: "owner/repo" } } } });
+    expect(current.ok).toBe(true);
+    if (!current.ok) return;
+    const parsed = parseAppConfig(mergeAppConfig(current.config, { projects: { app: { workRepo: { workingDir: "/custom/work" } } } }));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.config.projects.app.workRepo).toEqual({ repo: "owner/app-work", workingDir: "/custom/work" });
   });
 
   it("deletes a project when its PATCH value is null", () => {

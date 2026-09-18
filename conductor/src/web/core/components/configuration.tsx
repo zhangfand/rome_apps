@@ -3,13 +3,14 @@ import { fetchAppApi } from "@rome-os/app-web-sdk";
 import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
 import { Badge } from "@rome-os/ui/badge";
 import { Button } from "@rome-os/ui/button";
+import { Card } from "@rome-os/ui/card";
 import { DialogBody, DialogFooter } from "@rome-os/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@rome-os/ui/field";
 import { Input } from "@rome-os/ui/input";
 import { FormRow, FormRowControl, FormRowDescription, FormRowHeading, FormRowLabel, FormRows } from "@rome-os/ui/layout-form";
-import { List, ListRow } from "@rome-os/ui/list-row";
 import { Section, SectionActions, SectionDescription, SectionHeader, SectionHeading, SectionTitle } from "@rome-os/ui/page";
 import { Spinner } from "@rome-os/ui/spinner";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rome-os/ui/table";
 import { Textarea } from "@rome-os/ui/textarea";
 import { ChevronRight } from "lucide-react";
 import { presentConfig, responseError, type ConfigResponse } from "../lib/config-api";
@@ -18,6 +19,7 @@ import { safeText } from "../lib/facts";
 import { useInspection } from "../lib/use-inspection";
 import type { ConfigJson, ProjectPresentation, RuntimeJson } from "../lib/types";
 import { ProjectStatusDot } from "./project-status";
+import { PathSelector } from "./path-selector";
 
 const JSON_HEADERS = { "content-type": "application/json" };
 type ProjectValue = ConfigJson["projects"][string];
@@ -77,19 +79,32 @@ export function ProjectsOverview({ onOpenProject, onAddProject, onEditSop }: {
         {projects.length === 0 ? (
           <p className="text-ui text-muted-foreground">Add the first project to finish configuring Conductor.</p>
         ) : (
-          <List>
-            {projects.map(([id, project]) => (
-              <ProjectListRow
-                key={id}
-                id={id}
-                project={project}
-                isDefault={config.defaultProject === id}
-                runtime={runtime}
-                presentation={projectPresentation[id]}
-                onOpen={onOpenProject}
-              />
-            ))}
-          </List>
+          <Card className="overflow-hidden py-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead scope="col" className="border-r border-border-subtle">Project</TableHead>
+                  <TableHead scope="col" className="border-r border-border-subtle">Repository</TableHead>
+                  <TableHead scope="col" className="w-28 border-r border-border-subtle">Intake</TableHead>
+                  <TableHead scope="col" className="w-28 border-r border-border-subtle">Status</TableHead>
+                  <TableHead scope="col" className="w-10"><span className="sr-only">Open</span></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {projects.map(([id, project]) => (
+                  <ProjectTableRow
+                    key={id}
+                    id={id}
+                    project={project}
+                    isDefault={config.defaultProject === id}
+                    runtime={runtime}
+                    presentation={projectPresentation[id]}
+                    onOpen={onOpenProject}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
         )}
       </Section>
 
@@ -116,7 +131,7 @@ export function ProjectsOverview({ onOpenProject, onAddProject, onEditSop }: {
   );
 }
 
-function ProjectListRow({ id, project, isDefault, runtime, presentation, onOpen }: {
+function ProjectTableRow({ id, project, isDefault, runtime, presentation, onOpen }: {
   id: string;
   project: ProjectValue;
   isDefault: boolean;
@@ -132,18 +147,22 @@ function ProjectListRow({ id, project, isDefault, runtime, presentation, onOpen 
   const intake = presentation?.sourceEnabled ? presentation.sourceValue ?? "on" : "off";
 
   return (
-    <ListRow asChild interactive className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,0.6fr)_auto_auto] gap-3">
-      <button type="button" onClick={() => onOpen(id)}>
+    <TableRow className="cursor-pointer" onClick={() => onOpen(id)}>
+      <TableCell className="border-r border-border-subtle">
         <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate font-medium">{safeText(id)}</span>
+          <Button variant="link" size="xs" align="start" className="min-w-0 truncate px-0 font-medium text-foreground" onClick={() => onOpen(id)}>
+            {safeText(id)}
+          </Button>
           {isDefault && <Badge variant="info">default</Badge>}
         </span>
-        <span className="truncate font-mono text-aux text-muted-foreground">{reference ? safeText(reference) : "—"}</span>
-        <span className="truncate text-aux text-muted-foreground">{safeText(intake)}</span>
-        <ProjectStatusDot status={status} showLabel />
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      </button>
-    </ListRow>
+      </TableCell>
+      <TableCell className="max-w-0 border-r border-border-subtle font-mono text-aux text-muted-foreground">
+        <span className="block truncate">{reference ? safeText(reference) : "—"}</span>
+      </TableCell>
+      <TableCell className="border-r border-border-subtle text-aux text-muted-foreground">{safeText(intake)}</TableCell>
+      <TableCell className="border-r border-border-subtle"><ProjectStatusDot status={status} showLabel /></TableCell>
+      <TableCell className="text-right"><ChevronRight className="ml-auto size-4 text-muted-foreground" aria-hidden="true" /></TableCell>
+    </TableRow>
   );
 }
 
@@ -199,7 +218,7 @@ export function AddProjectBody({ onBack, onCreated }: {
             </Field>
             <Field>
               <FieldLabel htmlFor="add-project-dir">Working directory</FieldLabel>
-              <Input id="add-project-dir" className="font-mono" value={workingDir} onChange={(event) => setWorkingDir(event.target.value)} placeholder="/absolute/path" />
+              <PathSelector id="add-project-dir" value={workingDir} onValueChange={(value) => setWorkingDir(value)} />
             </Field>
             {error && <FieldError errors={[safeText(error)]} />}
           </>

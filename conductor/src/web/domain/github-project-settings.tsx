@@ -13,6 +13,7 @@ import type { ProjectSettingsSlotProps } from "../core/domain";
 import { deriveProjectStatus } from "../core/lib/configuration";
 import { safeText } from "../core/lib/facts";
 import { ProjectStatusDot } from "../core/components/project-status";
+import { GitHubRepoSelector } from "./github-repo-selector";
 
 export function GitHubProjectSettings({ projectId, project, patch, inspection, refreshInspection, disabled }: ProjectSettingsSlotProps) {
   const github = objectValue(project.github);
@@ -86,7 +87,12 @@ export function GitHubProjectSettings({ projectId, project, patch, inspection, r
             <FormRow>
               <FormRowHeading><FormRowLabel htmlFor={`github-repo-${projectId}`}>Repository</FormRowLabel></FormRowHeading>
               <FormRowControl>
-                <Input id={`github-repo-${projectId}`} className="w-44 min-w-0 font-mono sm:w-80" value={repo} disabled={disabled} onChange={(event) => setField({ repo: event.target.value })} placeholder="owner/name" />
+                <GitHubRepoSelector
+                  id={`github-repo-${projectId}`}
+                  value={repo}
+                  disabled={disabled}
+                  onValueChange={(value, source) => setField({ repo: value }, { immediate: source === "picker" })}
+                />
               </FormRowControl>
             </FormRow>
             <FormRow>

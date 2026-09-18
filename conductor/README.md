@@ -90,7 +90,7 @@ writes one fact.
 
 ## Setup
 
-Open **SOP & runtime** → **Projects** in the app to add, edit, inspect, or
+Open **Settings** → **Projects** in the app to add, edit, inspect, or
 remove projects. The form accepts a permanent lowercase slug, an absolute
 working directory, a workspace kind, GitHub repository and intake settings,
 an optional project SOP, and the default-project choice. A GitHub repository
@@ -100,23 +100,46 @@ directories are never replaced. Project deletion is blocked when open tasks
 are pinned to it until the UI's explicit force confirmation. Existing tasks
 keep the project snapshot recorded when they were created.
 
+Each project also gets a private agent work repository named
+`<project>-work`, checked out beside the code repository. It holds product
+specs, engineering designs, and other coordination artifacts. **Set up**
+creates the private GitHub repository when needed and clones it locally.
+Repository fields keep manual entry for new repositories and also provide a
+searchable selector populated from every repository visible to the connected
+GitHub identity.
+
 The same settings remain available programmatically:
 
 ```
 conductor:setup {
   projects: {
-    playground: { workingDir: "/abs/path", github: { repo: "owner/name", intakeLabel: "conductor" } },
+    playground: {
+      workingDir: "/abs/path",
+      github: { repo: "owner/name", intakeLabel: "conductor" },
+      workRepo: { repo: "owner/playground-work", workingDir: "/abs/playground-work" }, // optional; derived by default
+    },
     research:   { workspace: "none", sop: "..." },
   },
+  workRepoOwner?: "owner", // default owner for derived <project>-work repositories
   github?: { intakeLabel: "conductor" },
   sop?: "...",            // omit for the built-in software-development SOP (src/domain/sop.ts)
-  workerAgents?: { "coding:coding": "...", "assistant:assistant": "..." },
+  workerAgents?: { "conductor:pm": "...", "coding:coding": "...", "assistant:assistant": "..." },
   maxWorkers?: 3, intervalMinutes?: 5, reuseSessions?: true, maxDecisionsPerTurn?: 25
 }
 ```
 
 The SOP is editable on the Configuration page; a project may carry its own
 `sop` to override the global one.
+
+### PM worker
+
+`conductor:pm` is a specialist worker backed by the bundled PM skill from
+`zhangfand/software-factory`. The orchestrator may send it a broad or ambiguous
+feature request before coding. It researches the codebase read-only and writes
+`<slug>/spec.md` to the project's agent work repository. Questions return as a
+blocked worker result; the orchestrator asks the person and resumes the same PM
+session. A successful return names a pushed, `Status: ready` spec that a coding
+worker can consume.
 
 > **Dependency note:** `@rome-os/ui` is temporarily linked to a local
 > unpublished build (`"@rome-os/ui": "link:/app/packages/ui"`, version 0.3.1)

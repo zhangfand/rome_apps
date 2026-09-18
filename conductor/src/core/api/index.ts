@@ -10,6 +10,7 @@ import { type Fact } from "../lib/facts.js";
 import { fold, foldTask, needsAttention, type TaskView } from "../lib/fold.js";
 import { applyIngest, type IngestRequest, planIngest } from "../lib/ingest.js";
 import { HEARTBEAT_LEASE_MS } from "../lib/worker-health.js";
+import { browseDirectories, DirectoryBrowserError } from "../lib/directory-browser.js";
 
 /**
  *   GET state              every task, folded, with its latest decision
@@ -22,6 +23,7 @@ import { HEARTBEAT_LEASE_MS } from "../lib/worker-health.js";
  *   POST tasks/:id/cancel  close as not wanted, through conductor:cancel
  *   GET|PATCH config       settings; projects.<id>: null deletes (force=1 overrides the open-task guard)
  *   GET config/inspect     inspect one working directory through its workspace provider
+ *   GET config/directories browse directories on the Rome host
  *   POST config/<domain>   app-owned configuration operations, such as cloning
  *   POST tick              run a tick now
  */
@@ -122,6 +124,16 @@ class ConductorApiHandler implements RomeAppApiHandler {
         const inspect = this.composition.providerFor(kind).inspect;
         if (!inspect) return json({ error: `Workspace kind ${kind} cannot be inspected.` }, 501);
         return json(await inspect(workingDir));
+      }
+      if (route === "config/directories") {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);
+        try {
+          return json(await browseDirectories(request.query.get("path") ?? undefined));
+        } catch (error) {
+          if (error instanceof DirectoryBrowserError) return json({ error: error.message }, error.status);
+          throw error;
+        }
       }
       const configRoute = request.path[0] === "config"
         ? this.composition.configRoutes?.find((candidate) => (

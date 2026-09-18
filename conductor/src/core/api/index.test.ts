@@ -57,6 +57,21 @@ describe("app-owned task reads", () => {
 });
 
 describe("configuration writes", () => {
+  it("lets only the guardian browse host directories", async () => {
+    const { sqlite, handler } = configuredHandler(undefined);
+    const request = apiRequest("GET", ["config", "directories"]);
+    request.query.set("path", process.cwd());
+
+    const response = await handler.handle(request);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ path: process.cwd(), entries: expect.any(Array) });
+
+    const denied = apiRequest("GET", ["config", "directories"]);
+    denied.caller = { kind: "anonymous" };
+    expect((await handler.handle(denied)).status).toBe(403);
+    sqlite.close();
+  });
+
   it("guards project deletion by open pinned tasks and accepts forced deletion", async () => {
     const { sqlite, handler } = configuredHandler({
       projects: { app: { workingDir: "/repo" }, second: { workspace: "none" }, keep: { workspace: "none" } },
@@ -113,11 +128,12 @@ function taskRequest(taskId: string, caller: RomeAppApiRequest["caller"]): RomeA
 }
 
 function configRequest(method: "GET" | "PATCH", body?: unknown): RomeAppApiRequest {
+  return apiRequest(method, ["config"], body);
+}
+
+function apiRequest(method: "GET" | "PATCH", path: string[], body?: unknown): RomeAppApiRequest {
   return {
-    method,
-    path: ["config"],
-    headers: {},
-    query: new URLSearchParams(),
+    method, path, headers: {}, query: new URLSearchParams(),
     caller: { kind: "guardian", userId: "g1", via: "cookie" },
     ...(body === undefined ? {} : { body: new TextEncoder().encode(JSON.stringify(body)) }),
   };

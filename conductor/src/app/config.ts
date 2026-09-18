@@ -9,16 +9,36 @@ import {
 } from "../core/lib/config.js";
 import { DEFAULT_SOP } from "../domain/sop.js";
 import { DEFAULT_INTAKE_LABEL, githubConfigExtensions, githubProject, githubRepo, githubRoot } from "../domain/adapters/github/config.js";
+import { defaultWorkRepo, workRepoFor } from "../domain/work-repo.js";
+import type { ConfigExtensions } from "../core/lib/config.js";
 
-export const DEFAULT_WORKER_AGENTS: Record<string, string> = {
+const PM_AGENT_DESCRIPTION = "Product manager for broad or ambiguous feature requests. Researches the codebase and product precedents, decides defaults, and writes a bounded, implementation-ready spec in the project's agent work repo. Use before coding when scope or user-visible behavior is not clear; if it returns questions, ask the person and resume the same worker.";
+
+const LEGACY_DEFAULT_WORKER_AGENTS: Record<string, string> = {
   "coding:coding": "Writes code in the task's worktree: implements, tests, commits, pushes, opens pull requests. Has a shell and git.",
   "assistant:assistant": "General assistant with web and shell access. Good for research, reading external state (e.g. a PR's review/CI status), reviewing, and writing summaries.",
 };
 
-export const parseAppConfig = createConfigParser(
+export const DEFAULT_WORKER_AGENTS: Record<string, string> = {
+  "conductor:pm": PM_AGENT_DESCRIPTION,
+  ...LEGACY_DEFAULT_WORKER_AGENTS,
+};
+
+const parseConfig = createConfigParser(
   { sop: DEFAULT_SOP, workerAgents: DEFAULT_WORKER_AGENTS, workspaceKinds: ["git-worktree", "none"], defaultWorkspaceKind: "git-worktree" },
-  githubConfigExtensions,
+  appConfigExtensions(),
 );
+
+/** Add the PM worker to installs that still carry the exact pre-PM defaults. */
+export function parseAppConfig(raw: unknown) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return parseConfig(raw);
+  const value = raw as Record<string, unknown>;
+  const workers = value.workerAgents;
+  const migrated = workers && typeof workers === "object" && !Array.isArray(workers) && sameRecord(workers as Record<string, unknown>, LEGACY_DEFAULT_WORKER_AGENTS)
+    ? { ...value, workerAgents: DEFAULT_WORKER_AGENTS }
+    : value;
+  return parseConfig(migrated);
+}
 
 /** UI-only defaults for an install that has not persisted settings yet. */
 export const initialAppConfig: ConductorConfig = {
@@ -46,6 +66,14 @@ export const setupSchema = {
         enabled: { type: "boolean" },
       },
     },
+    workRepo: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        repo: { type: "string" },
+        workingDir: { type: "string" },
+      },
+    },
     // One-release compatibility input shape.
     repo: { type: "string" },
     intakeEnabled: { type: "boolean" },
@@ -53,6 +81,10 @@ export const setupSchema = {
     projectLabel: { type: "string" },
   },
   rootProperties: {
+    workRepoOwner: {
+      type: "string",
+      description: "Default GitHub owner for per-project agent work repositories (for example, zhangfand).",
+    },
     github: {
       type: "object",
       additionalProperties: false,
@@ -74,6 +106,47 @@ export function githubPresentation(project: Parameters<typeof githubProject>[0],
     sourceLabel: "intake",
     sourceValue: labels.join(" + "),
     emptySubtitle: "no repository · chat intake only",
+  };
+}
+
+function appConfigExtensions(): ConfigExtensions {
+  return {
+    project(id, raw, root) {
+      const github = githubConfigExtensions.project?.(id, raw, root) ?? { ok: true as const };
+      if (!github.ok) return github;
+
+      const nested = raw.workRepo;
+      if (nested !== undefined && (!nested || typeof nested !== "object" || Array.isArray(nested))) {
+        return { ok: false, error: `projects.${id}.workRepo must be an object` };
+      }
+      const supplied = (nested ?? {}) as Record<string, unknown>;
+      const parsedGithub = github.values?.github as { repo?: string } | undefined;
+      const owner = parseWorkRepoOwner(root.workRepoOwner);
+      const derived = defaultWorkRepo(id, parsedGithub?.repo, typeof raw.workingDir === "string" ? raw.workingDir : undefined, owner);
+      const repoRaw = supplied.repo ?? derived?.repo;
+      const workingDirRaw = supplied.workingDir ?? derived?.workingDir;
+      const candidate = workRepoFor({ workRepo: { repo: repoRaw, workingDir: workingDirRaw } });
+      if ((repoRaw !== undefined || workingDirRaw !== undefined) && !candidate) {
+        return { ok: false, error: `projects.${id}.workRepo requires an owner/name repo and an absolute workingDir` };
+      }
+      return { ok: true, values: { ...(github.values ?? {}), ...(candidate ? { workRepo: candidate } : {}) } };
+    },
+    root(raw) {
+      const github = githubConfigExtensions.root?.(raw) ?? { ok: true as const };
+      if (!github.ok) return github;
+      const owner = raw.workRepoOwner;
+      if (owner !== undefined && !parseWorkRepoOwner(owner)) {
+        return { ok: false, error: "workRepoOwner must be a GitHub owner name" };
+      }
+      return {
+        ok: true,
+        values: {
+          ...(github.values ?? {}),
+          ...(owner !== undefined ? { workRepoOwner: parseWorkRepoOwner(owner) } : {}),
+        },
+      };
+    },
+    validate: githubConfigExtensions.validate,
   };
 }
 
@@ -109,6 +182,11 @@ export function mergeAppConfig(current: Record<string, unknown>, patch: Record<s
         ...projectCurrent,
         ...projectPatch,
         ...((projectPatch.github !== undefined || Object.keys(legacy).length) ? { github: { ...githubCurrent, ...legacy, ...githubPatch } } : {}),
+        ...(projectPatch.workRepo !== undefined ? {
+          workRepo: projectPatch.workRepo && typeof projectPatch.workRepo === "object" && !Array.isArray(projectPatch.workRepo)
+            ? { ...objectValue(projectCurrent.workRepo), ...projectPatch.workRepo as Record<string, unknown> }
+            : projectPatch.workRepo,
+        } : {}),
       };
     }
     merged.projects = projects;
@@ -119,4 +197,15 @@ export function mergeAppConfig(current: Record<string, unknown>, patch: Record<s
 
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function sameRecord(actual: Record<string, unknown>, expected: Record<string, string>): boolean {
+  const keys = Object.keys(actual);
+  return keys.length === Object.keys(expected).length && keys.every((key) => actual[key] === expected[key]);
+}
+
+function parseWorkRepoOwner(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const owner = value.trim();
+  return owner && /^[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?$/.test(owner) ? owner : undefined;
 }

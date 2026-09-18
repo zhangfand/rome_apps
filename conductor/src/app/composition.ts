@@ -5,6 +5,9 @@ import { SOURCE_ADAPTERS } from "./adapters/index.js";
 import { initialAppConfig, parseAppConfig, githubPresentation, mergeAppConfig, setupSchema } from "./config.js";
 import { providerFor } from "./workspaces/index.js";
 import { cloneConfigRoute } from "../domain/config/clone.js";
+import { workRepoPromptNote } from "../domain/work-repo.js";
+import { setupWorkRepoConfigRoute } from "../domain/config/work-repo.js";
+import { githubRepositoriesConfigRoute } from "../domain/config/github-repositories.js";
 
 export const APP_COMPOSITION: CoreComposition = {
   parseConfig: parseAppConfig,
@@ -13,7 +16,7 @@ export const APP_COMPOSITION: CoreComposition = {
   sourceAdapters: SOURCE_ADAPTERS,
   providerFor,
   setupSchema,
-  projectPromptNote: githubPromptNote,
+  projectPromptNote: (task, audience) => `${githubPromptNote(task, audience)}${workRepoPromptNote(task, audience)}`,
   projectPresentation: githubPresentation,
   mergeConfig: mergeAppConfig,
   initialConfig: initialAppConfig,
@@ -22,5 +25,9 @@ export const APP_COMPOSITION: CoreComposition = {
     path: ["pull-requests"],
     handle: readPullRequestStatuses,
   }],
-  configRoutes: [{ method: "POST", path: ["clone"], handle: cloneConfigRoute }],
+  configRoutes: [
+    { method: "POST", path: ["clone"], handle: cloneConfigRoute },
+    { method: "GET", path: ["github", "repositories"], handle: githubRepositoriesConfigRoute },
+    { method: "POST", path: ["work-repo", "setup"], handle: setupWorkRepoConfigRoute },
+  ],
 };

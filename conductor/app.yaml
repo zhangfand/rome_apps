@@ -28,6 +28,10 @@ db:
 agents:
   - app/agents/conductor.yaml
   - app/agents/orchestrator.yaml
+  - app/agents/pm.yaml
+
+skills:
+  - app/skills/pm
 
 actions:
   - app/actions/setup

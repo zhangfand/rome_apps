@@ -21,7 +21,7 @@ export function SettingsDialog({ open, initialView, onClose }: {
 }) {
   const [stack, setStack] = useState<SettingsView[]>([initialView]);
   const [projectStatus, setProjectStatus] = useState("");
-  const [projectHeading, setProjectHeading] = useState<{ isDefault: boolean; workingDir: string } | null>(null);
+  const [projectHeading, setProjectHeading] = useState<{ isDefault: boolean } | null>(null);
   const [sopDirty, setSopDirty] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const wasOpen = useRef(open);
@@ -69,7 +69,6 @@ export function SettingsDialog({ open, initialView, onClose }: {
               {safeText(active.id)}
               {projectHeading?.isDefault && <Badge variant="info">default</Badge>}
             </DialogTitle>
-            {projectHeading?.workingDir && <DialogDescription className="truncate font-mono">{safeText(projectHeading.workingDir)}</DialogDescription>}
           </SettingsDialogHeader>
           <DialogBody className="min-h-[60vh]">
             <ProjectSettingsBody key={active.id} projectId={active.id} onBack={pop} reportStatus={setProjectStatus} reportHeading={setProjectHeading} />

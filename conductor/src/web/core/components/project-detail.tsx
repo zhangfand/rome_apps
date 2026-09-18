@@ -4,7 +4,6 @@ import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
 import { Button } from "@rome-os/ui/button";
 import { Dialog, DialogBody, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@rome-os/ui/dialog";
 import { FieldError } from "@rome-os/ui/field";
-import { Input } from "@rome-os/ui/input";
 import { FormRow, FormRowControl, FormRowHeading, FormRowLabel, FormRows } from "@rome-os/ui/layout-form";
 import { Section, SectionHeader, SectionHeading, SectionTitle } from "@rome-os/ui/page";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@rome-os/ui/select";
@@ -16,6 +15,7 @@ import { createSaveQueue, saveStatusText, type SaveQueue } from "../lib/configur
 import { safeText } from "../lib/facts";
 import { useInspection } from "../lib/use-inspection";
 import type { ConfigJson, RuntimeJson } from "../lib/types";
+import { PathSelector } from "./path-selector";
 
 const JSON_HEADERS = { "content-type": "application/json" };
 const IDLE_MS = 600;
@@ -25,7 +25,7 @@ export function ProjectSettingsBody({ projectId, onBack, reportStatus, reportHea
   projectId: string;
   onBack: () => void;
   reportStatus: (text: string) => void;
-  reportHeading: (heading: { isDefault: boolean; workingDir: string }) => void;
+  reportHeading: (heading: { isDefault: boolean }) => void;
 }) {
   const [config, setConfig] = useState<ConfigJson | null>(null);
   const [runtime, setRuntime] = useState<RuntimeJson | null>(null);
@@ -79,7 +79,7 @@ function ProjectDetailBody({ projectId, initialConfig, runtime, onServerConfig, 
   onServerConfig: (config: ConfigJson) => void;
   onBack: () => void;
   reportStatus: (text: string) => void;
-  reportHeading: (heading: { isDefault: boolean; workingDir: string }) => void;
+  reportHeading: (heading: { isDefault: boolean }) => void;
 }) {
   const initialProject = initialConfig.projects[projectId] as ProjectValue;
   const [draft, setDraftState] = useState<ProjectValue>(() => ({ ...initialProject }));
@@ -148,7 +148,7 @@ function ProjectDetailBody({ projectId, initialConfig, runtime, onServerConfig, 
 
   const workspace = typeof draft.workspace === "string" ? draft.workspace : runtime.defaultWorkspaceKind;
   const workingDir = typeof draft.workingDir === "string" ? draft.workingDir : "";
-  useEffect(() => { reportHeading({ isDefault, workingDir }); }, [isDefault, workingDir, reportHeading]);
+  useEffect(() => { reportHeading({ isDefault }); }, [isDefault, reportHeading]);
   const sopOverride = typeof draft.sop === "string" ? draft.sop : "";
   const { inspection, refresh: refreshInspection } = useInspection(workspace, workingDir);
   const slots = webDomain().projectSettingsFields;
@@ -161,13 +161,11 @@ function ProjectDetailBody({ projectId, initialConfig, runtime, onServerConfig, 
           <FormRow>
             <FormRowHeading><FormRowLabel htmlFor="project-working-dir">Working directory</FormRowLabel></FormRowHeading>
             <FormRowControl>
-              <Input
+              <PathSelector
                 id="project-working-dir"
-                className="w-40 min-w-0 font-mono sm:w-80"
                 value={workingDir}
-                onChange={(event) => applyPatch({ workingDir: event.target.value })}
+                onValueChange={(value, source) => applyPatch({ workingDir: value }, { immediate: source === "picker" })}
                 onBlur={flush}
-                placeholder="/absolute/path"
               />
             </FormRowControl>
           </FormRow>
