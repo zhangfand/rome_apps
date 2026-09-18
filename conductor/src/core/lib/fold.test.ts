@@ -43,6 +43,7 @@ describe("foldTask", () => {
     facts.push(f({ kind: "Reply", by: "zhangfan", source: "go", payload: { text: "go" } }));
     task = foldTask(facts);
     expect(task.decisionsSinceLastPersonFact).toBe(0);
+    expect(task.waiting).toBeUndefined();
     expect(needsAttention(task, new Date(t0 + 10_000)).wake).toBe(true);
   });
   it("orchestrator Completed closes the task", () => {

@@ -98,7 +98,11 @@ export function foldTask(facts: readonly Fact[]): TaskView {
   }
 
   const unseen = ordered.filter((f) => f.seq > lastDecisionSeq && f.kind !== "Opened");
-  const waiting = lastDecision?.kind === "Waited"
+  // A person's reply supersedes a prior wait immediately, before the
+  // orchestrator has had time to record its next decision. Keeping the old
+  // wait here makes the UI claim that the task is still sleeping after the
+  // person has answered it.
+  const waiting = decisionsSinceLastPersonFact > 0 && lastDecision?.kind === "Waited"
     ? { reason: (lastDecision as WaitedFact).payload.reason, resumeAfter: (lastDecision as WaitedFact).payload.resumeAfter }
     : undefined;
 

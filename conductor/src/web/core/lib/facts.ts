@@ -65,12 +65,22 @@ export function isSafetyEvent(fact: FactJson | undefined): boolean {
   return fact?.kind === "Event" && value(fact.payload, "type") === "circuit_breaker";
 }
 
+/**
+ * An Asked/Reported decision needs the person only until that person writes a
+ * newer fact. `lastDecision` is historical and deliberately remains present
+ * after a reply, so it must never be used by itself as outstanding attention.
+ */
+export function hasOutstandingPersonDecision(task: TaskSummary): boolean {
+  return task.decisionsSinceLastPersonFact > 0 &&
+    (task.lastDecision?.kind === "Asked" || task.lastDecision?.kind === "Reported");
+}
+
 /** The four user-facing task groups are derived solely from TaskSummary. */
 export function bucketTask(task: TaskSummary): TaskBucket {
   if (task.state !== "open") return "closed";
   if (task.liveWorker) return "running";
   if (task.waiting) return "resting";
-  if (isSafetyEvent(task.latest) || task.lastDecision?.kind === "Asked" || task.lastDecision?.kind === "Reported") {
+  if (isSafetyEvent(task.latest) || hasOutstandingPersonDecision(task)) {
     return "needs-you";
   }
   return "resting";

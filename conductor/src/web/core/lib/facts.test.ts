@@ -31,14 +31,23 @@ describe("bucketTask", () => {
   });
 
   it("prefers running, then resting, before a prior question or report", () => {
-    expect(bucketTask(task({ liveWorker: { workerId: "w-1", agent: "coding:coding", since: "2026-09-11T00:00:00.000Z" }, lastDecision: item("Asked") }))).toBe("running");
-    expect(bucketTask(task({ waiting: { reason: "check later", resumeAfter: "2026-09-12T00:00:00.000Z" }, lastDecision: item("Reported") }))).toBe("resting");
+    expect(bucketTask(task({ liveWorker: { workerId: "w-1", agent: "coding:coding", since: "2026-09-11T00:00:00.000Z" }, lastDecision: item("Asked"), decisionsSinceLastPersonFact: 1 }))).toBe("running");
+    expect(bucketTask(task({ waiting: { reason: "check later", resumeAfter: "2026-09-12T00:00:00.000Z" }, lastDecision: item("Reported"), decisionsSinceLastPersonFact: 1 }))).toBe("resting");
   });
 
   it("recognises questions, reports, and the safety event as needing the person", () => {
-    expect(bucketTask(task({ lastDecision: item("Asked") }))).toBe("needs-you");
-    expect(bucketTask(task({ lastDecision: item("Reported") }))).toBe("needs-you");
+    expect(bucketTask(task({ lastDecision: item("Asked"), decisionsSinceLastPersonFact: 1 }))).toBe("needs-you");
+    expect(bucketTask(task({ lastDecision: item("Reported"), decisionsSinceLastPersonFact: 1 }))).toBe("needs-you");
     expect(bucketTask(task({ latest: item("Event", { type: "circuit_breaker" }) }))).toBe("needs-you");
+  });
+
+  it("stops asking for input as soon as the person has replied", () => {
+    expect(bucketTask(task({
+      latest: { ...item("Reply", { text: "yes" }), seq: 2 },
+      lastDecision: item("Asked", { question: "Proceed?" }),
+      decisionsSinceLastPersonFact: 0,
+      factCount: 3,
+    }))).toBe("resting");
   });
 
   it("rests an otherwise open task", () => {

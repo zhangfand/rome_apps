@@ -287,6 +287,7 @@ function latestRestingText(task: TaskSummary): string {
 }
 
 function restingWhen(task: TaskSummary, now: number): string {
+  if (task.needsAttention) return "picking up now";
   if (!task.waiting) return "ready when something changes";
   const remaining = new Date(task.waiting.resumeAfter).getTime() - now;
   return remaining <= 0 ? "ready to continue" : `continues in ${compactDuration(remaining)}`;

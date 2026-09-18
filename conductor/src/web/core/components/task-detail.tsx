@@ -20,6 +20,7 @@ import {
   factBody,
   factLabel,
   factTone,
+  hasOutstandingPersonDecision,
   isRoutine,
   isSafetyEvent,
   latestText,
@@ -347,8 +348,9 @@ function whereItStands(task: TaskDetailJson): string {
   if (task.liveWorker) return `Work is moving now. ${latestText(task)}`;
   if (task.waiting) return `${safeText(task.waiting.reason)} It will continue after ${formatStamp(task.waiting.resumeAfter)}.`;
   if (isSafetyEvent(task.latest)) return `${factBody(task.latest).title}. ${attentionText(task)}`;
-  if (task.lastDecision?.kind === "Asked") return `${attentionText(task)} Conductor is waiting for your answer.`;
-  if (task.lastDecision?.kind === "Reported") return `${attentionText(task)} Conductor is waiting for your reply. Nothing is running.`;
+  if (hasOutstandingPersonDecision(task) && task.lastDecision?.kind === "Asked") return `${attentionText(task)} Conductor is waiting for your answer.`;
+  if (hasOutstandingPersonDecision(task) && task.lastDecision?.kind === "Reported") return `${attentionText(task)} Conductor is waiting for your reply. Nothing is running.`;
+  if (task.latest.kind === "Reply" && task.needsAttention) return `Your reply was sent. Conductor is picking it up now.`;
   return `${latestText(task)} Nothing is running right now.`;
 }
 
