@@ -14,15 +14,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@rome-os/ui/textarea";
 import { ChevronRight } from "lucide-react";
 import { presentConfig, responseError, type ConfigResponse } from "../lib/config-api";
-import { deriveProjectStatus } from "../lib/configuration";
 import { safeText } from "../lib/facts";
-import { useInspection } from "../lib/use-inspection";
 import type { ConfigJson, ProjectPresentation, RuntimeJson } from "../lib/types";
-import { ProjectStatusDot } from "./project-status";
 import { PathSelector } from "./path-selector";
 
 const JSON_HEADERS = { "content-type": "application/json" };
-type ProjectValue = ConfigJson["projects"][string];
 
 function useConfig() {
   const [config, setConfig] = useState<ConfigJson | null>(null);
@@ -86,18 +82,15 @@ export function ProjectsOverview({ onOpenProject, onAddProject, onEditSop }: {
                   <TableHead scope="col" className="border-r border-border-subtle">Project</TableHead>
                   <TableHead scope="col" className="border-r border-border-subtle">Repository</TableHead>
                   <TableHead scope="col" className="w-28 border-r border-border-subtle">Intake</TableHead>
-                  <TableHead scope="col" className="w-28 border-r border-border-subtle">Status</TableHead>
                   <TableHead scope="col" className="w-10"><span className="sr-only">Open</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {projects.map(([id, project]) => (
+                {projects.map(([id]) => (
                   <ProjectTableRow
                     key={id}
                     id={id}
-                    project={project}
                     isDefault={config.defaultProject === id}
-                    runtime={runtime}
                     presentation={projectPresentation[id]}
                     onOpen={onOpenProject}
                   />
@@ -131,18 +124,12 @@ export function ProjectsOverview({ onOpenProject, onAddProject, onEditSop }: {
   );
 }
 
-function ProjectTableRow({ id, project, isDefault, runtime, presentation, onOpen }: {
+function ProjectTableRow({ id, isDefault, presentation, onOpen }: {
   id: string;
-  project: ProjectValue;
   isDefault: boolean;
-  runtime: RuntimeJson;
   presentation?: ProjectPresentation;
   onOpen: (id: string) => void;
 }) {
-  const workspace = typeof project.workspace === "string" ? project.workspace : runtime.defaultWorkspaceKind;
-  const workingDir = typeof project.workingDir === "string" ? project.workingDir : "";
-  const { inspection, inspectionError } = useInspection(workspace, workingDir);
-  const status = deriveProjectStatus(inspection, inspectionError, false, workspace === "none");
   const reference = presentation?.repo ?? "";
   const intake = presentation?.sourceEnabled ? presentation.sourceValue ?? "on" : "off";
 
@@ -160,7 +147,6 @@ function ProjectTableRow({ id, project, isDefault, runtime, presentation, onOpen
         <span className="block truncate">{reference ? safeText(reference) : "—"}</span>
       </TableCell>
       <TableCell className="border-r border-border-subtle text-aux text-muted-foreground">{safeText(intake)}</TableCell>
-      <TableCell className="border-r border-border-subtle"><ProjectStatusDot status={status} showLabel /></TableCell>
       <TableCell className="text-right"><ChevronRight className="ml-auto size-4 text-muted-foreground" aria-hidden="true" /></TableCell>
     </TableRow>
   );

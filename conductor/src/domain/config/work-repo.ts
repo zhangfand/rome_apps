@@ -24,6 +24,22 @@ export async function setupWorkRepository(
   input: { repo?: unknown; workingDir?: unknown },
   commands: WorkRepoCommands = ghCommands,
 ): Promise<SetupResult> {
+  return provisionWorkRepository(input, commands, false);
+}
+
+/** Create a brand-new private remote and clone it, refusing to reuse an existing repository. */
+export async function createWorkRepository(
+  input: { repo?: unknown; workingDir?: unknown },
+  commands: WorkRepoCommands = ghCommands,
+): Promise<SetupResult> {
+  return provisionWorkRepository(input, commands, true);
+}
+
+async function provisionWorkRepository(
+  input: { repo?: unknown; workingDir?: unknown },
+  commands: WorkRepoCommands,
+  mustCreate: boolean,
+): Promise<SetupResult> {
   const repo = parseRepo(input.repo);
   if (!repo) return { ok: false, error: "repo must be an owner/name or github.com URL", status: 400 };
   if (typeof input.workingDir !== "string" || !path.isAbsolute(input.workingDir) || input.workingDir.includes("\0")) {
@@ -36,10 +52,16 @@ export async function setupWorkRepository(
     if (!entry.isDirectory()) return { ok: false, error: "The target exists and is not a directory.", status: 409 };
     if ((await readdir(workingDir)).length > 0) {
       const inspection = await inspectGitWorkspace(workingDir);
-      if (inspection.isRepository && inspection.originRepo?.toLowerCase() === repo.toLowerCase()) {
+      if (!mustCreate && inspection.isRepository && inspection.originRepo?.toLowerCase() === repo.toLowerCase()) {
         return { ok: true, repo, workingDir, created: false, cloned: false };
       }
-      return { ok: false, error: inspection.problem ?? "The target directory is not the configured work repository.", status: 409 };
+      return {
+        ok: false,
+        error: mustCreate
+          ? "The local checkout path must be empty when creating a new repository."
+          : inspection.problem ?? "The target directory is not the configured work repository.",
+        status: 409,
+      };
     }
   } catch (error) {
     const code = error && typeof error === "object" && "code" in error ? String(error.code) : undefined;
@@ -51,6 +73,10 @@ export async function setupWorkRepository(
     exists = await commands.exists(repo);
   } catch (error) {
     return { ok: false, error: shortError(error), status: 502 };
+  }
+
+  if (mustCreate && exists) {
+    return { ok: false, error: `GitHub repository ${repo} already exists. Select it and use Set up instead.`, status: 409 };
   }
 
   if (!exists) {
@@ -71,6 +97,13 @@ export async function setupWorkRepoConfigRoute(_ctx: RomeAppContext, request: Ro
   if (!body) return json({ error: "A JSON object is required." }, 400);
   const result = await setupWorkRepository(body);
   return result.ok ? json(result) : json({ error: result.error }, result.status);
+}
+
+export async function createWorkRepoConfigRoute(_ctx: RomeAppContext, request: RomeAppApiRequest): Promise<Response> {
+  const body = readBody(request);
+  if (!body) return json({ error: "A JSON object is required." }, 400);
+  const result = await createWorkRepository(body);
+  return result.ok ? json(result, 201) : json({ error: result.error }, result.status);
 }
 
 const ghCommands: WorkRepoCommands = {

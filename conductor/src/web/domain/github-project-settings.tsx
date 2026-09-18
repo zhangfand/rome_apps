@@ -2,17 +2,13 @@ import { useState } from "react";
 import { fetchAppApi } from "@rome-os/app-web-sdk";
 import { Button } from "@rome-os/ui/button";
 import { FieldError } from "@rome-os/ui/field";
-import { IconButton } from "@rome-os/ui/icon-button";
 import { Input } from "@rome-os/ui/input";
 import { FormRow, FormRowControl, FormRowHeading, FormRowLabel, FormRows } from "@rome-os/ui/layout-form";
 import { Section, SectionActions, SectionHeader, SectionHeading, SectionTitle } from "@rome-os/ui/page";
 import { Spinner } from "@rome-os/ui/spinner";
 import { Switch } from "@rome-os/ui/switch";
-import { RefreshCw } from "lucide-react";
 import type { ProjectSettingsSlotProps } from "../core/domain";
-import { deriveProjectStatus } from "../core/lib/configuration";
 import { safeText } from "../core/lib/facts";
-import { ProjectStatusDot } from "../core/components/project-status";
 import { GitHubRepoSelector } from "./github-repo-selector";
 
 export function GitHubProjectSettings({ projectId, project, patch, inspection, refreshInspection, disabled }: ProjectSettingsSlotProps) {
@@ -26,8 +22,6 @@ export function GitHubProjectSettings({ projectId, project, patch, inspection, r
   const canClone = Boolean(normalizedRepo && workingDir && inspection && (
     !inspection.exists || (!inspection.isRepository && inspection.problem === "Directory is empty.")
   ));
-  const status = deriveProjectStatus(inspection, null, cloning, false);
-  const repoStatusLine = repoStatus(inspection);
 
   const setField = (changes: Record<string, unknown>, options?: { immediate?: boolean }) => {
     patch({ github: { ...github, ...changes } }, options);
@@ -59,20 +53,11 @@ export function GitHubProjectSettings({ projectId, project, patch, inspection, r
       <SectionHeader>
         <SectionHeading><SectionTitle>GitHub issue intake</SectionTitle></SectionHeading>
         <SectionActions className="min-w-0 max-w-full">
-          {(cloning || repoStatusLine) && (
-            <span className="flex min-w-0 max-w-[28rem] items-center gap-1.5">
-              <ProjectStatusDot status={status} />
-              <span className="truncate font-mono text-aux text-muted-foreground">
-                {cloning ? "Cloning…" : safeText(repoStatusLine ?? "")}
-              </span>
-            </span>
-          )}
           {canClone && (
             <Button type="button" variant="outline" size="sm" disabled={disabled || cloning} onClick={() => void clone()}>
               {cloning && <Spinner />}{cloning ? "Cloning…" : "Clone here"}
             </Button>
           )}
-          <IconButton label="Refresh workspace status" size="sm" disabled={disabled || cloning} onClick={() => refreshInspection()} icon={<RefreshCw />} />
         </SectionActions>
       </SectionHeader>
       <FormRows>
@@ -113,19 +98,6 @@ export function GitHubProjectSettings({ projectId, project, patch, inspection, r
       {cloneError && <FieldError errors={[safeText(cloneError)]} />}
     </Section>
   );
-}
-
-/** The "origin owner/name · main · clean" line, or the workspace problem text. */
-function repoStatus(inspection: ProjectSettingsSlotProps["inspection"]): string | undefined {
-  if (!inspection) return undefined;
-  if (inspection.isRepository) {
-    return [
-      inspection.originRepo ? `origin ${inspection.originRepo}` : undefined,
-      inspection.defaultBranch,
-      inspection.dirty === true ? "local changes" : inspection.dirty === false ? "clean" : undefined,
-    ].filter(Boolean).join(" · ") || undefined;
-  }
-  return inspection.problem;
 }
 
 function objectValue(value: unknown): Record<string, unknown> {

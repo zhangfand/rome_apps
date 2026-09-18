@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { setupWorkRepository, type WorkRepoCommands } from "./work-repo.js";
+import { createWorkRepository, setupWorkRepository, type WorkRepoCommands } from "./work-repo.js";
 
 const exec = promisify(execFile);
 const cleanup: string[] = [];
@@ -39,5 +39,49 @@ describe("work repository setup", () => {
     };
     expect(await setupWorkRepository({ repo: "bad", workingDir: "relative" }, commands)).toMatchObject({ ok: false, status: 400 });
     expect(called).toBe(false);
+  });
+
+  it("refuses to reuse an existing remote when explicitly creating a new repository", async () => {
+    const calls: string[] = [];
+    const commands: WorkRepoCommands = {
+      exists: async (repo) => { calls.push(`exists:${repo}`); return true; },
+      create: async (repo) => { calls.push(`create:${repo}`); },
+      clone: async (repo, target) => { calls.push(`clone:${repo}:${target}`); },
+    };
+    const parent = await mkdtemp(path.join(os.tmpdir(), "conductor-work-repo-"));
+    cleanup.push(parent);
+    const target = path.join(parent, "new-work");
+
+    expect(await createWorkRepository({ repo: "owner/existing", workingDir: target }, commands)).toEqual({
+      ok: false,
+      error: "GitHub repository owner/existing already exists. Select it and use Set up instead.",
+      status: 409,
+    });
+    expect(calls).toEqual(["exists:owner/existing"]);
+  });
+
+  it("creates and clones a new repository through the explicit create path", async () => {
+    const parent = await mkdtemp(path.join(os.tmpdir(), "conductor-work-repo-"));
+    cleanup.push(parent);
+    const calls: string[] = [];
+    const commands: WorkRepoCommands = {
+      exists: async (repo) => { calls.push(`exists:${repo}`); return false; },
+      create: async (repo) => { calls.push(`create:${repo}`); },
+      clone: async (repo, target) => {
+        calls.push(`clone:${repo}:${target}`);
+        await exec("git", ["init", "--initial-branch=main", target]);
+        await exec("git", ["-C", target, "remote", "add", "origin", `https://github.com/${repo}.git`]);
+      },
+    };
+    const target = path.join(parent, "new-work");
+
+    expect(await createWorkRepository({ repo: "owner/new-work", workingDir: target }, commands)).toEqual({
+      ok: true,
+      repo: "owner/new-work",
+      workingDir: target,
+      created: true,
+      cloned: true,
+    });
+    expect(calls).toEqual([`exists:owner/new-work`, "create:owner/new-work", `clone:owner/new-work:${target}`]);
   });
 });

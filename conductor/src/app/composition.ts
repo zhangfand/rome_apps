@@ -6,7 +6,7 @@ import { initialAppConfig, parseAppConfig, githubPresentation, mergeAppConfig, s
 import { providerFor } from "./workspaces/index.js";
 import { cloneConfigRoute } from "../domain/config/clone.js";
 import { workRepoPromptNote } from "../domain/work-repo.js";
-import { setupWorkRepoConfigRoute } from "../domain/config/work-repo.js";
+import { createWorkRepoConfigRoute, setupWorkRepoConfigRoute } from "../domain/config/work-repo.js";
 import { githubRepositoriesConfigRoute } from "../domain/config/github-repositories.js";
 
 export const APP_COMPOSITION: CoreComposition = {
@@ -28,6 +28,7 @@ export const APP_COMPOSITION: CoreComposition = {
   configRoutes: [
     { method: "POST", path: ["clone"], handle: cloneConfigRoute },
     { method: "GET", path: ["github", "repositories"], handle: githubRepositoriesConfigRoute },
+    { method: "POST", path: ["work-repo", "create"], handle: createWorkRepoConfigRoute },
     { method: "POST", path: ["work-repo", "setup"], handle: setupWorkRepoConfigRoute },
   ],
 };

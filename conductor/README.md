@@ -102,8 +102,10 @@ keep the project snapshot recorded when they were created.
 
 Each project also gets a private agent work repository named
 `<project>-work`, checked out beside the code repository. It holds product
-specs, engineering designs, and other coordination artifacts. **Set up**
-creates the private GitHub repository when needed and clones it locally.
+specs, engineering designs, and other coordination artifacts. **New
+repository** opens a dedicated flow that creates a private GitHub repository,
+clones it locally, and saves it on the project. **Set up** makes the currently
+selected repository ready, creating it when needed and cloning it locally.
 Repository fields keep manual entry for new repositories and also provide a
 searchable selector populated from every repository visible to the connected
 GitHub identity.
