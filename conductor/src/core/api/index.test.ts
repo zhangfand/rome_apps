@@ -57,6 +57,30 @@ describe("app-owned task reads", () => {
 });
 
 describe("configuration writes", () => {
+  it("forwards Asked association only from the explicit answer request", async () => {
+    const { sqlite, handler, actionCalls } = configuredHandler(undefined);
+
+    const steering = await handler.handle(apiRequest("POST", ["tasks", "task-1", "reply"], {
+      text: "Also update the README.",
+    }));
+    expect(steering.status).toBe(200);
+    expect(actionCalls[0]).toEqual({
+      name: "conductor:record_person_reply",
+      args: { taskId: "task-1", text: "Also update the README.", source: "Also update the README." },
+    });
+
+    const answer = await handler.handle(apiRequest("POST", ["tasks", "task-1", "reply"], {
+      text: "Option A",
+      resolvesAskedSeq: 42,
+    }));
+    expect(answer.status).toBe(200);
+    expect(actionCalls[1]).toEqual({
+      name: "conductor:record_person_reply",
+      args: { taskId: "task-1", text: "Option A", source: "Option A", resolvesAskedSeq: 42 },
+    });
+    sqlite.close();
+  });
+
   it("keeps Board fallback visible across unrelated replies until the exact question is resolved", async () => {
     const { sqlite, handler } = configuredHandler({
       projects: { app: { workingDir: "/repo" } },
@@ -152,7 +176,7 @@ function configRequest(method: "GET" | "PATCH", body?: unknown): RomeAppApiReque
   return apiRequest(method, ["config"], body);
 }
 
-function apiRequest(method: "GET" | "PATCH", path: string[], body?: unknown): RomeAppApiRequest {
+function apiRequest(method: "GET" | "PATCH" | "POST", path: string[], body?: unknown): RomeAppApiRequest {
   return {
     method, path, headers: {}, query: new URLSearchParams(),
     caller: { kind: "guardian", userId: "g1", via: "cookie" },
@@ -193,6 +217,7 @@ function configuredHandler(rawConfig?: Record<string, unknown>) {
       .run("conductor_config", JSON.stringify(parsed.config), Date.now());
   }
   const actions: string[] = [];
+  const actionCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
   const composition = {
     parseConfig,
     workspaceKinds: ["git-worktree", "none"],
@@ -205,9 +230,13 @@ function configuredHandler(rawConfig?: Record<string, unknown>) {
     db: { connection: drizzle(sqlite), tablePrefix: "conductor", tableName: (name: string) => `conductor__${name}` },
     log: { error: () => undefined, info: () => undefined },
     listRoutines: async () => [],
-    runAction: async (name: string) => { actions.push(name); return { status: "ok", data: {} }; },
+    runAction: async (name: string, args: Record<string, unknown>) => {
+      actions.push(name);
+      actionCalls.push({ name, args });
+      return { status: "ok", data: {} };
+    },
   } as unknown as RomeAppContext;
-  return { sqlite, handler: createApiHandler(ctx, composition), actions };
+  return { sqlite, handler: createApiHandler(ctx, composition), actions, actionCalls };
 }
 
 function insertFact(sqlite: Database.Database, taskId: string, kind: string, payload: unknown, by = "guardian"): number {

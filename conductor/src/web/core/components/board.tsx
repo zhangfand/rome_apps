@@ -21,6 +21,7 @@ import {
   TONE_BADGE,
 } from "../lib/facts";
 import { formatDuration, formatRelative, truncate } from "../lib/format";
+import { replySubmissionBody, type ReplySubmissionIntent } from "../lib/reply-submission";
 import { LightMarkdown } from "./light-markdown";
 import { WorkerLink } from "./worker-link";
 import type { StateJson, TaskDetailJson, TaskSummary } from "../lib/types";
@@ -55,7 +56,7 @@ export function Board({
   const [sending, setSending] = useState<Set<string>>(() => new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const sendReply = async (task: TaskSummary) => {
+  const sendReply = async (task: TaskSummary, intent: ReplySubmissionIntent) => {
     const text = drafts[task.id]?.trim();
     if (!text) return;
     setBusy(task.id, true);
@@ -64,12 +65,7 @@ export function Board({
       const response = await fetchAppApi(`tasks/${encodeURIComponent(task.id)}/reply`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          text,
-          ...(hasOutstandingPersonDecision(task) && !isSafetyEvent(task.latest) && task.lastDecision?.kind === "Asked"
-            ? { resolvesAskedSeq: task.lastDecision.seq }
-            : {}),
-        }),
+        body: JSON.stringify(replySubmissionBody(text, intent)),
       });
       if (!response.ok) {
         const message = await responseError(response);
@@ -119,6 +115,9 @@ export function Board({
           const isExpanded = expanded.has(task.id);
           const busy = sending.has(task.id);
           const question = label === "question";
+          const askedSeq = question && hasOutstandingPersonDecision(task) && !isSafetyEvent(task.latest) && task.lastDecision?.kind === "Asked"
+            ? task.lastDecision.seq
+            : undefined;
           const replies = QUICK_REPLIES[label === "paused" ? "paused" : question ? "question" : "report"];
           return (
             <article key={task.id}>
@@ -192,9 +191,15 @@ export function Board({
                       onChange={(event) => setDrafts((current) => ({ ...current, [task.id]: event.target.value }))}
                     />
                     <div className="flex flex-wrap items-center gap-2.5">
-                      <Button disabled={busy || !drafts[task.id]?.trim()} onClick={() => void sendReply(task)}>
+                      {askedSeq !== undefined && (
+                        <Button disabled={busy || !drafts[task.id]?.trim()} onClick={() => void sendReply(task, { kind: "answer", askedSeq })}>
+                          {busy && <Spinner />}
+                          Answer question
+                        </Button>
+                      )}
+                      <Button variant={askedSeq !== undefined ? "outline" : "default"} disabled={busy || !drafts[task.id]?.trim()} onClick={() => void sendReply(task, { kind: "reply" })}>
                         {busy && <Spinner />}
-                        {busy ? "Sending…" : "Send reply"}
+                        Send reply
                       </Button>
                     </div>
                     {errors[task.id] && <ReplyError message={errors[task.id]} />}
