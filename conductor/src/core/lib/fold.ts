@@ -3,6 +3,7 @@ import {
   type Fact,
   type JobCreatedFact,
   type WaitedFact,
+  DECISION_KINDS,
   isTerminalKind,
   isWorkerTerminalKind,
   ORCHESTRATOR,
@@ -54,9 +55,9 @@ export interface TaskView {
   liveWorker?: WorkerRef;
   /** A JobCreated that is still the newest fact and has not been dispatched. */
   pendingJob?: JobRef;
-  /** Seq of the newest fact the orchestrator wrote; 0 if none yet. */
+  /** Seq of the newest orchestrator decision; 0 if none yet. */
   lastDecisionSeq: number;
-  /** The newest orchestrator fact, if any. */
+  /** The newest orchestrator-authored decision fact, if any. */
   lastDecision?: Fact;
   /** Seq of the newest fact a person wrote. */
   lastPersonFactSeq: number;
@@ -118,7 +119,7 @@ export function foldTask(facts: readonly Fact[]): TaskView {
       if (named === liveWorker.workerId) liveWorker = undefined;
     }
 
-    if (fact.by === ORCHESTRATOR) {
+    if (fact.by === ORCHESTRATOR && DECISION_KINDS.some((kind) => kind === fact.kind)) {
       lastDecisionSeq = fact.seq;
       lastDecision = fact;
       decisionsSinceLastPersonFact += 1;
@@ -200,9 +201,6 @@ export function needsAttention(task: TaskView, now: Date): { wake: true; why: st
   if (task.state !== "open") return { wake: false };
   if (task.unseen.length > 0) {
     return { wake: true, why: `new facts since decision #${task.lastDecisionSeq}: ${task.unseen.map((f) => `${f.kind}#${f.seq}`).join(", ")}` };
-  }
-  if (task.lastDecision?.kind === "Lost") {
-    return { wake: true, why: `you stopped worker ${task.lastDecision.payload.workerId} (#${task.lastDecision.seq}) and have not decided what happens next` };
   }
   if (task.waiting && now.getTime() >= Date.parse(task.waiting.resumeAfter)) {
     return { wake: true, why: `revisit time ${task.waiting.resumeAfter} has come: ${task.waiting.reason}` };

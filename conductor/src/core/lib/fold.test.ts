@@ -28,6 +28,20 @@ describe("foldTask", () => {
     })]);
     expect(task.parent).toEqual({ taskId: "parent", planItemId: "slice-1", specRef: "feature/spec.md" });
     expect(task.state).toBe("open");
+    expect(task.lastDecision).toBeUndefined();
+    expect(task.unseen.map((fact) => fact.kind)).toEqual(["Created"]);
+    expect(needsAttention(task, new Date())).toMatchObject({ wake: true });
+  });
+  it("does not treat an orchestrator-authored runtime outcome as a decision", () => {
+    const task = foldTask([
+      created(),
+      f({ kind: "Noted", by: "orchestrator", payload: { note: "worker is still useful" } }),
+      f({ kind: "Dispatched", by: "runtime", payload: { jobId: "j-1", workerId: "w-1", agent: "coding:coding", instructions: "x", prompt: "x" } }),
+      f({ kind: "Lost", by: "orchestrator", payload: { jobId: "j-1", workerId: "w-1", why: "stopped" } }),
+    ]);
+    expect(task.lastDecision?.kind).toBe("Noted");
+    expect(task.unseen.map((fact) => fact.kind)).toEqual(["Lost"]);
+    expect(needsAttention(task, new Date())).toMatchObject({ wake: true });
   });
   it("separates a coordinator Job from runtime dispatch and wakes only for its result", () => {
     const facts = [created(),
