@@ -140,6 +140,11 @@ export function Board({
                   </CardAction>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2">
+                  {task.interventionNotice?.boardFallback && (
+                    <Alert variant="warning">
+                      <AlertDescription>Discord delivery was unavailable or could not be confirmed. Answer here on the Board.</AlertDescription>
+                    </Alert>
+                  )}
                   <LightMarkdown
                     markdown={text}
                     compact

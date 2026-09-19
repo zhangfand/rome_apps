@@ -52,7 +52,31 @@ export function createAppDbSchema(tablePrefix: string = "conductor") {
     expiresAt: integer("expires_at").notNull(),
   });
 
-  return { facts, config, locks, workerHealth };
+  /**
+   * Durable accounting for guardian-action notices. The Asked fact is the
+   * source of truth; this table is deliberately an outbox rather than another
+   * ledger fact so delivery bookkeeping cannot wake the coordinator.
+   */
+  const interventionNotices = sqliteTable(
+    `${tablePrefix}__intervention_notices`,
+    {
+      /** Stable dedupe key: one row for one Asked fact. */
+      key: text("key").primaryKey(),
+      taskId: text("task_id").notNull(),
+      factSeq: integer("fact_seq").notNull(),
+      status: text("status").notNull(),
+      providerMessageId: text("provider_message_id"),
+      failureCode: text("failure_code"),
+      createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+      attemptedAt: integer("attempted_at", { mode: "timestamp_ms" }),
+      settledAt: integer("settled_at", { mode: "timestamp_ms" }),
+    },
+    (t) => [
+      index(`${tablePrefix}__intervention_notices_task_idx`).on(t.taskId),
+    ],
+  );
+
+  return { facts, config, locks, workerHealth, interventionNotices };
 }
 
 const defaultSchema = createAppDbSchema();
@@ -62,3 +86,4 @@ export const config = defaultSchema.config;
 export const locks = defaultSchema.locks;
 
 export const workerHealth = defaultSchema.workerHealth;
+export const interventionNotices = defaultSchema.interventionNotices;

@@ -173,6 +173,14 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
             </AlertDescription>
           </Alert>
         </CardContent>
+        {task.interventionNotice?.boardFallback && (
+          <CardContent>
+            <Alert variant="warning">
+              <AlertTitle>Reply on the Board</AlertTitle>
+              <AlertDescription>Discord delivery was unavailable or could not be confirmed. The request is still active here and was not sent to another conversation.</AlertDescription>
+            </Alert>
+          </CardContent>
+        )}
         {task.state === "open" && (
           <CardFooter className="flex-wrap">
             <Button onClick={focusComposer}>Reply</Button>

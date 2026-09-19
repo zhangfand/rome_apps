@@ -114,6 +114,19 @@ export interface TaskParent {
   planRef?: string;
 }
 
+/**
+ * An explicitly authorized return route captured from the trusted inbound
+ * action context. Provider ids are opaque routing data, never identity hints.
+ */
+export interface DiscordInterventionRoute {
+  channel: "discord";
+  connectionId: string;
+  threadId: string;
+  channelUserId: string;
+  visibility: "guardian-dm" | "guardian-authorized-thread";
+  parentThreadId?: string;
+}
+
 // ---- person facts -------------------------------------------------------
 
 export type CreatedFact = FactOf<"Created", {
@@ -126,6 +139,8 @@ export type CreatedFact = FactOf<"Created", {
   origin?: TaskOrigin;
   /** Legacy shape of the above, kept for facts already in the ledger. */
   issue?: IssueOrigin;
+  /** Authorized origin-only route for action-required notices. */
+  interventionRoute?: DiscordInterventionRoute;
 }>;
 export type ReplyFact = FactOf<"Reply", { text: string }>;
 /** Completed / Cancelled may be written by a person or by the orchestrator. */

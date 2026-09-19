@@ -37,6 +37,10 @@ export interface TaskSummary {
   decisionsSinceLastPersonFact: number;
   needsAttention?: string;
   factCount: number;
+  interventionNotice?: {
+    status: "pending" | "sending" | "delivered" | "board_only" | "outcome_unknown" | "cancelled";
+    boardFallback: boolean;
+  };
 }
 
 export interface TaskDetailJson extends TaskSummary {

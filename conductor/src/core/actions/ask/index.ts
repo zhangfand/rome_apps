@@ -20,7 +20,21 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       if (!input.ok) return { status: "error", error: input.error };
       const question = String(args.question ?? "").trim();
       if (!question) return { status: "error", error: "question is required" };
-      return writeDecision(appContext, { ...input, source: "conductor:ask_person", fact: { kind: "Asked", payload: { question } } });
+      const result = writeDecision(appContext, { ...input, source: "conductor:ask_person", fact: { kind: "Asked", payload: { question } } });
+      if (result.status === "ok") {
+        try {
+          await appContext.runAction("conductor:dispatch_intervention_notices", {}, { detached: true });
+        } catch (error) {
+          // The Asked fact is already durable and the next reconcile rebuilds
+          // its outbox row. Delivery infrastructure must not rewrite the task
+          // decision as a failed action call.
+          appContext.log.warn("intervention dispatcher could not be started", {
+            taskId: input.taskId,
+            error: error instanceof Error ? error.name : "unknown",
+          });
+        }
+      }
+      return result;
     },
   };
 }

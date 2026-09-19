@@ -57,6 +57,21 @@ describe("app-owned task reads", () => {
 });
 
 describe("configuration writes", () => {
+  it("surfaces an outstanding Board fallback when no Discord route was approved", async () => {
+    const { sqlite, handler } = configuredHandler({
+      projects: { app: { workingDir: "/repo" } },
+      defaultProject: "app",
+    });
+    insertFact(sqlite, "needs-answer", "Created", { brief: "ship it", projectId: "app" });
+    insertFact(sqlite, "needs-answer", "Asked", { question: "Approve?" }, "orchestrator");
+
+    const response = await handler.handle(apiRequest("GET", ["state"]));
+    expect(response.status).toBe(200);
+    const state = await response.json() as { tasks: Array<{ interventionNotice?: unknown }> };
+    expect(state.tasks[0]?.interventionNotice).toEqual({ status: "board_only", boardFallback: true });
+    sqlite.close();
+  });
+
   it("lets only the guardian browse host directories", async () => {
     const { sqlite, handler } = configuredHandler(undefined);
     const request = apiRequest("GET", ["config", "directories"]);
@@ -163,6 +178,7 @@ function configuredHandler(rawConfig?: Record<string, unknown>) {
     CREATE TABLE conductor__facts (seq integer PRIMARY KEY AUTOINCREMENT NOT NULL, id text NOT NULL, task_id text NOT NULL, kind text NOT NULL, by text NOT NULL, source text, payload text NOT NULL, created_at integer NOT NULL);
     CREATE TABLE conductor__config (key text PRIMARY KEY NOT NULL, value text NOT NULL, updated_at integer NOT NULL);
     CREATE TABLE conductor__locks (name text PRIMARY KEY NOT NULL, held_until integer NOT NULL);
+    CREATE TABLE conductor__intervention_notices (key text PRIMARY KEY NOT NULL, task_id text NOT NULL, fact_seq integer NOT NULL, status text NOT NULL, provider_message_id text, failure_code text, created_at integer NOT NULL, attempted_at integer, settled_at integer);
   `);
   if (rawConfig) {
     const parsed = parseConfig(rawConfig);
@@ -188,7 +204,7 @@ function configuredHandler(rawConfig?: Record<string, unknown>) {
   return { sqlite, handler: createApiHandler(ctx, composition), actions };
 }
 
-function insertFact(sqlite: Database.Database, taskId: string, kind: string, payload: unknown): void {
+function insertFact(sqlite: Database.Database, taskId: string, kind: string, payload: unknown, by = "guardian"): void {
   sqlite.prepare("INSERT INTO conductor__facts (id, task_id, kind, by, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(crypto.randomUUID(), taskId, kind, "guardian", JSON.stringify(payload), Date.now());
+    .run(crypto.randomUUID(), taskId, kind, by, JSON.stringify(payload), Date.now());
 }

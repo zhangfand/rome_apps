@@ -1,0 +1,9 @@
+name: dispatch_intervention_notices
+type: custom
+description: >-
+  Deliver durable, deduplicated guardian-action notices to approved Discord origins.
+entry: ./index.ts
+complexity: moderate
+speed: moderate
+reliability: high
+sideEffects: write
