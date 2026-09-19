@@ -1,9 +1,10 @@
-import type { Action, ActionConfig, ActionResult, AppActionRuntimeDeps } from "@rome-os/app-runtime";
+import type { Action, ActionConfig, ActionResult, AppActionRuntimeDeps, ThreadContext } from "@rome-os/app-runtime";
 import { getCurrentActionContext } from "@rome-os/app-runtime";
 import { writePersonFact } from "../../lib/person-fact.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import { resolveHumanProject } from "../../lib/projects.js";
 import type { CoreComposition } from "../../lib/composition.js";
+import type { DiscordInterventionRoute } from "../../lib/facts.js";
 
 /** Opens a task with a Created fact. The only way a task comes into being from chat. */
 export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, composition: CoreComposition): Action {
@@ -16,6 +17,10 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         projectId: { type: "string", description: "Target configured project. Explicit choice wins over the selected chat project. Ask rather than guess when ambiguous." },
         brief: { type: "string", description: "What the task is, in a sentence or two. The orchestrator reads this as the request." },
         source: { type: "string", description: "The person's message, verbatim. Recorded as the fact's citation." },
+        allowSharedDiscordNotices: {
+          type: "boolean",
+          description: "Set true only when the guardian explicitly approved action-required notices in this existing shared Discord native thread. Never infer consent from creating the task there. Discord DMs do not need this flag.",
+        },
       },
       required: ["brief", "source"],
       additionalProperties: false,
@@ -40,7 +45,44 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         return { status: "error", error: error instanceof Error ? error.message : String(error) };
       }
       const taskId = `t-${crypto.randomUUID().slice(0, 8)}`;
-      return await writePersonFact(appContext, { taskId, kind: "Created", source, payload: { brief, ...binding } });
+      const interventionRoute = discordInterventionRoute(
+        context,
+        args.allowSharedDiscordNotices === true,
+      );
+      return await writePersonFact(appContext, {
+        taskId,
+        kind: "Created",
+        source,
+        payload: { brief, ...binding, ...(interventionRoute ? { interventionRoute } : {}) },
+      });
     },
   };
+}
+
+/** Capture only an authorized origin route; never infer or retarget one. */
+export function discordInterventionRoute(
+  context: ThreadContext | undefined,
+  allowSharedThread: boolean,
+): DiscordInterventionRoute | undefined {
+  if (context?.channel !== "discord" || context.senderBondLevel !== "guardian") return undefined;
+  const connectionId = context.connectionId?.trim();
+  const threadId = context.threadId?.trim();
+  const channelUserId = context.channelUserId?.trim();
+  if (!connectionId || !threadId || !channelUserId) return undefined;
+
+  if (context.threadType === "private" && !context.parentThreadId) {
+    return { channel: "discord", connectionId, threadId, channelUserId, visibility: "guardian-dm" };
+  }
+  const parentThreadId = context.parentThreadId?.trim();
+  if (context.threadType === "group" && parentThreadId && allowSharedThread) {
+    return {
+      channel: "discord",
+      connectionId,
+      threadId,
+      parentThreadId,
+      channelUserId,
+      visibility: "guardian-authorized-thread",
+    };
+  }
+  return undefined;
 }

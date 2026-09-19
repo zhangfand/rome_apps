@@ -114,6 +114,19 @@ export interface TaskParent {
   planRef?: string;
 }
 
+/**
+ * An explicitly authorized return route captured from the trusted inbound
+ * action context. Provider ids are opaque routing data, never identity hints.
+ */
+export interface DiscordInterventionRoute {
+  channel: "discord";
+  connectionId: string;
+  threadId: string;
+  channelUserId: string;
+  visibility: "guardian-dm" | "guardian-authorized-thread";
+  parentThreadId?: string;
+}
+
 // ---- person facts -------------------------------------------------------
 
 export type CreatedFact = FactOf<"Created", {
@@ -126,8 +139,14 @@ export type CreatedFact = FactOf<"Created", {
   origin?: TaskOrigin;
   /** Legacy shape of the above, kept for facts already in the ledger. */
   issue?: IssueOrigin;
+  /** Authorized origin-only route for action-required notices. */
+  interventionRoute?: DiscordInterventionRoute;
 }>;
-export type ReplyFact = FactOf<"Reply", { text: string }>;
+export type ReplyFact = FactOf<"Reply", {
+  text: string;
+  /** Exact guardian-action request this reply resolves, when it is an answer. */
+  resolvesAskedSeq?: number;
+}>;
 /** Completed / Cancelled may be written by a person or by the orchestrator. */
 export type CompletedFact = FactOf<"Completed", { reason?: string; evidence?: string }>;
 export type CancelledFact = FactOf<"Cancelled", { reason?: string }>;
@@ -213,6 +232,13 @@ export type Fact =
   | JobCreatedFact | AskedFact | ReportedFact | WaitedFact | NotedFact
   | DispatchedFact | JobFailedFact | OpenedFact | ReturnedFact | FailedFact | LostFact | EventFact;
 
+/** Whether a later fact explicitly resolves this particular Asked fact. */
+export function resolvesAsked(fact: Fact, askedSeq: number): boolean {
+  if (fact.seq <= askedSeq) return false;
+  if (fact.kind === "Reply") return fact.payload.resolvesAskedSeq === askedSeq;
+  return isTerminalKind(fact.kind);
+}
+
 export type NewFact = Omit<Fact, "seq" | "id" | "createdAt">;
 
 /**
@@ -256,7 +282,9 @@ export function describeFact(fact: Fact, opts: { full?: boolean } = {}): string 
           ? `${fact.payload.brief}\nMaterialized by parent ${fact.payload.parent.taskId} as plan item ${fact.payload.parent.planItemId}${fact.payload.parent.specRef ? ` from ${fact.payload.parent.specRef}` : ""}`
           : fact.payload.brief;
       case "Reply":
-        return fact.payload.text;
+        return fact.payload.resolvesAskedSeq
+          ? `${fact.payload.text}\nResolves Asked #${fact.payload.resolvesAskedSeq}`
+          : fact.payload.text;
       case "Completed":
         return [fact.payload.reason, fact.payload.evidence ? `evidence: ${fact.payload.evidence}` : ""].filter(Boolean).join(" — ");
       case "Cancelled":

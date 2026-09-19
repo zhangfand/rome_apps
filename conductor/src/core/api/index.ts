@@ -11,6 +11,8 @@ import { fold, foldTask, needsAttention, type TaskView } from "../lib/fold.js";
 import { applyIngest, type IngestRequest, planIngest } from "../lib/ingest.js";
 import { HEARTBEAT_LEASE_MS } from "../lib/worker-health.js";
 import { browseDirectories, DirectoryBrowserError } from "../lib/directory-browser.js";
+import { createInterventionNoticeRepository, type InterventionNotice } from "../db/repositories/intervention-notices.js";
+import { noticeBoardState } from "../lib/intervention-notices.js";
 
 /**
  *   GET state              every task, folded, with its latest decision
@@ -39,6 +41,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         if (!ledger.reachable()) return json({ error: "the ledger is unreachable" }, 503);
         const now = new Date();
         const snapshot = fold(now, ledger.all());
+        const notices = createInterventionNoticeRepository(this.ctx.db);
         const config = settings.get();
         const health = config ? safe(() => createWorkerHealthRepository(this.ctx.db).status(now)) : [];
         const lock = createLockRepository(this.ctx.db).peek(TICK_LOCK);
@@ -48,7 +51,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
           projects: config ? Object.fromEntries(Object.entries(config.projects).map(([id, p]) => [id, { workingDir: p.workingDir, workspace: p.workspace, ...this.composition.projectPresentation?.(p, config) }])) : {},
           maxWorkers: config?.maxWorkers ?? 0,
           tickRunning: Boolean(lock && lock.heldUntil > now.getTime()),
-          tasks: snapshot.tasks.map((task) => taskSummary(task, now, this.composition, config)),
+          tasks: snapshot.tasks.map((task) => taskSummary(task, now, this.composition, config, notices.forTask(task.id))),
           workers: health ?? [],
         });
       }
@@ -57,7 +60,8 @@ class ConductorApiHandler implements RomeAppApiHandler {
         if (!facts.length) return json({ error: "task_not_found" }, 404);
         const now = new Date();
         const task = foldTask(facts);
-        return json({ ...taskSummary(task, now, this.composition, settings.get()), facts: task.facts.map(factJson) });
+        const notices = createInterventionNoticeRepository(this.ctx.db).forTask(task.id);
+        return json({ ...taskSummary(task, now, this.composition, settings.get(), notices), facts: task.facts.map(factJson) });
       }
       const taskRoute = request.path[0] === "tasks"
         ? this.composition.taskRoutes?.find((candidate) => (
@@ -73,9 +77,17 @@ class ConductorApiHandler implements RomeAppApiHandler {
       if (request.path[0] === "tasks" && request.path[2] === "reply" && request.path.length === 3) {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
         if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-        const body = readJsonBody<{ text?: unknown }>(request);
+        const body = readJsonBody<{ text?: unknown; resolvesAskedSeq?: unknown }>(request);
         if (!body || typeof body.text !== "string" || !body.text.trim()) return json({ error: "Enter a reply." }, 400);
-        const result = await this.ctx.runAction("conductor:record_person_reply", { taskId: request.path[1], text: body.text.trim(), source: body.text.trim() });
+        if (body.resolvesAskedSeq !== undefined && (!Number.isInteger(body.resolvesAskedSeq) || Number(body.resolvesAskedSeq) < 1)) {
+          return json({ error: "resolvesAskedSeq must be a positive Asked fact seq." }, 400);
+        }
+        const result = await this.ctx.runAction("conductor:record_person_reply", {
+          taskId: request.path[1],
+          text: body.text.trim(),
+          source: body.text.trim(),
+          ...(body.resolvesAskedSeq !== undefined ? { resolvesAskedSeq: body.resolvesAskedSeq } : {}),
+        });
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `reply returned ${result.status}` }, 502);
         return json(result.data ?? {});
       }
@@ -85,7 +97,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         const taskId = request.path[1];
         const result = await this.ctx.runAction("conductor:complete_task", { taskId, source: "Mark complete" });
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `complete returned ${result.status}` }, 502);
-        return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get());
+        return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get(), createInterventionNoticeRepository(this.ctx.db).forTask(taskId));
       }
       if (request.path[0] === "tasks" && request.path[2] === "cancel" && request.path.length === 3) {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
@@ -93,7 +105,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         const taskId = request.path[1];
         const result = await this.ctx.runAction("conductor:cancel_task", { taskId, source: "Cancel task" });
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `cancel returned ${result.status}` }, 502);
-        return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get());
+        return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get(), createInterventionNoticeRepository(this.ctx.db).forTask(taskId));
       }
       // The ingest seam over HTTP. Any system that can reach Rome can open a
       // task or report an event; it cannot do anything else to the ledger,
@@ -223,11 +235,11 @@ class ConductorApiHandler implements RomeAppApiHandler {
   }
 }
 
-function refreshedTask(facts: Fact[], composition: CoreComposition, config?: ConductorConfig): Response {
+function refreshedTask(facts: Fact[], composition: CoreComposition, config?: ConductorConfig, notices: readonly InterventionNotice[] = []): Response {
   if (!facts.length) return json({ error: "task_not_found" }, 404);
   const now = new Date();
   const task = foldTask(facts);
-  return json({ ...taskSummary(task, now, composition, config), facts: task.facts.map(factJson) });
+  return json({ ...taskSummary(task, now, composition, config, notices), facts: task.facts.map(factJson) });
 }
 
 function mergeConfig(current: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
@@ -267,7 +279,7 @@ function runtimeJson(composition: CoreComposition, config?: ConductorConfig) {
   };
 }
 
-function taskSummary(task: TaskView, now: Date, composition: CoreComposition, config?: ConductorConfig) {
+function taskSummary(task: TaskView, now: Date, composition: CoreComposition, config?: ConductorConfig, notices: readonly InterventionNotice[] = []) {
   const attention = needsAttention(task, now);
   return {
     id: task.id,
@@ -297,6 +309,7 @@ function taskSummary(task: TaskView, now: Date, composition: CoreComposition, co
     decisionsSinceLastPersonFact: task.decisionsSinceLastPersonFact,
     needsAttention: attention.wake ? attention.why : undefined,
     factCount: task.facts.length,
+    interventionNotice: noticeBoardState(task, notices),
   };
 }
 

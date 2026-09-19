@@ -57,6 +57,51 @@ describe("app-owned task reads", () => {
 });
 
 describe("configuration writes", () => {
+  it("forwards Asked association only from the explicit answer request", async () => {
+    const { sqlite, handler, actionCalls } = configuredHandler(undefined);
+
+    const steering = await handler.handle(apiRequest("POST", ["tasks", "task-1", "reply"], {
+      text: "Also update the README.",
+    }));
+    expect(steering.status).toBe(200);
+    expect(actionCalls[0]).toEqual({
+      name: "conductor:record_person_reply",
+      args: { taskId: "task-1", text: "Also update the README.", source: "Also update the README." },
+    });
+
+    const answer = await handler.handle(apiRequest("POST", ["tasks", "task-1", "reply"], {
+      text: "Option A",
+      resolvesAskedSeq: 42,
+    }));
+    expect(answer.status).toBe(200);
+    expect(actionCalls[1]).toEqual({
+      name: "conductor:record_person_reply",
+      args: { taskId: "task-1", text: "Option A", source: "Option A", resolvesAskedSeq: 42 },
+    });
+    sqlite.close();
+  });
+
+  it("keeps Board fallback visible across unrelated replies until the exact question is resolved", async () => {
+    const { sqlite, handler } = configuredHandler({
+      projects: { app: { workingDir: "/repo" } },
+      defaultProject: "app",
+    });
+    insertFact(sqlite, "needs-answer", "Created", { brief: "ship it", projectId: "app" });
+    const askedSeq = insertFact(sqlite, "needs-answer", "Asked", { question: "Approve?" }, "orchestrator");
+    insertFact(sqlite, "needs-answer", "Reply", { text: "Also update the README." });
+
+    const response = await handler.handle(apiRequest("GET", ["state"]));
+    expect(response.status).toBe(200);
+    const state = await response.json() as { tasks: Array<{ interventionNotice?: unknown }> };
+    expect(state.tasks[0]?.interventionNotice).toEqual({ status: "board_only", boardFallback: true });
+
+    insertFact(sqlite, "needs-answer", "Reply", { text: "Approved", resolvesAskedSeq: askedSeq });
+    const resolved = await handler.handle(apiRequest("GET", ["state"]));
+    const resolvedState = await resolved.json() as { tasks: Array<{ interventionNotice?: unknown }> };
+    expect(resolvedState.tasks[0]?.interventionNotice).toBeUndefined();
+    sqlite.close();
+  });
+
   it("lets only the guardian browse host directories", async () => {
     const { sqlite, handler } = configuredHandler(undefined);
     const request = apiRequest("GET", ["config", "directories"]);
@@ -131,7 +176,7 @@ function configRequest(method: "GET" | "PATCH", body?: unknown): RomeAppApiReque
   return apiRequest(method, ["config"], body);
 }
 
-function apiRequest(method: "GET" | "PATCH", path: string[], body?: unknown): RomeAppApiRequest {
+function apiRequest(method: "GET" | "PATCH" | "POST", path: string[], body?: unknown): RomeAppApiRequest {
   return {
     method, path, headers: {}, query: new URLSearchParams(),
     caller: { kind: "guardian", userId: "g1", via: "cookie" },
@@ -163,6 +208,7 @@ function configuredHandler(rawConfig?: Record<string, unknown>) {
     CREATE TABLE conductor__facts (seq integer PRIMARY KEY AUTOINCREMENT NOT NULL, id text NOT NULL, task_id text NOT NULL, kind text NOT NULL, by text NOT NULL, source text, payload text NOT NULL, created_at integer NOT NULL);
     CREATE TABLE conductor__config (key text PRIMARY KEY NOT NULL, value text NOT NULL, updated_at integer NOT NULL);
     CREATE TABLE conductor__locks (name text PRIMARY KEY NOT NULL, held_until integer NOT NULL);
+    CREATE TABLE conductor__intervention_notices (key text PRIMARY KEY NOT NULL, task_id text NOT NULL, fact_seq integer NOT NULL, status text NOT NULL, provider_message_id text, failure_code text, created_at integer NOT NULL, attempted_at integer, settled_at integer);
   `);
   if (rawConfig) {
     const parsed = parseConfig(rawConfig);
@@ -171,6 +217,7 @@ function configuredHandler(rawConfig?: Record<string, unknown>) {
       .run("conductor_config", JSON.stringify(parsed.config), Date.now());
   }
   const actions: string[] = [];
+  const actionCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
   const composition = {
     parseConfig,
     workspaceKinds: ["git-worktree", "none"],
@@ -183,12 +230,17 @@ function configuredHandler(rawConfig?: Record<string, unknown>) {
     db: { connection: drizzle(sqlite), tablePrefix: "conductor", tableName: (name: string) => `conductor__${name}` },
     log: { error: () => undefined, info: () => undefined },
     listRoutines: async () => [],
-    runAction: async (name: string) => { actions.push(name); return { status: "ok", data: {} }; },
+    runAction: async (name: string, args: Record<string, unknown>) => {
+      actions.push(name);
+      actionCalls.push({ name, args });
+      return { status: "ok", data: {} };
+    },
   } as unknown as RomeAppContext;
-  return { sqlite, handler: createApiHandler(ctx, composition), actions };
+  return { sqlite, handler: createApiHandler(ctx, composition), actions, actionCalls };
 }
 
-function insertFact(sqlite: Database.Database, taskId: string, kind: string, payload: unknown): void {
-  sqlite.prepare("INSERT INTO conductor__facts (id, task_id, kind, by, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(crypto.randomUUID(), taskId, kind, "guardian", JSON.stringify(payload), Date.now());
+function insertFact(sqlite: Database.Database, taskId: string, kind: string, payload: unknown, by = "guardian"): number {
+  const result = sqlite.prepare("INSERT INTO conductor__facts (id, task_id, kind, by, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(crypto.randomUUID(), taskId, kind, by, JSON.stringify(payload), Date.now());
+  return Number(result.lastInsertRowid);
 }

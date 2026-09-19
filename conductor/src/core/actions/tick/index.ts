@@ -44,6 +44,17 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         if (!conductorConfig) return { status: "error", error: "Conductor is not configured. Run conductor:configure_conductor first." };
         const applied: string[] = [];
 
+        // Recover action-required notices from their durable Asked facts. This
+        // makes a crash between decision and enqueue harmless without adding a
+        // delivery fact that would wake the coordinator.
+        try {
+          await appContext.runAction("conductor:dispatch_intervention_notices", {});
+        } catch (error) {
+          log.warn("intervention notice reconciliation failed; task reconciliation will continue", {
+            error: error instanceof Error ? error.name : "unknown",
+          });
+        }
+
         // 1. observe
         applied.push(...observeWorkerHealth(ledger, createWorkerHealthRepository(appContext.db)));
         applied.push(...observeChildOutcomes(ledger));

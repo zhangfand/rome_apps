@@ -29,6 +29,7 @@ import {
   TONE_BADGE,
 } from "../lib/facts";
 import { formatRelative, formatStamp, formatTime } from "../lib/format";
+import { replySubmissionBody, type ReplySubmissionIntent } from "../lib/reply-submission";
 import type { FactJson, TaskDetailJson, TaskSummary } from "../lib/types";
 import { workerSessions, type WorkerSession } from "../lib/workers";
 import { webDomain } from "../domain";
@@ -72,7 +73,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
     try { window.localStorage.setItem(VIEW_KEY, historyView); } catch { /* preference persistence is optional */ }
   }, [historyView]);
 
-  const send = async () => {
+  const send = async (intent: ReplySubmissionIntent) => {
     if (!reply.trim()) return;
     setSending(true);
     setError(null);
@@ -80,7 +81,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
       const response = await fetchAppApi(`tasks/${encodeURIComponent(taskId)}/reply`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: reply }),
+        body: JSON.stringify(replySubmissionBody(reply, intent)),
       });
       if (!response.ok) {
         setError(await responseError(response));
@@ -136,6 +137,9 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
     composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     composerRef.current?.focus({ preventScroll: true });
   };
+  const askedSeq = hasOutstandingPersonDecision(task) && task.lastDecision?.kind === "Asked"
+    ? task.lastDecision.seq
+    : undefined;
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -173,6 +177,14 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
             </AlertDescription>
           </Alert>
         </CardContent>
+        {task.interventionNotice?.boardFallback && (
+          <CardContent>
+            <Alert variant="warning">
+              <AlertTitle>Reply on the Board</AlertTitle>
+              <AlertDescription>Discord delivery was unavailable or could not be confirmed. The request is still active here and was not sent to another conversation.</AlertDescription>
+            </Alert>
+          </CardContent>
+        )}
         {task.state === "open" && (
           <CardFooter className="flex-wrap">
             <Button onClick={focusComposer}>Reply</Button>
@@ -219,10 +231,18 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
             <Textarea ref={composerRef} className="min-h-[104px]" value={reply} onChange={(event) => setReply(event.target.value)} aria-label="Reply to this task" />
           </CardContent>
           <CardFooter className="flex-col items-stretch gap-2.5">
-            <Button className="w-fit" onClick={() => void send()} disabled={sending || !reply.trim()}>
-              {sending && <Spinner />}
-              {sending ? "Sending…" : "Send reply"}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2.5">
+              {askedSeq !== undefined && (
+                <Button onClick={() => void send({ kind: "answer", askedSeq })} disabled={sending || !reply.trim()}>
+                  {sending && <Spinner />}
+                  Answer question
+                </Button>
+              )}
+              <Button variant={askedSeq !== undefined ? "outline" : "default"} onClick={() => void send({ kind: "reply" })} disabled={sending || !reply.trim()}>
+                {sending && <Spinner />}
+                Send reply
+              </Button>
+            </div>
             {error && <DetailError message={error} />}
           </CardFooter>
         </Card>

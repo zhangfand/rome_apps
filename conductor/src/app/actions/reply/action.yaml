@@ -1,7 +1,7 @@
 name: record_person_reply
 type: custom
 description: >-
-  Record a person's reply on an existing Task.
+  Record a person's reply and any specific Asked fact it explicitly resolves.
 entry: ./index.ts
 complexity: simple
 speed: fast
