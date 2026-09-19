@@ -9,6 +9,7 @@ import type { FactJson, TaskDetailJson } from "../lib/types.js";
 import type { SessionUsageAnalysis, TaskUsageAnalysis } from "../lib/task-usage-analysis.js";
 import { formatCost, formatTokens, type SessionRecord } from "../lib/task-usage.js";
 import { formatDuration } from "../lib/format.js";
+import { factBody } from "../lib/facts.js";
 import { WorkerLink } from "./worker-link.js";
 
 type View = "Waterfall" | "Icicle" | "Hotspots";
@@ -111,48 +112,77 @@ function ModelBreakdown({ analysis }: { analysis: TaskUsageAnalysis }) {
 
 function Waterfall({ task, analysis }: { task: TaskDetailJson; analysis: TaskUsageAnalysis }) {
   const facts = new Map(task.facts.map((fact) => [fact.seq, fact]));
-  const ordered = [...analysis.sessions].sort((a, b) => a.ref.firstSeenAt.localeCompare(b.ref.firstSeenAt));
-  const max = Math.max(1, ...ordered.map(sessionTokens));
+  const groups = causalGroups(task, analysis.sessions);
+  const jobCount = groups.filter((group) => group.jobId).length;
+  const decisionCount = groups.length - jobCount;
+  const max = Math.max(1, ...analysis.sessions.map(sessionTokens));
   const attempts = attemptCounts(analysis.sessions);
   return (
     <CardContent className="border-t pt-4">
+      <div className="mb-3 rounded-8 border border-border bg-surface-muted/45 px-3 py-2.5 text-aux text-muted-foreground">
+        <strong className="font-semibold text-foreground">How to read this:</strong> each numbered item is a bounded <strong className="font-semibold text-foreground">Job</strong> (or a coordinator decision), not a model or tool step. A Job can contain multiple agent runs when it is retried. Read top to bottom as: what just happened → why Conductor created it → model and tokens used → outcome.
+        <div className="mt-1 font-mono text-[10px] text-subtle-foreground">{jobCount} Jobs{decisionCount ? ` · ${decisionCount} coordinator decision${decisionCount === 1 ? "" : "s"}` : ""} · {analysis.sessions.length} agent runs</div>
+      </div>
       <div className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-muted-foreground">
         <Legend tone="bg-muted-foreground/35" label="uncached input" />
         <Legend tone="bg-primary/55" label="cache read/write" />
         <Legend tone="bg-success/65" label="output" />
-        <span>Bar width = session tokens · rows follow causal time</span>
+        <span>Bar width = run tokens · Jobs follow causal time</span>
       </div>
       <div className="flex flex-col gap-2">
-        {ordered.map((session, index) => {
-          const total = sessionTokens(session);
-          const usage = session.record?.stats.usage;
-          const width = Math.max(10, total / max * 100);
-          const trigger = session.ref.triggerSeq ? facts.get(session.ref.triggerSeq) : undefined;
-          const result = session.ref.resultSeq ? facts.get(session.ref.resultSeq) : undefined;
+        {groups.map((group, index) => {
+          const purpose = group.created ? jobPurpose(group.created) : undefined;
+          const after = group.created ? precedingContext(task.facts, group.created.seq) : undefined;
+          const result = latestResult(group.sessions, facts);
           return (
-            <div key={session.ref.id} className="grid gap-1.5 rounded-8 border border-border px-3 py-2.5 md:grid-cols-[132px_minmax(0,1fr)]">
-              <div className="flex items-start gap-2 md:flex-col md:gap-0.5">
-                <Badge variant={session.ref.role === "coordinator" ? "brand" : "outline"}>{stageLabel(session)}</Badge>
-                <span className="font-mono text-[10px] text-subtle-foreground">{index + 1} / {ordered.length}</span>
+            <div key={group.key} className="grid gap-2 rounded-8 border border-border px-3 py-3 md:grid-cols-[132px_minmax(0,1fr)]">
+              <div className="flex items-start gap-2 md:flex-col md:gap-1">
+                <Badge variant={group.role === "coordinator" ? "brand" : "outline"}>{group.label}</Badge>
+                <span className="font-mono text-[10px] text-subtle-foreground">{group.jobId ? "Job" : "Decision"} {index + 1} / {groups.length}</span>
+                {group.jobId && <span className="font-mono text-[10px] text-subtle-foreground">{group.jobId}</span>}
               </div>
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-aux">
-                  <span className="text-muted-foreground">{trigger ? factRef(trigger) : "session opened"}</span>
-                  <span aria-hidden>→</span>
-                  <strong className="font-mono font-semibold text-foreground">{sessionModels(session)}</strong>
-                  {attempts.get(session.ref.jobId ?? "")! > 1 && <Badge variant="warning">retry</Badge>}
-                  <span aria-hidden>→</span>
-                  <span className="text-muted-foreground">{result ? factRef(result) : "in progress / unlinked result"}</span>
-                </div>
-                <div className="mt-2 h-3 max-w-full overflow-hidden rounded-full bg-surface-muted" style={{ width: `${width}%` }} title={usageTitle(session)}>
-                  {usage && <UsageBar usage={usage} />}
-                </div>
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                  <strong className="font-mono font-semibold text-foreground">{formatTokens(total)}</strong>
-                  <span>{formatCost(usage?.costUsd ?? undefined)}</span>
-                  <span>{session.record?.stats.runCount ?? session.turns.length} model run{(session.record?.stats.runCount ?? session.turns.length) === 1 ? "" : "s"}</span>
-                  {session.turns.reduce((sum, turn) => sum + (turn.durationMs ?? 0), 0) > 0 && <span>{formatDuration(session.turns.reduce((sum, turn) => sum + (turn.durationMs ?? 0), 0))}</span>}
-                  <WorkerLink workerId={session.ref.workerId ?? "coordinator"} session={{ id: session.ref.id, type: session.ref.type }} label="open session" icon />
+                {purpose ? (
+                  <div className="grid gap-x-3 gap-y-1 text-aux sm:grid-cols-[56px_minmax(0,1fr)]">
+                    <span className="font-semibold text-subtle-foreground">Why</span>
+                    <span className="text-foreground">{purpose}</span>
+                    <span className="font-semibold text-subtle-foreground">After</span>
+                    <span className="text-muted-foreground">{after ? factSummary(after) : "Task began"}</span>
+                    <span className="font-semibold text-subtle-foreground">Result</span>
+                    <span className="text-muted-foreground">{result ? factSummary(result) : "In progress or no linked result"}</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-aux text-muted-foreground">
+                    <span>{triggerSummary(group.sessions[0], facts)}</span>
+                    <span aria-hidden>→</span>
+                    <span>{result ? factSummary(result) : "In progress or no linked result"}</span>
+                  </div>
+                )}
+                <div className="mt-2.5 flex flex-col gap-2 border-t border-border-subtle pt-2">
+                  {group.sessions.map((session, attemptIndex) => {
+                    const total = sessionTokens(session);
+                    const usage = session.record?.stats.usage;
+                    const width = Math.max(10, total / max * 100);
+                    return (
+                      <div key={session.ref.id}>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+                          <span className="font-medium text-muted-foreground">{group.sessions.length > 1 ? `Run ${attemptIndex + 1}` : "Run"}</span>
+                          <strong className="font-mono font-semibold text-foreground">{sessionModels(session)}</strong>
+                          {(attempts.get(session.ref.jobId ?? "") ?? 0) > 1 && attemptIndex > 0 && <Badge variant="warning">retry</Badge>}
+                        </div>
+                        <div className="mt-1.5 h-3 max-w-full overflow-hidden rounded-full bg-surface-muted" style={{ width: `${width}%` }} title={usageTitle(session)}>
+                          {usage && <UsageBar usage={usage} />}
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                          <strong className="font-mono font-semibold text-foreground">{formatTokens(total)}</strong>
+                          <span>{formatCost(usage?.costUsd ?? undefined)}</span>
+                          <span>{session.record?.stats.runCount ?? session.turns.length} model run{(session.record?.stats.runCount ?? session.turns.length) === 1 ? "" : "s"}</span>
+                          {session.turns.reduce((sum, turn) => sum + (turn.durationMs ?? 0), 0) > 0 && <span>{formatDuration(session.turns.reduce((sum, turn) => sum + (turn.durationMs ?? 0), 0))}</span>}
+                          <WorkerLink workerId={session.ref.workerId ?? "coordinator"} session={{ id: session.ref.id, type: session.ref.type }} label="open session" icon />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -271,6 +301,73 @@ function stageLabel(session: SessionUsageAnalysis): string { return session.ref.
 function shortStage(session: SessionUsageAnalysis): string { return session.ref.jobId ?? stageLabel(session); }
 function sessionModels(session: SessionUsageAnalysis): string { return session.models.join(" + ") || session.record?.largeModelSelection || "unknown model"; }
 function factRef(fact: FactJson): string { return `#${fact.seq} ${fact.kind}`; }
+interface CausalGroup {
+  key: string;
+  jobId?: string;
+  role: "coordinator" | "worker";
+  label: string;
+  created?: FactJson;
+  sessions: SessionUsageAnalysis[];
+  order: number;
+}
+function causalGroups(task: TaskDetailJson, sessions: SessionUsageAnalysis[]): CausalGroup[] {
+  const createdByJob = new Map<string, FactJson>();
+  for (const fact of task.facts) {
+    const jobId = stringValue(fact.payload, "jobId");
+    if (fact.kind === "JobCreated" && jobId) createdByJob.set(jobId, fact);
+  }
+  const groups = new Map<string, CausalGroup>();
+  for (const session of sessions) {
+    const key = session.ref.jobId ? `job:${session.ref.jobId}` : `session:${session.ref.id}`;
+    const created = session.ref.jobId ? createdByJob.get(session.ref.jobId) : undefined;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.sessions.push(session);
+      existing.order = Math.min(existing.order, created?.seq ?? Number.MAX_SAFE_INTEGER);
+      continue;
+    }
+    groups.set(key, {
+      key,
+      jobId: session.ref.jobId,
+      role: session.ref.role,
+      label: stageLabel(session),
+      created,
+      sessions: [session],
+      order: created?.seq ?? Number.MAX_SAFE_INTEGER,
+    });
+  }
+  return [...groups.values()]
+    .map((group) => ({ ...group, sessions: [...group.sessions].sort((a, b) => a.ref.firstSeenAt.localeCompare(b.ref.firstSeenAt)) }))
+    .sort((a, b) => a.order - b.order || a.sessions[0].ref.firstSeenAt.localeCompare(b.sessions[0].ref.firstSeenAt));
+}
+function jobPurpose(fact: FactJson): string {
+  return stringValue(fact.payload, "note") || firstSentence(stringValue(fact.payload, "instructions")) || "Conductor created this bounded piece of work.";
+}
+function precedingContext(facts: FactJson[], beforeSeq: number): FactJson | undefined {
+  const meaningful = new Set(["Created", "Reply", "Returned", "Failed", "Lost", "Event", "Asked", "Reported", "Waited"]);
+  return [...facts].reverse().find((fact) => fact.seq < beforeSeq && meaningful.has(fact.kind));
+}
+function latestResult(sessions: SessionUsageAnalysis[], facts: Map<number, FactJson>): FactJson | undefined {
+  return sessions
+    .map((session) => session.ref.resultSeq ? facts.get(session.ref.resultSeq) : undefined)
+    .filter((fact): fact is FactJson => Boolean(fact))
+    .sort((a, b) => b.seq - a.seq)[0];
+}
+function triggerSummary(session: SessionUsageAnalysis | undefined, facts: Map<number, FactJson>): string {
+  const trigger = session?.ref.triggerSeq ? facts.get(session.ref.triggerSeq) : undefined;
+  return trigger ? factSummary(trigger) : "Coordinator picked up new context";
+}
+function factSummary(fact: FactJson): string {
+  const content = factBody(fact);
+  const text = [content.title, content.body].filter(Boolean).join(" — ");
+  return `${factRef(fact)}${text ? ` · ${compact(text, 220)}` : ""}`;
+}
+function stringValue(payload: Record<string, unknown>, key: string): string { return typeof payload[key] === "string" ? payload[key] as string : ""; }
+function firstSentence(text: string): string { return compact(text.split(/\n|(?<=[.!?])\s/)[0] ?? text, 220); }
+function compact(text: string, max: number): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  return normalized.length > max ? `${normalized.slice(0, max - 1).trimEnd()}…` : normalized;
+}
 function attemptCounts(sessions: SessionUsageAnalysis[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const session of sessions) if (session.ref.jobId) counts.set(session.ref.jobId, (counts.get(session.ref.jobId) ?? 0) + 1);
