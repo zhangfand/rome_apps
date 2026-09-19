@@ -1,0 +1,10 @@
+name: frontdesk_shadow_report
+type: custom
+description: >-
+  Read recent Jev front-desk shadow decisions, the LLM's actual ledger writes,
+  agreement rate, latency, and estimated Jev input cost.
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: read-only

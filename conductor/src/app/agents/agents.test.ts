@@ -67,6 +67,7 @@ describe("Conductor agent boundaries", () => {
       "create_child_tasks",
       "create_job",
       "create_task",
+      "frontdesk_shadow_report",
       "list_tasks",
       "read_task_history",
       "reconcile_tasks",

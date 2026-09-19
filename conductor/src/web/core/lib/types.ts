@@ -91,3 +91,57 @@ export interface DirectoryBrowserListing {
   entries: Array<{ name: string; path: string }>;
   shortcuts: Array<{ label: string; path: string }>;
 }
+
+export type FrontdeskShadowStatus = "running" | "completed" | "error" | "skipped_missing_api_key";
+
+export interface FrontdeskShadowDecision {
+  intent: "create_task" | "reply_to_task" | "complete_task" | "cancel_task" | "ask_status" | "other" | "ambiguous";
+  targetTask: string;
+  project: string;
+  explicitAcceptance: number;
+  explicitCancellation: number;
+  answersLatestQuestion: number;
+  needsGeneratedResponse: number;
+  confidence: { intent: number; targetTask: number; project: number };
+}
+
+export interface FrontdeskShadowRun {
+  id: string;
+  createdAt: string;
+  completedAt?: string;
+  status: FrontdeskShadowStatus;
+  input: string;
+  state: {
+    message: string;
+    tasks: Array<{ id: string; brief: string; projectId?: string; latestDecision?: string; recent: string[] }>;
+    projects: string[];
+  };
+  model?: string;
+  decision?: FrontdeskShadowDecision;
+  actual: { kind?: string; taskId?: string; projectId?: string };
+  matched?: boolean;
+  mismatch?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  estimatedInputCostUsd?: number;
+  latencyMs?: number;
+  error?: string;
+}
+
+export interface FrontdeskShadowReport {
+  summary: {
+    returned: number;
+    running: number;
+    completed: number;
+    compared: number;
+    matched: number;
+    mismatched: number;
+    errors: number;
+    skippedMissingApiKey: number;
+    matchRate?: number;
+    inputTokens: number;
+    estimatedInputCostUsd: number;
+    averageLatencyMs?: number;
+  };
+  runs: FrontdeskShadowRun[];
+}

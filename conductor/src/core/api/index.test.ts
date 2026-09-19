@@ -56,6 +56,43 @@ describe("app-owned task reads", () => {
   });
 });
 
+describe("front desk shadow reads", () => {
+  it("is guardian-only and returns comparison summaries without credential data", async () => {
+    const { sqlite, handler } = configuredHandler(undefined);
+    sqlite.prepare(`
+      INSERT INTO conductor__frontdesk_shadow_runs (
+        id, session_id, channel_thread_key, input, state, status, model, decision,
+        input_tokens, output_tokens, latency_ms, actual_kind, actual_task_id,
+        matched, created_at, completed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      "shadow-1", "session-1", "webchat:thread-1", "continue the prototype",
+      JSON.stringify({ message: "continue the prototype", tasks: [], projects: ["conductor"] }),
+      "completed", "jev-latest",
+      JSON.stringify({
+        intent: "reply_to_task", targetTask: "task-1", project: "conductor",
+        explicitAcceptance: 0, explicitCancellation: 0, answersLatestQuestion: 1,
+        needsGeneratedResponse: 0, confidence: { intent: 0.98, targetTask: 0.96, project: 0.9 },
+      }),
+      2_000, 20, 125, "Reply", "task-1", 1, Date.now(), Date.now(),
+    );
+
+    const response = await handler.handle(apiRequest("GET", ["frontdesk-shadow"]));
+    expect(response.status).toBe(200);
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).toMatchObject({
+      summary: { returned: 1, compared: 1, matched: 1, mismatched: 0, matchRate: 1, inputTokens: 2_000 },
+      runs: [{ id: "shadow-1", input: "continue the prototype", matched: true }],
+    });
+    expect(JSON.stringify(body)).not.toContain("apiKey");
+
+    const denied = apiRequest("GET", ["frontdesk-shadow"]);
+    denied.caller = { kind: "anonymous" };
+    expect((await handler.handle(denied)).status).toBe(403);
+    sqlite.close();
+  });
+});
+
 describe("configuration writes", () => {
   it("lets only the guardian browse host directories", async () => {
     const { sqlite, handler } = configuredHandler(undefined);
@@ -163,6 +200,28 @@ function configuredHandler(rawConfig?: Record<string, unknown>) {
     CREATE TABLE conductor__facts (seq integer PRIMARY KEY AUTOINCREMENT NOT NULL, id text NOT NULL, task_id text NOT NULL, kind text NOT NULL, by text NOT NULL, source text, payload text NOT NULL, created_at integer NOT NULL);
     CREATE TABLE conductor__config (key text PRIMARY KEY NOT NULL, value text NOT NULL, updated_at integer NOT NULL);
     CREATE TABLE conductor__locks (name text PRIMARY KEY NOT NULL, held_until integer NOT NULL);
+    CREATE TABLE conductor__frontdesk_shadow_runs (
+      id text PRIMARY KEY NOT NULL,
+      session_id text NOT NULL,
+      channel_thread_key text NOT NULL,
+      input text NOT NULL,
+      state text NOT NULL,
+      status text NOT NULL,
+      model text,
+      decision text,
+      raw_response text,
+      input_tokens integer,
+      output_tokens integer,
+      latency_ms integer,
+      error text,
+      actual_kind text,
+      actual_task_id text,
+      actual_project_id text,
+      matched integer,
+      mismatch text,
+      created_at integer NOT NULL,
+      completed_at integer
+    );
   `);
   if (rawConfig) {
     const parsed = parseConfig(rawConfig);

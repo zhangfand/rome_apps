@@ -17,6 +17,16 @@ const PM_AGENT_DESCRIPTION = "Product manager for broad or ambiguous feature req
 const LEGACY_ORCHESTRATOR_AGENT = "conductor:orchestrator";
 const LEGACY_DEFAULT_SOP_SHA256 = "e4890d96b2624dc1640871f496b42c43f59ebcb7db462f582320f93643291d8d";
 
+export interface FrontdeskShadowConfig {
+  enabled: boolean;
+  model: string;
+}
+
+export const DEFAULT_FRONTDESK_SHADOW: FrontdeskShadowConfig = {
+  enabled: true,
+  model: "jev-latest",
+};
+
 const LEGACY_DEFAULT_WORKER_AGENTS: Record<string, string> = {
   "coding:coding": "Writes code in the task's worktree: implements, tests, commits, pushes, opens pull requests. Has a shell and git.",
   "assistant:assistant": "General assistant with web and shell access. Good for research, reading external state (e.g. a PR's review/CI status), reviewing, and writing summaries.",
@@ -64,6 +74,7 @@ export const initialAppConfig: ConductorConfig = {
   intervalMinutes: DEFAULT_INTERVAL_MINUTES,
   reuseSessions: DEFAULT_REUSE_SESSIONS,
   maxDecisionsPerTurn: DEFAULT_MAX_DECISIONS_PER_TURN,
+  frontdeskShadow: DEFAULT_FRONTDESK_SHADOW,
   github: { intakeLabel: DEFAULT_INTAKE_LABEL },
 };
 
@@ -105,6 +116,15 @@ export const setupSchema = {
       properties: { intakeLabel: { type: "string", description: `Default intake label. Defaults to "${DEFAULT_INTAKE_LABEL}".` } },
     },
     intakeLabel: { type: "string", description: "Legacy default intake label; accepted for one release." },
+    frontdeskShadow: {
+      type: "object",
+      additionalProperties: false,
+      description: "Compare Jev's front-desk routing decision with the existing LLM without changing behavior. Requires TYPESAFE_API_KEY in the Rome process environment.",
+      properties: {
+        enabled: { type: "boolean" },
+        model: { type: "string" },
+      },
+    },
   },
 };
 
@@ -152,11 +172,14 @@ function appConfigExtensions(): ConfigExtensions {
       if (owner !== undefined && !parseWorkRepoOwner(owner)) {
         return { ok: false, error: "workRepoOwner must be a GitHub owner name" };
       }
+      const frontdeskShadow = parseFrontdeskShadow(raw.frontdeskShadow);
+      if (!frontdeskShadow.ok) return frontdeskShadow;
       return {
         ok: true,
         values: {
           ...(github.values ?? {}),
           ...(owner !== undefined ? { workRepoOwner: parseWorkRepoOwner(owner) } : {}),
+          frontdeskShadow: frontdeskShadow.value,
         },
       };
     },
@@ -222,4 +245,25 @@ function parseWorkRepoOwner(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const owner = value.trim();
   return owner && /^[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?$/.test(owner) ? owner : undefined;
+}
+
+function parseFrontdeskShadow(value: unknown): { ok: true; value: FrontdeskShadowConfig } | { ok: false; error: string } {
+  if (value === undefined) return { ok: true, value: DEFAULT_FRONTDESK_SHADOW };
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { ok: false, error: "frontdeskShadow must be an object" };
+  }
+  const raw = value as Record<string, unknown>;
+  if (raw.enabled !== undefined && typeof raw.enabled !== "boolean") {
+    return { ok: false, error: "frontdeskShadow.enabled must be a boolean" };
+  }
+  if (raw.model !== undefined && (typeof raw.model !== "string" || !/^[A-Za-z0-9._-]+$/.test(raw.model))) {
+    return { ok: false, error: "frontdeskShadow.model must be a model id using letters, numbers, dots, underscores, or hyphens" };
+  }
+  return {
+    ok: true,
+    value: {
+      enabled: raw.enabled ?? DEFAULT_FRONTDESK_SHADOW.enabled,
+      model: typeof raw.model === "string" ? raw.model : DEFAULT_FRONTDESK_SHADOW.model,
+    },
+  };
 }

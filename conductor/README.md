@@ -160,6 +160,33 @@ conductor:configure_conductor {
 The SOP is editable on the Configuration page; a project may carry its own
 `sop` to override the global one.
 
+### Jev front-desk shadow
+
+Conductor can evaluate each `conductor:conductor` turn with TypeSafe Jev beside
+the existing LLM front desk. Shadow mode never rewrites the prompt, calls a
+person action, or changes the reply: the LLM remains authoritative. After the
+turn, Conductor records Jev's typed intent / task / project decision together
+with the person fact the LLM actually wrote, if any.
+
+Shadow evaluation is enabled in app configuration by default but makes no
+external request unless the Rome process has a `TYPESAFE_API_KEY` environment
+variable. The key is read from the process environment and is never stored in
+Conductor's config or database. Disable the experiment with:
+
+```json
+{
+  "frontdeskShadow": { "enabled": false, "model": "jev-latest" }
+}
+```
+
+Run `conductor:frontdesk_shadow_report` to inspect recent decisions, agreement
+with the LLM's ledger write, latency, token usage, and estimated Jev input cost.
+The report treats a no-write LLM turn as agreement with Jev's `ask_status`,
+`other`, or `ambiguous` intents; it cannot yet distinguish those three from the
+ledger alone. Shadow rows include the user's input and compact open-task state,
+so enabling the experiment sends that state to TypeSafe and keeps a local copy
+for evaluation.
+
 ### PM worker
 
 `conductor:pm` is a specialist worker whose complete role, judgment boundary,

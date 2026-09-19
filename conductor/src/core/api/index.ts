@@ -11,6 +11,8 @@ import { fold, foldTask, needsAttention, type TaskView } from "../lib/fold.js";
 import { applyIngest, type IngestRequest, planIngest } from "../lib/ingest.js";
 import { HEARTBEAT_LEASE_MS } from "../lib/worker-health.js";
 import { browseDirectories, DirectoryBrowserError } from "../lib/directory-browser.js";
+import { createFrontdeskShadowRepository } from "../db/repositories/frontdesk-shadow.js";
+import { frontdeskShadowLimit, frontdeskShadowReport } from "../frontdesk/report.js";
 
 /**
  *   GET state              every task, folded, with its latest decision
@@ -25,6 +27,7 @@ import { browseDirectories, DirectoryBrowserError } from "../lib/directory-brows
  *   GET config/inspect     inspect one working directory through its workspace provider
  *   GET config/directories browse directories on the Rome host
  *   POST config/<domain>   app-owned configuration operations, such as cloning
+ *   GET frontdesk-shadow   recent Jev/LLM routing comparisons
  *   POST tick              run a tick now
  */
 class ConductorApiHandler implements RomeAppApiHandler {
@@ -51,6 +54,13 @@ class ConductorApiHandler implements RomeAppApiHandler {
           tasks: snapshot.tasks.map((task) => taskSummary(task, now, this.composition, config)),
           workers: health ?? [],
         });
+      }
+      if (route === "frontdesk-shadow") {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);
+        const limit = frontdeskShadowLimit(request.query.get("limit"));
+        const rows = createFrontdeskShadowRepository(this.ctx.db).recent(limit);
+        return json(frontdeskShadowReport(rows));
       }
       if (request.path[0] === "tasks" && request.path.length === 2 && request.method === "GET") {
         const facts = ledger.factsFor(request.path[1]);

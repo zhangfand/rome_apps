@@ -52,7 +52,44 @@ export function createAppDbSchema(tablePrefix: string = "conductor") {
     expiresAt: integer("expires_at").notNull(),
   });
 
-  return { facts, config, locks, workerHealth };
+  /**
+   * Observations from the experimental Jev front-desk router. Shadow runs are
+   * deliberately mutable: the row is opened before the ordinary LLM front
+   * desk runs, then completed with both Jev's prediction and the person fact
+   * the LLM actually wrote. This is evaluation data, not task history, so it
+   * does not belong in the append-only facts table.
+   */
+  const frontdeskShadowRuns = sqliteTable(
+    `${tablePrefix}__frontdesk_shadow_runs`,
+    {
+      id: text("id").primaryKey(),
+      sessionId: text("session_id").notNull(),
+      channelThreadKey: text("channel_thread_key").notNull(),
+      input: text("input").notNull(),
+      state: text("state").notNull(),
+      status: text("status").notNull(),
+      model: text("model"),
+      decision: text("decision"),
+      rawResponse: text("raw_response"),
+      inputTokens: integer("input_tokens"),
+      outputTokens: integer("output_tokens"),
+      latencyMs: integer("latency_ms"),
+      error: text("error"),
+      actualKind: text("actual_kind"),
+      actualTaskId: text("actual_task_id"),
+      actualProjectId: text("actual_project_id"),
+      matched: integer("matched", { mode: "boolean" }),
+      mismatch: text("mismatch"),
+      createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+      completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+    },
+    (t) => [
+      index(`${tablePrefix}__frontdesk_shadow_created_idx`).on(t.createdAt),
+      index(`${tablePrefix}__frontdesk_shadow_session_idx`).on(t.sessionId),
+    ],
+  );
+
+  return { facts, config, locks, workerHealth, frontdeskShadowRuns };
 }
 
 const defaultSchema = createAppDbSchema();
@@ -62,3 +99,4 @@ export const config = defaultSchema.config;
 export const locks = defaultSchema.locks;
 
 export const workerHealth = defaultSchema.workerHealth;
+export const frontdeskShadowRuns = defaultSchema.frontdeskShadowRuns;

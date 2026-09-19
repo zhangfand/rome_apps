@@ -15,6 +15,18 @@ describe("app config composition", () => {
     expect(parsed.config.workerAgents).toEqual(DEFAULT_WORKER_AGENTS);
     expect(parsed.config.orchestratorAgent).toBe(DEFAULT_ORCHESTRATOR_AGENT);
     expect(parsed.config.github).toEqual({ intakeLabel: DEFAULT_INTAKE_LABEL });
+    expect(parsed.config.frontdeskShadow).toEqual({ enabled: true, model: "jev-latest" });
+  });
+
+  it("validates front-desk shadow settings without accepting an endpoint or key", () => {
+    const parsed = parseAppConfig({ ...base, frontdeskShadow: { enabled: false, model: "jev-1.13.0" } });
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(parsed.config.frontdeskShadow).toEqual({ enabled: false, model: "jev-1.13.0" });
+    expect(parseAppConfig({ ...base, frontdeskShadow: "on" })).toEqual({ ok: false, error: "frontdeskShadow must be an object" });
+    expect(parseAppConfig({ ...base, frontdeskShadow: { model: "bad model" } })).toEqual({
+      ok: false,
+      error: "frontdeskShadow.model must be a model id using letters, numbers, dots, underscores, or hyphens",
+    });
   });
 
   it("moves the former built-in orchestrator id to the engineering lead without changing a custom coordinator", () => {

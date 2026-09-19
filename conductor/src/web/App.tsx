@@ -8,6 +8,7 @@ import { IconButton } from "@rome-os/ui/icon-button";
 import { Settings } from "lucide-react";
 import { Board } from "./core/components/board";
 import { Runtime } from "./core/components/runtime";
+import { FrontdeskShadow } from "./core/components/frontdesk-shadow";
 import { SettingsDialog, type SettingsView } from "./core/components/settings-dialog";
 import { TaskDetail } from "./core/components/task-detail";
 import { TaskList } from "./core/components/task-list";
@@ -25,6 +26,7 @@ type Route =
   | { page: "tasks" }
   | { page: "config" }
   | { page: "runtime" }
+  | { page: "shadow" }
   | { page: "project"; projectId: string }
   | { page: "detail"; taskId: string };
 
@@ -34,6 +36,7 @@ function route(path: string): Route {
   const parts = segment.split("/");
   if (segment === "tasks") return { page: "tasks" };
   if (segment === "runtime") return { page: "runtime" };
+  if (segment === "shadow") return { page: "shadow" };
   if (parts[0] === "config") {
     if (parts[1] === "projects" && parts[2]) return { page: "project", projectId: parts[2] };
     return { page: "config" };
@@ -91,12 +94,17 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
           Runtime
           {feed.state && feed.state.workers.length > 0 && <span className="font-mono text-[10.5px] text-subtle-foreground">{feed.state.workers.length}</span>}
         </NavItem>
+        <NavItem active={page === "shadow"} onClick={() => navigateToApp("/shadow")}>
+          Shadow
+        </NavItem>
       </nav>
 
       {current.page === "detail" ? (
         <TaskDetail key={current.taskId} taskId={current.taskId} onTaskChanged={feed.updateTask} />
       ) : page === "runtime" ? (
         <Runtime state={feed.state} />
+      ) : page === "shadow" ? (
+        <FrontdeskShadow />
       ) : page === "tasks" ? (
         <StateGate feed={feed}>
           {(state) => <TaskList tasks={state.tasks} now={state.now} freshIds={feed.freshIds} />}

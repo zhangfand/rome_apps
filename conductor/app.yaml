@@ -29,6 +29,9 @@ agents:
   - app/agents/engineer-lead.yaml
   - app/agents/pm.yaml
 
+hooks:
+  - app/hooks/frontdesk-shadow
+
 actions:
   - app/actions/setup
   - app/actions/tick
@@ -39,6 +42,7 @@ actions:
   - app/actions/complete
   - app/actions/cancel
   - app/actions/snapshot
+  - app/actions/frontdesk-shadow-report
   - app/actions/ledger
   - app/actions/dispatch
   - app/actions/create-tasks
