@@ -142,6 +142,7 @@ async function summonWithFallback(input: {
       role: "worker",
       workerId,
       jobId: dispatched.payload.jobId,
+      triggerSeq: dispatched.seq,
     });
     ledger.append({
       taskId,

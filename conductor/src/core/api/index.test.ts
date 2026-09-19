@@ -108,7 +108,7 @@ describe("task usage session reads", () => {
     const response = await handler.handle(apiRequest("GET", ["tasks", "t-usage"]));
     expect(response.status).toBe(200);
     expect((await response.json() as { usageSessions: unknown[] }).usageSessions).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "worker-session", role: "worker", workerId: "w-1", jobId: "j-1", agent: "coding:coding" }),
+      expect.objectContaining({ id: "worker-session", role: "worker", workerId: "w-1", jobId: "j-1", agent: "coding:coding", triggerSeq: 2 }),
       expect.objectContaining({ id: "coordinator-session", role: "coordinator", agent: "conductor:engineer-lead" }),
     ]));
     sqlite.close();
@@ -277,6 +277,8 @@ function configuredHandler(
       role text NOT NULL,
       worker_id text,
       job_id text,
+      trigger_seq integer,
+      result_seq integer,
       created_at integer NOT NULL,
       last_seen_at integer NOT NULL,
       UNIQUE(task_id, session_id)

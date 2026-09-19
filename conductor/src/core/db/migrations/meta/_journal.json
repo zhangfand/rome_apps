@@ -22,6 +22,13 @@
       "when": 1789814511535,
       "tag": "0002_brainy_owl",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789830274776,
+      "tag": "0003_certain_guardian",
+      "breakpoints": true
     }
   ]
 }

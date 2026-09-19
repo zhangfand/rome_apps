@@ -361,6 +361,8 @@ function taskUsageSessions(task: TaskView, stored: TaskSessionRef[], config?: Co
     role: "coordinator" | "worker";
     workerId?: string;
     jobId?: string;
+    triggerSeq?: number;
+    resultSeq?: number;
     firstSeenAt: string;
   }>();
   for (const row of stored) refs.set(row.sessionId, {
@@ -369,6 +371,8 @@ function taskUsageSessions(task: TaskView, stored: TaskSessionRef[], config?: Co
     role: row.role,
     workerId: row.workerId,
     jobId: row.jobId,
+    triggerSeq: row.triggerSeq,
+    resultSeq: row.resultSeq,
     firstSeenAt: row.createdAt.toISOString(),
   });
   for (const fact of task.facts) {
@@ -386,8 +390,13 @@ function taskUsageSessions(task: TaskView, stored: TaskSessionRef[], config?: Co
     const dispatch = ref.workerId
       ? task.facts.find((fact) => fact.kind === "Dispatched" && fact.payload.workerId === ref.workerId)
       : undefined;
+    const outcome = ref.workerId && dispatch
+      ? task.facts.find((fact) => fact.seq > dispatch.seq && ["Returned", "Failed", "Lost"].includes(fact.kind) && (fact.payload as { workerId?: string }).workerId === ref.workerId)
+      : undefined;
     return {
       ...ref,
+      triggerSeq: ref.triggerSeq ?? dispatch?.seq,
+      resultSeq: ref.resultSeq ?? outcome?.seq,
       agent: ref.role === "coordinator"
         ? config?.orchestratorAgent
         : dispatch?.kind === "Dispatched" ? dispatch.payload.agent : undefined,

@@ -56,25 +56,27 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         log.info("waking orchestrator", { taskId, seenSeq: task.latest.seq, why: attention.why });
 
         const taskSessions = createTaskSessionRepository(appContext.db);
-        const rememberSession = (data: unknown) => {
+        const rememberSession = (data: unknown, resultSeq?: number) => {
           const session = readSummonOutput(data).romeSession;
           if (session) taskSessions.record({
             taskId,
             sessionId: session.id,
             sessionType: session.type,
             role: "coordinator",
+            triggerSeq: task.latest.seq,
+            resultSeq,
           });
         };
 
         const summon = (p: string, sessionId?: string) => appContext.runAction("system:summon", { agentName: settings.orchestratorAgent, prompt: p, ...(sessionId ? { sessionId } : {}) })
           .catch((error: unknown) => ({ status: "error" as const, error: error instanceof Error ? error.message : String(error) }));
         let result = await summon(prompt);
-        if (result.status === "ok") rememberSession(result.data);
         let reply = result.status === "ok" ? readSummonOutput(result.data).reply : "";
         let error = result.status === "ok" ? undefined : result.status === "error" ? result.error : `summon returned ${result.status}`;
 
         let after = foldTask(ledger.factsFor(taskId));
         let decided = after.lastDecisionSeq > task.lastDecisionSeq || after.state !== "open";
+        if (result.status === "ok") rememberSession(result.data, decided ? after.lastDecisionSeq : undefined);
         const sessionId = result.status === "ok" ? readSummonOutput(result.data).sessionId : undefined;
         if (!decided && !error && sessionId) {
           // It talked instead of acting. Nobody reads its chat; give it one
@@ -84,11 +86,11 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
             "Nothing was recorded. Your chat reply is not visible to anyone; only a decision action reaches the person or a worker.",
             `Record the decision you just described by calling the matching action now, with taskId="${taskId}" and seenSeq=${after.latest.seq}.`,
           ].join("\n"), sessionId);
-          if (result.status === "ok") rememberSession(result.data);
           reply = result.status === "ok" ? readSummonOutput(result.data).reply || reply : reply;
           error = result.status === "ok" ? undefined : result.status === "error" ? result.error : `summon returned ${result.status}`;
           after = foldTask(ledger.factsFor(taskId));
           decided = after.lastDecisionSeq > task.lastDecisionSeq || after.state !== "open";
+          if (result.status === "ok") rememberSession(result.data, decided ? after.lastDecisionSeq : undefined);
         }
         if (!decided) {
           // The runtime observed a failed/incomplete wake; it must not turn that

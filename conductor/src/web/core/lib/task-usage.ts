@@ -17,8 +17,13 @@ export interface TaskTokenUsage extends TokenUsage {
   workers: TokenUsage;
 }
 
-interface SessionRecord {
+export interface SessionRecord {
   id: string;
+  displayTitle?: string;
+  largeModelSelection?: string | null;
+  agentName?: string | null;
+  createdAt?: string;
+  activityAt?: string;
   stats: {
     runCount: number;
     usage: {
@@ -30,6 +35,15 @@ interface SessionRecord {
       costUsd: number | null;
     };
   };
+}
+
+export interface ModelUsage {
+  key: string;
+  label: string;
+  provider?: string;
+  sessionCount: number;
+  runCount: number;
+  usage: SessionRecord["stats"]["usage"];
 }
 
 export function aggregateTaskUsage(task: Pick<TaskSummary, "usageSessions">, sessions: ReadonlyMap<string, SessionRecord>): TaskTokenUsage {
@@ -69,6 +83,42 @@ export async function fetchSessionUsage(ids: readonly string[]): Promise<Map<str
     for (const record of body.sessions ?? []) records.set(record.id, record);
   }
   return records;
+}
+
+export async function fetchModelUsage(ids: readonly string[]): Promise<ModelUsage[]> {
+  if (!ids.length) return [];
+  const response = await fetch("/api/sessions/metrics", {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      scope: {
+        time: { kind: "all" },
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        sessions: { ids },
+      },
+      projections: [{ id: "models", groupBy: "model", interval: "none", rankBy: "tokens", limit: 50 }],
+    }),
+  });
+  if (!response.ok) throw new Error(`model usage returned ${response.status}`);
+  const body = await response.json() as {
+    projections?: Array<{ groups?: Array<{
+      key: string;
+      label: string;
+      description?: string | null;
+      sessionCount: number;
+      runCount: number;
+      usage: SessionRecord["stats"]["usage"];
+    }> }>;
+  };
+  return (body.projections?.find((projection) => projection)?.groups ?? []).map((group) => ({
+    key: group.key,
+    label: group.label,
+    provider: group.description ?? undefined,
+    sessionCount: group.sessionCount,
+    runCount: group.runCount,
+    usage: group.usage,
+  }));
 }
 
 export function usageSessionIds(tasks: readonly Pick<TaskSummary, "usageSessions">[]): string[] {

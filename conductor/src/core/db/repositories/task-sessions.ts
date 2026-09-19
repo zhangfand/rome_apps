@@ -11,6 +11,8 @@ export interface TaskSessionRef {
   role: TaskSessionRole;
   workerId?: string;
   jobId?: string;
+  triggerSeq?: number;
+  resultSeq?: number;
   createdAt: Date;
   lastSeenAt: Date;
 }
@@ -32,6 +34,8 @@ export class TaskSessionRepository {
       role: input.role,
       workerId: input.workerId,
       jobId: input.jobId,
+      triggerSeq: input.triggerSeq,
+      resultSeq: input.resultSeq,
       createdAt: now,
       lastSeenAt: now,
     }).onConflictDoUpdate({
@@ -41,6 +45,8 @@ export class TaskSessionRepository {
         role: input.role,
         workerId: input.workerId,
         jobId: input.jobId,
+        ...(input.triggerSeq !== undefined ? { triggerSeq: input.triggerSeq } : {}),
+        ...(input.resultSeq !== undefined ? { resultSeq: input.resultSeq } : {}),
         lastSeenAt: now,
       },
     }).returning().get();
@@ -70,6 +76,8 @@ type TaskSessionRow = {
   role: string;
   workerId: string | null;
   jobId: string | null;
+  triggerSeq: number | null;
+  resultSeq: number | null;
   createdAt: Date;
   lastSeenAt: Date;
 };
@@ -82,6 +90,8 @@ function toRef(row: TaskSessionRow): TaskSessionRef {
     role: row.role === "worker" ? "worker" : "coordinator",
     workerId: row.workerId ?? undefined,
     jobId: row.jobId ?? undefined,
+    triggerSeq: row.triggerSeq ?? undefined,
+    resultSeq: row.resultSeq ?? undefined,
     createdAt: row.createdAt,
     lastSeenAt: row.lastSeenAt,
   };

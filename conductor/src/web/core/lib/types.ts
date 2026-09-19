@@ -48,6 +48,8 @@ export interface TaskUsageSession {
   agent?: string;
   workerId?: string;
   jobId?: string;
+  triggerSeq?: number;
+  resultSeq?: number;
   firstSeenAt: string;
 }
 

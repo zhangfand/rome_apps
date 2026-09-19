@@ -67,6 +67,10 @@ export function createAppDbSchema(tablePrefix: string = "conductor") {
       role: text("role").notNull(),
       workerId: text("worker_id"),
       jobId: text("job_id"),
+      /** Fact that caused this agent run, when the runtime knows it exactly. */
+      triggerSeq: integer("trigger_seq"),
+      /** Decision/outcome fact produced by this run, once it exists. */
+      resultSeq: integer("result_seq"),
       createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
       lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }).notNull(),
     },
