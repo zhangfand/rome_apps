@@ -3,6 +3,8 @@ import { createLedgerRepository } from "../db/repositories/ledger.js";
 import { createLockRepository, TICK_LOCK } from "../db/repositories/lock.js";
 import { createSettingsRepository } from "../db/repositories/settings.js";
 import { createWorkerHealthRepository } from "../db/repositories/worker-health.js";
+import { createTaskSessionRepository, type TaskSessionRef } from "../db/repositories/task-sessions.js";
+import { createRuntimeControlRepository, type RuntimeControl } from "../db/repositories/runtime-control.js";
 import { persistConfiguration } from "../actions/setup/index.js";
 import type { CoreComposition } from "../lib/composition.js";
 import type { ConductorConfig } from "../lib/config.js";
@@ -28,6 +30,7 @@ import { frontdeskShadowLimit, frontdeskShadowReport } from "../frontdesk/report
  *   GET config/directories browse directories on the Rome host
  *   POST config/<domain>   app-owned configuration operations, such as cloning
  *   GET frontdesk-shadow   recent Jev/LLM routing comparisons
+ *   POST runtime/pause     pause or resume runtime dispatch
  *   POST tick              run a tick now
  */
 class ConductorApiHandler implements RomeAppApiHandler {
@@ -37,6 +40,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
     const route = request.path.join("/");
     const ledger = createLedgerRepository(this.ctx.db);
     const settings = createSettingsRepository(this.ctx.db, this.composition.parseConfig);
+    const runtimeControl = createRuntimeControlRepository(this.ctx.db);
     try {
       if (request.method === "GET" && route === "state") {
         if (!ledger.reachable()) return json({ error: "the ledger is unreachable" }, 503);
@@ -45,13 +49,16 @@ class ConductorApiHandler implements RomeAppApiHandler {
         const config = settings.get();
         const health = config ? safe(() => createWorkerHealthRepository(this.ctx.db).status(now)) : [];
         const lock = createLockRepository(this.ctx.db).peek(TICK_LOCK);
+        const storedSessions = safe(() => createTaskSessionRepository(this.ctx.db).all()) ?? [];
+        const sessionsByTask = groupTaskSessions(storedSessions);
         return json({
           now: now.toISOString(),
           configured: Boolean(config),
           projects: config ? Object.fromEntries(Object.entries(config.projects).map(([id, p]) => [id, { workingDir: p.workingDir, workspace: p.workspace, ...this.composition.projectPresentation?.(p, config) }])) : {},
           maxWorkers: config?.maxWorkers ?? 0,
           tickRunning: Boolean(lock && lock.heldUntil > now.getTime()),
-          tasks: snapshot.tasks.map((task) => taskSummary(task, now, this.composition, config)),
+          runtimePaused: runtimeControl.get().paused,
+          tasks: snapshot.tasks.map((task) => taskSummary(task, now, this.composition, config, sessionsByTask.get(task.id))),
           workers: health ?? [],
         });
       }
@@ -67,7 +74,8 @@ class ConductorApiHandler implements RomeAppApiHandler {
         if (!facts.length) return json({ error: "task_not_found" }, 404);
         const now = new Date();
         const task = foldTask(facts);
-        return json({ ...taskSummary(task, now, this.composition, settings.get()), facts: task.facts.map(factJson) });
+        const storedSessions = safe(() => createTaskSessionRepository(this.ctx.db).forTask(task.id)) ?? [];
+        return json({ ...taskSummary(task, now, this.composition, settings.get(), storedSessions), facts: task.facts.map(factJson) });
       }
       const taskRoute = request.path[0] === "tasks"
         ? this.composition.taskRoutes?.find((candidate) => (
@@ -100,7 +108,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         const result = await this.ctx.runAction("conductor:complete_task", { taskId, seenSeq: body.seenSeq, source: "Mark complete" });
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `complete returned ${result.status}` }, 502);
         if (isConflictData(result.data)) return json(result.data, 409);
-        return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get());
+        return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get(), safe(() => createTaskSessionRepository(this.ctx.db).forTask(taskId)) ?? []);
       }
       if (request.path[0] === "tasks" && request.path[2] === "cancel" && request.path.length === 3) {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
@@ -111,7 +119,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         const result = await this.ctx.runAction("conductor:cancel_task", { taskId, seenSeq: body.seenSeq, source: "Cancel task" });
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `cancel returned ${result.status}` }, 502);
         if (isConflictData(result.data)) return json(result.data, 409);
-        return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get());
+        return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get(), safe(() => createTaskSessionRepository(this.ctx.db).forTask(taskId)) ?? []);
       }
       // The ingest seam over HTTP. Any system that can reach Rome can open a
       // task or report an event; it cannot do anything else to the ledger,
@@ -168,7 +176,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         if (request.method === "GET") {
           const config = settings.get();
           const shown = config ?? this.composition.initialConfig;
-          return json({ configured: Boolean(config), config: shown, runtime: runtimeJson(this.composition, shown), projectPresentation: configPresentation(shown, this.composition) });
+          return json({ configured: Boolean(config), config: shown, runtime: runtimeJson(this.composition, shown, runtimeControl.get()), projectPresentation: configPresentation(shown, this.composition) });
         }
         if (request.method !== "PATCH") return json({ error: "method_not_allowed" }, 405);
         const body = readJsonBody<Record<string, unknown>>(request);
@@ -196,7 +204,16 @@ class ConductorApiHandler implements RomeAppApiHandler {
           if (!installed.ok) return json({ error: installed.error }, 503);
         }
         this.ctx.log.info("guardian updated conductor configuration", { fields: Object.keys(patch) });
-        return json({ configured: true, config: parsed.config, runtime: runtimeJson(this.composition, parsed.config), projectPresentation: configPresentation(parsed.config, this.composition) });
+        return json({ configured: true, config: parsed.config, runtime: runtimeJson(this.composition, parsed.config, runtimeControl.get()), projectPresentation: configPresentation(parsed.config, this.composition) });
+      }
+      if (route === "runtime/pause") {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+        const body = readJsonBody<{ paused?: unknown }>(request);
+        if (!body || typeof body.paused !== "boolean") return json({ error: "paused must be a boolean." }, 400);
+        const control = runtimeControl.setPaused(body.paused);
+        this.ctx.log.info(body.paused ? "guardian paused conductor runtime" : "guardian resumed conductor runtime");
+        return json(runtimeControlJson(control));
       }
       if (route === "tick" && request.method === "POST") {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
@@ -240,11 +257,11 @@ class ConductorApiHandler implements RomeAppApiHandler {
   }
 }
 
-function refreshedTask(facts: Fact[], composition: CoreComposition, config?: ConductorConfig): Response {
+function refreshedTask(facts: Fact[], composition: CoreComposition, config?: ConductorConfig, storedSessions: TaskSessionRef[] = []): Response {
   if (!facts.length) return json({ error: "task_not_found" }, 404);
   const now = new Date();
   const task = foldTask(facts);
-  return json({ ...taskSummary(task, now, composition, config), facts: task.facts.map(factJson) });
+  return json({ ...taskSummary(task, now, composition, config, storedSessions), facts: task.facts.map(factJson) });
 }
 
 function mergeConfig(current: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
@@ -274,17 +291,25 @@ function configPresentation(config: ConductorConfig, composition: CoreCompositio
   return Object.fromEntries(Object.entries(config.projects).map(([id, project]) => [id, composition.projectPresentation?.(project, config) ?? {}]));
 }
 
-function runtimeJson(composition: CoreComposition, config?: ConductorConfig) {
+function runtimeJson(composition: CoreComposition, config?: ConductorConfig, control: RuntimeControl = { paused: false }) {
   return {
     heartbeatLeaseSeconds: HEARTBEAT_LEASE_MS / 1000,
     /** Whether the global SOP is still the app's built-in one. */
     sopBuiltIn: (config ?? composition.initialConfig).sop === composition.initialConfig.sop,
     workspaceKinds: composition.workspaceKinds,
     defaultWorkspaceKind: composition.defaultWorkspaceKind,
+    ...runtimeControlJson(control),
   };
 }
 
-function taskSummary(task: TaskView, now: Date, composition: CoreComposition, config?: ConductorConfig) {
+function runtimeControlJson(control: RuntimeControl) {
+  return {
+    paused: control.paused,
+    ...(control.updatedAt ? { pauseChangedAt: control.updatedAt.toISOString() } : {}),
+  };
+}
+
+function taskSummary(task: TaskView, now: Date, composition: CoreComposition, config?: ConductorConfig, storedSessions: TaskSessionRef[] = []) {
   const attention = needsAttention(task, now);
   return {
     id: task.id,
@@ -314,7 +339,60 @@ function taskSummary(task: TaskView, now: Date, composition: CoreComposition, co
     decisionsSinceLastPersonFact: task.decisionsSinceLastPersonFact,
     needsAttention: attention.wake ? attention.why : undefined,
     factCount: task.facts.length,
+    usageSessions: taskUsageSessions(task, storedSessions, config),
   };
+}
+
+function groupTaskSessions(rows: TaskSessionRef[]): Map<string, TaskSessionRef[]> {
+  const grouped = new Map<string, TaskSessionRef[]>();
+  for (const row of rows) grouped.set(row.taskId, [...(grouped.get(row.taskId) ?? []), row]);
+  return grouped;
+}
+
+/**
+ * Session ids are the join key into Rome's guardian-only session accounting
+ * API. Opened facts backfill worker sessions from before the join table was
+ * introduced; coordinator sessions can only be tracked from this version on.
+ */
+function taskUsageSessions(task: TaskView, stored: TaskSessionRef[], config?: ConductorConfig) {
+  const refs = new Map<string, {
+    id: string;
+    type: string;
+    role: "coordinator" | "worker";
+    workerId?: string;
+    jobId?: string;
+    firstSeenAt: string;
+  }>();
+  for (const row of stored) refs.set(row.sessionId, {
+    id: row.sessionId,
+    type: row.sessionType,
+    role: row.role,
+    workerId: row.workerId,
+    jobId: row.jobId,
+    firstSeenAt: row.createdAt.toISOString(),
+  });
+  for (const fact of task.facts) {
+    if (fact.kind !== "Opened" || refs.has(fact.payload.romeSessionId)) continue;
+    refs.set(fact.payload.romeSessionId, {
+      id: fact.payload.romeSessionId,
+      type: fact.payload.sessionType,
+      role: "worker",
+      workerId: fact.payload.workerId,
+      jobId: fact.payload.jobId,
+      firstSeenAt: fact.createdAt.toISOString(),
+    });
+  }
+  return [...refs.values()].sort((a, b) => a.firstSeenAt.localeCompare(b.firstSeenAt)).map((ref) => {
+    const dispatch = ref.workerId
+      ? task.facts.find((fact) => fact.kind === "Dispatched" && fact.payload.workerId === ref.workerId)
+      : undefined;
+    return {
+      ...ref,
+      agent: ref.role === "coordinator"
+        ? config?.orchestratorAgent
+        : dispatch?.kind === "Dispatched" ? dispatch.payload.agent : undefined,
+    };
+  });
 }
 
 function factJson(fact: Fact) {

@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /**
  * The Conductor's whole store. `facts` is the ledger: append-only, never updated,
@@ -53,6 +53,30 @@ export function createAppDbSchema(tablePrefix: string = "conductor") {
   });
 
   /**
+   * Durable Rome sessions that belong to a Task. Token accounting remains
+   * owned by Rome's session store; Conductor only keeps this small join so the
+   * guardian can aggregate the coordinator and worker sessions per Task.
+   */
+  const taskSessions = sqliteTable(
+    `${tablePrefix}__task_sessions`,
+    {
+      id: text("id").primaryKey(),
+      taskId: text("task_id").notNull(),
+      sessionId: text("session_id").notNull(),
+      sessionType: text("session_type").notNull(),
+      role: text("role").notNull(),
+      workerId: text("worker_id"),
+      jobId: text("job_id"),
+      createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+      lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }).notNull(),
+    },
+    (t) => [
+      uniqueIndex(`${tablePrefix}__task_sessions_task_session_idx`).on(t.taskId, t.sessionId),
+      index(`${tablePrefix}__task_sessions_task_idx`).on(t.taskId),
+    ],
+  );
+
+  /**
    * Observations from the experimental Jev front-desk router. Shadow runs are
    * deliberately mutable: the row is opened before the ordinary LLM front
    * desk runs, then completed with both Jev's prediction and the person fact
@@ -89,7 +113,7 @@ export function createAppDbSchema(tablePrefix: string = "conductor") {
     ],
   );
 
-  return { facts, config, locks, workerHealth, frontdeskShadowRuns };
+  return { facts, config, locks, workerHealth, taskSessions, frontdeskShadowRuns };
 }
 
 const defaultSchema = createAppDbSchema();
@@ -99,4 +123,5 @@ export const config = defaultSchema.config;
 export const locks = defaultSchema.locks;
 
 export const workerHealth = defaultSchema.workerHealth;
+export const taskSessions = defaultSchema.taskSessions;
 export const frontdeskShadowRuns = defaultSchema.frontdeskShadowRuns;

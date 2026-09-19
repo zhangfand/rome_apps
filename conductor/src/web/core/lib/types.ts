@@ -37,6 +37,18 @@ export interface TaskSummary {
   decisionsSinceLastPersonFact: number;
   needsAttention?: string;
   factCount: number;
+  /** Rome sessions whose accounting rolls up to this Task. */
+  usageSessions: TaskUsageSession[];
+}
+
+export interface TaskUsageSession {
+  id: string;
+  type: string;
+  role: "coordinator" | "worker";
+  agent?: string;
+  workerId?: string;
+  jobId?: string;
+  firstSeenAt: string;
 }
 
 export interface TaskDetailJson extends TaskSummary {
@@ -49,6 +61,7 @@ export interface StateJson {
   projects: Record<string, { workingDir?: string; repo?: string; workspace?: string }>;
   maxWorkers: number;
   tickRunning: boolean;
+  runtimePaused: boolean;
   tasks: TaskSummary[];
   workers: Array<{ taskId: string; workerId: string; status: string; lastHeartbeatAt?: string; expiresAt?: string }>;
 }
@@ -72,6 +85,8 @@ export interface RuntimeJson {
   sopBuiltIn: boolean;
   workspaceKinds: string[];
   defaultWorkspaceKind: string;
+  paused: boolean;
+  pauseChangedAt?: string;
 }
 
 export interface WorkspaceInspection {

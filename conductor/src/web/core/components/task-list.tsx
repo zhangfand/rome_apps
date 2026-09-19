@@ -9,6 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { bucketTask, latestText, safeText, taskStateLabel, taskTone, TONE_TEXT, type TaskBucket } from "../lib/facts";
 import { formatRelative } from "../lib/format";
 import type { TaskSummary } from "../lib/types";
+import { formatCost, formatTokens, type TaskTokenUsage } from "../lib/task-usage";
+import { useTaskUsage } from "../lib/use-task-usage";
 import { FreshEdge, taskTitle } from "./board";
 
 type Filter = "All" | "Needs you" | "Running" | "Resting" | "Closed";
@@ -34,6 +36,7 @@ export function TaskList({ tasks, now, freshIds }: { tasks: TaskSummary[]; now: 
     value,
     label: <span className="inline-flex items-center gap-1.5">{value}<span className="text-current/60">{counts[value]}</span></span>,
   }));
+  const usage = useTaskUsage(tasks);
 
   return (
     <div className="flex flex-col gap-3">
@@ -49,6 +52,7 @@ export function TaskList({ tasks, now, freshIds }: { tasks: TaskSummary[]; now: 
                 <TableHead scope="col">Brief · latest</TableHead>
                 <TableHead scope="col" className="w-[110px]">Project</TableHead>
                 <TableHead scope="col" className="w-[120px]">State</TableHead>
+                <TableHead scope="col" className="w-[105px] text-right">Tokens</TableHead>
                 <TableHead scope="col" className="w-[80px] text-right">Age</TableHead>
               </TableRow>
             </TableHeader>
@@ -82,6 +86,9 @@ export function TaskList({ tasks, now, freshIds }: { tasks: TaskSummary[]; now: 
                   </TableCell>
                   <TableCell className="text-aux text-muted-foreground">{safeText(task.projectId ?? "—")}</TableCell>
                   <TableCell className={cn("text-aux", TONE_TEXT[taskTone(task)])}>{taskStateLabel(task)}</TableCell>
+                  <TableCell className="text-right font-mono text-aux text-muted-foreground">
+                    <TaskUsageCell task={task} usage={usage.byTask.get(task.id)} loading={usage.loading} unavailable={usage.unavailable} />
+                  </TableCell>
                   <TableCell className="text-right text-aux text-muted-foreground">{formatRelative(task.updatedAt, nowMs)}</TableCell>
                 </TableRow>
               ))}
@@ -96,4 +103,24 @@ export function TaskList({ tasks, now, freshIds }: { tasks: TaskSummary[]; now: 
       </Card>
     </div>
   );
+}
+
+function TaskUsageCell({ task, usage, loading, unavailable }: {
+  task: TaskSummary;
+  usage?: TaskTokenUsage;
+  loading: boolean;
+  unavailable: boolean;
+}) {
+  if (loading && task.usageSessions.length) return <span title="Reading token usage">…</span>;
+  if (unavailable && task.usageSessions.length) return <span title="Token usage is temporarily unavailable">—</span>;
+  if (!usage) return <span>0</span>;
+  const detail = [
+    `${formatTokens(usage.inputTokens)} input`,
+    `${formatTokens(usage.outputTokens)} output`,
+    `${formatTokens(usage.cacheReadTokens)} cache read`,
+    `${formatTokens(usage.cacheWriteTokens)} cache write`,
+    `${formatCost(usage.costUsd)} cost`,
+    "tracked sessions; historical coordinator wakes may be absent",
+  ].join(" · ");
+  return <span title={detail}>{formatTokens(usage.totalTokens, true)}</span>;
 }

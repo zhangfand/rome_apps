@@ -34,6 +34,8 @@ import { workerSessions, type WorkerSession } from "../lib/workers";
 import { webDomain } from "../domain";
 import { StateChip, taskTitle } from "./board";
 import { WorkerLink } from "./worker-link";
+import { useTaskUsage } from "../lib/use-task-usage";
+import { TaskUsageSummary } from "./task-usage";
 
 type HistoryView = "Stream" | "Lanes" | "Table";
 const VIEW_KEY = "conductor-history-view";
@@ -49,6 +51,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
   const [historyView, setHistoryView] = useState<HistoryView>(readView);
   const [hideRoutine, setHideRoutine] = useState(true);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const usage = useTaskUsage(task ? [task] : []);
 
   const load = useCallback(async () => {
     try {
@@ -197,6 +200,8 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
         )}
         {error && <CardContent><DetailError message={error} /></CardContent>}
       </Card>
+
+      <TaskUsageSummary usage={usage.byTask.get(task.id)} loading={usage.loading} unavailable={usage.unavailable} />
 
       {webDomain().taskDetailPanels.map((Panel, index) => (
         <Panel key={Panel.displayName ?? Panel.name ?? index} taskId={taskId} task={task} />

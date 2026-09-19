@@ -8,6 +8,7 @@ import {
 import type { CoreComposition } from "../../lib/composition.js";
 import { createLedgerRepository, type LedgerRepository } from "../../db/repositories/ledger.js";
 import { createWorkerHealthRepository } from "../../db/repositories/worker-health.js";
+import { createTaskSessionRepository } from "../../db/repositories/task-sessions.js";
 import { startHeartbeatTimer } from "../../lib/worker-health.js";
 import { type DispatchedFact, isWorkerTerminalKind } from "../../lib/facts.js";
 import { parseWorkerReply } from "../../lib/worker-reply.js";
@@ -134,6 +135,14 @@ async function summonWithFallback(input: {
   }
 
   const onSession = (session: { id: string; type: string }) => {
+    createTaskSessionRepository(appContext.db).record({
+      taskId,
+      sessionId: session.id,
+      sessionType: session.type,
+      role: "worker",
+      workerId,
+      jobId: dispatched.payload.jobId,
+    });
     ledger.append({
       taskId,
       kind: "Opened",
@@ -201,10 +210,23 @@ export function isResumeRejection(error: string): boolean {
   );
 }
 
-export function readSummonOutput(data: unknown): { reply: string; sessionId?: string } {
+export function readSummonOutput(data: unknown): {
+  reply: string;
+  sessionId?: string;
+  romeSession?: { id: string; type: string };
+} {
   if (typeof data === "object" && data !== null) {
-    const { result, sessionId } = data as { result?: unknown; sessionId?: unknown };
-    return { reply: typeof result === "string" ? result : "", sessionId: typeof sessionId === "string" && sessionId ? sessionId : undefined };
+    const { result, sessionId, romeSession } = data as { result?: unknown; sessionId?: unknown; romeSession?: unknown };
+    const ref = typeof romeSession === "object" && romeSession !== null
+      ? romeSession as { _romeSessionId?: unknown; _type?: unknown }
+      : undefined;
+    return {
+      reply: typeof result === "string" ? result : "",
+      sessionId: typeof sessionId === "string" && sessionId ? sessionId : undefined,
+      romeSession: typeof ref?._romeSessionId === "string" && ref._romeSessionId && typeof ref._type === "string" && ref._type
+        ? { id: ref._romeSessionId, type: ref._type }
+        : undefined,
+    };
   }
   return { reply: "" };
 }

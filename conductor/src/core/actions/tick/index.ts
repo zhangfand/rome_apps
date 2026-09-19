@@ -4,6 +4,7 @@ import { createLedgerRepository, type LedgerRepository } from "../../db/reposito
 import { createLockRepository, orchestrateLock, TICK_LOCK } from "../../db/repositories/lock.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import { createWorkerHealthRepository, type WorkerHealthRepository } from "../../db/repositories/worker-health.js";
+import { createRuntimeControlRepository } from "../../db/repositories/runtime-control.js";
 import { fold, needsAttention } from "../../lib/fold.js";
 import { isTerminalKind, RUNTIME } from "../../lib/facts.js";
 import { describeOutcome, ingestAtomically, type IngestRequest } from "../../lib/ingest.js";
@@ -42,6 +43,9 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
       try {
         const conductorConfig = settings.get();
         if (!conductorConfig) return { status: "error", error: "Conductor is not configured. Run conductor:configure_conductor first." };
+        if (createRuntimeControlRepository(appContext.db).get().paused) {
+          return { status: "ok", data: { skipped: "runtime paused" } };
+        }
         const applied: string[] = [];
 
         // 1. observe

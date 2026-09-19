@@ -93,6 +93,28 @@ describe("front desk shadow reads", () => {
   });
 });
 
+describe("task usage session reads", () => {
+  it("returns stored coordinator sessions and backfills historical worker sessions from the ledger", async () => {
+    const { sqlite, handler } = configuredHandler({ projects: { app: { workspace: "none" } }, defaultProject: "app" });
+    insertFact(sqlite, "t-usage", "Created", { brief: "measure this", projectId: "app" });
+    insertFact(sqlite, "t-usage", "Dispatched", { workerId: "w-1", jobId: "j-1", agent: "coding:coding", instructions: "work", prompt: "work" });
+    insertFact(sqlite, "t-usage", "Opened", { workerId: "w-1", jobId: "j-1", romeSessionId: "worker-session", sessionType: "action" });
+    sqlite.prepare(`
+      INSERT INTO conductor__task_sessions
+        (id, task_id, session_id, session_type, role, created_at, last_seen_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run("ref-1", "t-usage", "coordinator-session", "action", "coordinator", Date.now(), Date.now());
+
+    const response = await handler.handle(apiRequest("GET", ["tasks", "t-usage"]));
+    expect(response.status).toBe(200);
+    expect((await response.json() as { usageSessions: unknown[] }).usageSessions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "worker-session", role: "worker", workerId: "w-1", jobId: "j-1", agent: "coding:coding" }),
+      expect.objectContaining({ id: "coordinator-session", role: "coordinator", agent: "conductor:engineer-lead" }),
+    ]));
+    sqlite.close();
+  });
+});
+
 describe("person Task writes", () => {
   it("requires a Task revision and maps a conditional-write conflict to HTTP 409", async () => {
     const { sqlite, handler, actions } = configuredHandler(
@@ -176,6 +198,28 @@ describe("configuration writes", () => {
   });
 });
 
+describe("developer runtime control", () => {
+  it("lets only the guardian pause and resume the runtime", async () => {
+    const { sqlite, handler } = configuredHandler({ projects: { app: { workspace: "none" } } });
+
+    const initial = await handler.handle(configRequest("GET"));
+    expect(await initial.json()).toMatchObject({ runtime: { paused: false } });
+
+    const denied = apiRequest("POST", ["runtime", "pause"], { paused: true });
+    denied.caller = { kind: "anonymous" };
+    expect((await handler.handle(denied)).status).toBe(403);
+
+    const paused = await handler.handle(apiRequest("POST", ["runtime", "pause"], { paused: true }));
+    expect(paused.status).toBe(200);
+    expect(await paused.json()).toMatchObject({ paused: true, pauseChangedAt: expect.any(String) });
+    expect(JSON.parse((sqlite.prepare("SELECT value FROM conductor__config WHERE key = ?").get("runtime_control") as { value: string }).value)).toEqual({ paused: true });
+
+    const resumed = await handler.handle(apiRequest("POST", ["runtime", "pause"], { paused: false }));
+    expect(await resumed.json()).toMatchObject({ paused: false });
+    sqlite.close();
+  });
+});
+
 function taskRequest(taskId: string, caller: RomeAppApiRequest["caller"]): RomeAppApiRequest {
   return {
     method: "GET",
@@ -225,6 +269,18 @@ function configuredHandler(
     CREATE TABLE conductor__facts (seq integer PRIMARY KEY AUTOINCREMENT NOT NULL, id text NOT NULL, task_id text NOT NULL, kind text NOT NULL, by text NOT NULL, source text, payload text NOT NULL, created_at integer NOT NULL);
     CREATE TABLE conductor__config (key text PRIMARY KEY NOT NULL, value text NOT NULL, updated_at integer NOT NULL);
     CREATE TABLE conductor__locks (name text PRIMARY KEY NOT NULL, held_until integer NOT NULL);
+    CREATE TABLE conductor__task_sessions (
+      id text PRIMARY KEY NOT NULL,
+      task_id text NOT NULL,
+      session_id text NOT NULL,
+      session_type text NOT NULL,
+      role text NOT NULL,
+      worker_id text,
+      job_id text,
+      created_at integer NOT NULL,
+      last_seen_at integer NOT NULL,
+      UNIQUE(task_id, session_id)
+    );
     CREATE TABLE conductor__frontdesk_shadow_runs (
       id text PRIMARY KEY NOT NULL,
       session_id text NOT NULL,

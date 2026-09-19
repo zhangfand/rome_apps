@@ -3,6 +3,7 @@ import type { CoreComposition } from "../../lib/composition.js";
 import { createLedgerRepository } from "../../db/repositories/ledger.js";
 import { createLockRepository, orchestrateLock } from "../../db/repositories/lock.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
+import { createTaskSessionRepository } from "../../db/repositories/task-sessions.js";
 import { RUNTIME, type NewFact } from "../../lib/facts.js";
 import { fold, foldTask, needsAttention } from "../../lib/fold.js";
 import { buildOrchestratorPrompt } from "../../lib/prompts.js";
@@ -54,9 +55,21 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         const prompt = buildOrchestratorPrompt({ task, children, config: settings, now, why: attention.why, providerFor: composition.providerFor, defaultWorkspaceKind: composition.defaultWorkspaceKind, projectNote: composition.projectPromptNote?.(task, "orchestrator"), sharedContracts: composition.sharedPromptContracts });
         log.info("waking orchestrator", { taskId, seenSeq: task.latest.seq, why: attention.why });
 
+        const taskSessions = createTaskSessionRepository(appContext.db);
+        const rememberSession = (data: unknown) => {
+          const session = readSummonOutput(data).romeSession;
+          if (session) taskSessions.record({
+            taskId,
+            sessionId: session.id,
+            sessionType: session.type,
+            role: "coordinator",
+          });
+        };
+
         const summon = (p: string, sessionId?: string) => appContext.runAction("system:summon", { agentName: settings.orchestratorAgent, prompt: p, ...(sessionId ? { sessionId } : {}) })
           .catch((error: unknown) => ({ status: "error" as const, error: error instanceof Error ? error.message : String(error) }));
         let result = await summon(prompt);
+        if (result.status === "ok") rememberSession(result.data);
         let reply = result.status === "ok" ? readSummonOutput(result.data).reply : "";
         let error = result.status === "ok" ? undefined : result.status === "error" ? result.error : `summon returned ${result.status}`;
 
@@ -71,6 +84,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
             "Nothing was recorded. Your chat reply is not visible to anyone; only a decision action reaches the person or a worker.",
             `Record the decision you just described by calling the matching action now, with taskId="${taskId}" and seenSeq=${after.latest.seq}.`,
           ].join("\n"), sessionId);
+          if (result.status === "ok") rememberSession(result.data);
           reply = result.status === "ok" ? readSummonOutput(result.data).reply || reply : reply;
           error = result.status === "ok" ? undefined : result.status === "error" ? result.error : `summon returned ${result.status}`;
           after = foldTask(ledger.factsFor(taskId));

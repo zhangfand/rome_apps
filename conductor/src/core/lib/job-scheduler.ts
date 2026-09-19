@@ -1,6 +1,7 @@
 import { createAppLogger, type RomeAppContext } from "@rome-os/app-runtime";
 import { createLedgerRepository } from "../db/repositories/ledger.js";
 import { createLockRepository, JOB_SCHEDULER_LOCK } from "../db/repositories/lock.js";
+import { createRuntimeControlRepository } from "../db/repositories/runtime-control.js";
 import type { CoreComposition } from "./composition.js";
 import type { ConductorConfig } from "./config.js";
 import { type DispatchedFact, type JobFailedFact, RUNTIME } from "./facts.js";
@@ -31,6 +32,10 @@ export async function dispatchPendingJobs(input: {
   taskId?: string;
 }): Promise<JobDispatchOutcome> {
   const { appContext, composition, config } = input;
+  const runtimeControl = createRuntimeControlRepository(appContext.db);
+  if (runtimeControl.get().paused) {
+    return { dispatched: [], failed: [], pending: pendingJobs(appContext, input.taskId), skipped: "runtime paused" };
+  }
   const locks = createLockRepository(appContext.db);
   if (!locks.tryAcquire(JOB_SCHEDULER_LOCK, SCHEDULER_LEASE_MS)) {
     return { dispatched: [], failed: [], pending: [], skipped: "another scheduler pass is running" };
@@ -77,6 +82,12 @@ export async function dispatchPendingJobs(input: {
           workerId,
           previous: handedOverWorkspace(task.facts),
         });
+        // A developer may pause while workspace preparation is in flight. Read
+        // the durable switch again before writing Dispatched or starting a run.
+        if (runtimeControl.get().paused) {
+          outcome.pending.push({ taskId: task.id, jobId: job.jobId });
+          break;
+        }
         const prompt = buildWorkerPrompt({
           task,
           jobId: job.jobId,
@@ -137,6 +148,12 @@ export async function dispatchPendingJobs(input: {
   } finally {
     locks.release(JOB_SCHEDULER_LOCK);
   }
+}
+
+function pendingJobs(appContext: RomeAppContext, taskId?: string): Array<{ taskId: string; jobId: string }> {
+  return fold(new Date(), createLedgerRepository(appContext.db).all()).tasks
+    .filter((task) => task.state === "open" && !task.liveWorker && task.pendingJob && (!taskId || task.id === taskId))
+    .map((task) => ({ taskId: task.id, jobId: task.pendingJob!.jobId }));
 }
 
 function appendJobFailure(

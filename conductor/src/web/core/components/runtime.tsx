@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchAppApi } from "@rome-os/app-web-sdk";
 import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
 import { Badge } from "@rome-os/ui/badge";
+import { Button } from "@rome-os/ui/button";
 import { FormRow, FormRowControl, FormRowDescription, FormRowHeading, FormRowLabel, FormRows } from "@rome-os/ui/layout-form";
 import { List, ListRow, ListRowContent, ListRowDescription, ListRowTitle } from "@rome-os/ui/list-row";
 import { Section, SectionDescription, SectionHeader, SectionHeading, SectionTitle } from "@rome-os/ui/page";
@@ -19,6 +20,7 @@ export function Runtime({ state }: { state: StateJson | null }) {
   const [config, setConfig] = useState<ConfigJson | null>(null);
   const [runtime, setRuntime] = useState<RuntimeJson | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -34,6 +36,25 @@ export function Runtime({ state }: { state: StateJson | null }) {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const setPaused = useCallback(async (paused: boolean) => {
+    setSaving(true);
+    try {
+      const response = await fetchAppApi("runtime/pause", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ paused }),
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+      const control = await response.json() as Pick<RuntimeJson, "paused" | "pauseChangedAt">;
+      setRuntime((current) => current ? { ...current, ...control } : current);
+      setError(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The runtime control could not be changed. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }, []);
 
   if (error && !config) {
     return (
@@ -63,7 +84,7 @@ export function Runtime({ state }: { state: StateJson | null }) {
           <SectionHeading>
             <SectionTitle>Now</SectionTitle>
             <SectionDescription>
-              {state?.tickRunning ? "A tick is running." : "Idle between ticks."}
+              {state?.runtimePaused ? "Runtime paused." : state?.tickRunning ? "A tick is running." : "Idle between ticks."}
               {` ${workers.length} of ${config.maxWorkers} worker slot${config.maxWorkers === 1 ? "" : "s"} in use.`}
             </SectionDescription>
           </SectionHeading>
@@ -83,6 +104,30 @@ export function Runtime({ state }: { state: StateJson | null }) {
             ))}
           </List>
         )}
+      </Section>
+
+      <Section>
+        <SectionHeader>
+          <SectionHeading>
+            <SectionTitle>Developer</SectionTitle>
+            <SectionDescription>
+              Pause the loop while debugging. Existing workers keep running, but ticks, coordinator wakes, and new worker dispatches stop. Queued jobs remain pending.
+            </SectionDescription>
+          </SectionHeading>
+        </SectionHeader>
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge variant={runtime.paused ? "warning" : "success"}>{runtime.paused ? "Runtime paused" : "Runtime active"}</Badge>
+          <Button
+            variant={runtime.paused ? "outline" : "destructive"}
+            size="sm"
+            disabled={saving}
+            onClick={() => void setPaused(!runtime.paused)}
+          >
+            {saving ? "Saving…" : runtime.paused ? "Resume runtime" : "Pause runtime"}
+          </Button>
+          {runtime.pauseChangedAt && <span className="text-aux text-muted-foreground">changed {formatRelative(runtime.pauseChangedAt, now)}</span>}
+        </div>
+        {error && <p className="mt-3 text-ui text-destructive">{safeText(error)}</p>}
       </Section>
 
       <Section>

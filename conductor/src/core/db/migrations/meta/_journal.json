@@ -15,6 +15,13 @@
       "when": 1789788707334,
       "tag": "0001_striped_mulholland_black",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789814511535,
+      "tag": "0002_brainy_owl",
+      "breakpoints": true
     }
   ]
 }
