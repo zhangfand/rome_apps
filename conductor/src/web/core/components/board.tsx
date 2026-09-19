@@ -13,6 +13,7 @@ import {
   attentionText,
   bucketTask,
   factBody,
+  hasOutstandingPersonDecision,
   isSafetyEvent,
   safeText,
   taskStateLabel,
@@ -63,7 +64,12 @@ export function Board({
       const response = await fetchAppApi(`tasks/${encodeURIComponent(task.id)}/reply`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({
+          text,
+          ...(hasOutstandingPersonDecision(task) && !isSafetyEvent(task.latest) && task.lastDecision?.kind === "Asked"
+            ? { resolvesAskedSeq: task.lastDecision.seq }
+            : {}),
+        }),
       });
       if (!response.ok) {
         const message = await responseError(response);

@@ -5,8 +5,8 @@ import {
 } from "../db/repositories/intervention-notices.js";
 import { createLedgerRepository } from "../db/repositories/ledger.js";
 import { createLockRepository } from "../db/repositories/lock.js";
-import { type AskedFact, type DiscordInterventionRoute, type Fact } from "./facts.js";
-import { fold, isPersonFact, type TaskView } from "./fold.js";
+import { type AskedFact, type DiscordInterventionRoute, type Fact, resolvesAsked } from "./facts.js";
+import { fold, type TaskView } from "./fold.js";
 
 export const INTERVENTION_DELIVERY_LOCK = "intervention-delivery";
 const LOCK_LEASE_MS = 5 * 60_000;
@@ -96,7 +96,7 @@ export async function dispatchInterventionNotices(
 
       try {
         const receipt = await talkRouter.send(route.connectionId, route.threadId as ConversationId, {
-          text: renderInterventionNotice(task, asked),
+          text: renderInterventionNotice(task),
         });
         const messageId = String(receipt.messageId ?? "").trim();
         if (messageId) {
@@ -129,7 +129,7 @@ function emptySummary(skipped?: string): InterventionDispatchSummary {
 }
 
 function resolvedAfter(facts: readonly Fact[], askedSeq: number): boolean {
-  return facts.some((fact) => fact.seq > askedSeq && isPersonFact(fact));
+  return facts.some((fact) => resolvesAsked(fact, askedSeq));
 }
 
 function validRoute(task: TaskView): DiscordInterventionRoute | undefined {
@@ -142,35 +142,24 @@ function validRoute(task: TaskView): DiscordInterventionRoute | undefined {
   return undefined;
 }
 
-export function renderInterventionNotice(task: TaskView, asked: AskedFact): string {
-  const title = minimize(task.brief, 120);
-  const action = minimize(asked.payload.question, 700);
+export function renderInterventionNotice(task: Pick<TaskView, "id">): string {
   return [
     `**Action needed · ${task.id}**`,
-    title,
-    action,
-    `Reply in this conversation, or answer on the Conductor Board for ${task.id}.`,
+    "Conductor needs your input to continue this task.",
+    `Open the Conductor Board to view the request and respond. You can also reply in this conversation with task ID ${task.id}.`,
   ].join("\n\n");
 }
 
-/** Conservative minimization for lock-screen-like shared chat surfaces. */
-function minimize(input: string, max: number): string {
-  const safe = input
-    .replace(/```[\s\S]*?```/g, "[details omitted]")
-    .replace(/(?:^|\s)(?:\/[\w.-]+){2,}/g, " [path omitted]")
-    .replace(/\b(token|secret|password|api[_-]?key)\s*[:=]\s*\S+/gi, "$1=[redacted]")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (safe.length <= max) return safe;
-  return `${safe.slice(0, max - 1).trimEnd()}…`;
-}
-
-export function noticeBoardState(task: TaskView, notice: InterventionNotice | undefined): {
+export function noticeBoardState(task: TaskView, notices: readonly InterventionNotice[]): {
   status: InterventionNotice["status"];
   boardFallback: boolean;
 } | undefined {
-  const outstandingAsk = [...task.facts].reverse().find((fact) => fact.kind === "Asked" && fact.seq > task.lastPersonFactSeq);
-  const currentNotice = outstandingAsk && notice?.factSeq === outstandingAsk.seq ? notice : undefined;
+  const outstandingAsk = [...task.facts].reverse().find((fact) => (
+    fact.kind === "Asked" && !resolvedAfter(task.facts, fact.seq)
+  ));
+  const currentNotice = outstandingAsk
+    ? notices.find((notice) => notice.factSeq === outstandingAsk.seq)
+    : undefined;
   if (!currentNotice) {
     if (!outstandingAsk || validRoute(task)) return undefined;
     return { status: "board_only", boardFallback: true };

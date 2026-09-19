@@ -12,7 +12,7 @@ describe("guardian intervention notice delivery", () => {
     const fixture = setup();
     const created = fixture.appendCreated("task-1", true);
     fixture.append({ taskId: "task-1", kind: "Returned", by: "worker-1", payload: { workerId: "worker-1", status: "blocked", summary: "need help" } });
-    const asked = fixture.append({ taskId: "task-1", kind: "Asked", by: "orchestrator", payload: { question: "Choose A or B. token=abc at /home/me/repo." } });
+    const asked = fixture.append({ taskId: "task-1", kind: "Asked", by: "orchestrator", payload: { question: "Choose A or B." } });
 
     expect(created.payload.interventionRoute?.threadId).toBe("discord-thread");
     const first = await dispatchInterventionNotices(fixture.ctx, fixture.talkRouter);
@@ -24,12 +24,42 @@ describe("guardian intervention notice delivery", () => {
     expect(fixture.sends[0]).toMatchObject({
       connectionId: "discord-connection",
       conversationId: "discord-thread",
-      message: { text: expect.stringContaining("Choose A or B.") },
+      message: { text: [
+        "**Action needed · task-1**",
+        "Conductor needs your input to continue this task.",
+        "Open the Conductor Board to view the request and respond. You can also reply in this conversation with task ID task-1.",
+      ].join("\n\n") },
     });
-    expect(fixture.sends[0]!.message.text).not.toContain("abc");
-    expect(fixture.sends[0]!.message.text).not.toContain("/home/me/repo");
     const notice = fixture.notices.get(`task-1:asked:${asked.seq}`);
     expect(notice).toMatchObject({ status: "delivered", providerMessageId: "message-1" });
+    fixture.close();
+  });
+
+  it("never interpolates arbitrary task or question text into Discord", async () => {
+    const fixture = setup();
+    const adversarial = [
+      "The production password is Swordfish! Keep it private.",
+      "Authorization: Bearer ghp_1234567890abcdefghijklmnopqrstuvwxyz",
+      "Use cloud access key AKIAIOSFODNN7EXAMPLE for this request.",
+    ];
+    for (const [index, secret] of adversarial.entries()) {
+      const taskId = `secret-${index + 1}`;
+      fixture.appendCreated(taskId, true, secret);
+      fixture.append({ taskId, kind: "Asked", by: "orchestrator", payload: { question: secret } });
+    }
+
+    await dispatchInterventionNotices(fixture.ctx, fixture.talkRouter);
+
+    expect(fixture.sends).toHaveLength(adversarial.length);
+    for (const [index, secret] of adversarial.entries()) {
+      const text = String(fixture.sends[index]!.message.text);
+      expect(text).toContain(`Action needed · secret-${index + 1}`);
+      expect(text).toContain("Open the Conductor Board");
+      expect(text).not.toContain(secret);
+      expect(text).not.toContain("Swordfish");
+      expect(text).not.toContain("ghp_");
+      expect(text).not.toContain("AKIA");
+    }
     fixture.close();
   });
 
@@ -65,11 +95,29 @@ describe("guardian intervention notice delivery", () => {
     fixture.close();
   });
 
-  it("cancels a pending notice when the guardian answers before dispatch", async () => {
+  it("keeps a notice eligible after an unrelated later guardian reply", async () => {
     const fixture = setup();
     fixture.appendCreated("answered", true);
     const asked = fixture.append({ taskId: "answered", kind: "Asked", by: "orchestrator", payload: { question: "Which option?" } });
-    fixture.append({ taskId: "answered", kind: "Reply", by: "guardian", payload: { text: "Option A" } });
+    fixture.append({ taskId: "answered", kind: "Reply", by: "guardian", payload: { text: "Also update the README." } });
+
+    await dispatchInterventionNotices(fixture.ctx, fixture.talkRouter);
+
+    expect(fixture.sends).toHaveLength(1);
+    expect(fixture.notices.get(`answered:asked:${asked.seq}`)).toMatchObject({ status: "delivered" });
+    fixture.close();
+  });
+
+  it("cancels a pending notice only when a reply explicitly resolves that Asked fact", async () => {
+    const fixture = setup();
+    fixture.appendCreated("answered", true);
+    const asked = fixture.append({ taskId: "answered", kind: "Asked", by: "orchestrator", payload: { question: "Which option?" } });
+    fixture.append({
+      taskId: "answered",
+      kind: "Reply",
+      by: "guardian",
+      payload: { text: "Option A", resolvesAskedSeq: asked.seq },
+    });
 
     await dispatchInterventionNotices(fixture.ctx, fixture.talkRouter);
 
@@ -139,13 +187,13 @@ function setup(sendResult: () => Promise<MessageReceipt> = async () => ({ conver
     sends,
     notices,
     append,
-    appendCreated(taskId: string, withRoute: boolean) {
+    appendCreated(taskId: string, withRoute: boolean, brief = "Ship the release") {
       return append({
         taskId,
         kind: "Created",
         by: "guardian",
         payload: {
-          brief: "Ship the release",
+          brief,
           ...(withRoute ? {
             interventionRoute: {
               channel: "discord" as const,

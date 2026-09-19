@@ -80,7 +80,12 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
       const response = await fetchAppApi(`tasks/${encodeURIComponent(taskId)}/reply`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: reply }),
+        body: JSON.stringify({
+          text: reply,
+          ...(task && hasOutstandingPersonDecision(task) && task.lastDecision?.kind === "Asked"
+            ? { resolvesAskedSeq: task.lastDecision.seq }
+            : {}),
+        }),
       });
       if (!response.ok) {
         setError(await responseError(response));

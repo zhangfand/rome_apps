@@ -57,18 +57,24 @@ describe("app-owned task reads", () => {
 });
 
 describe("configuration writes", () => {
-  it("surfaces an outstanding Board fallback when no Discord route was approved", async () => {
+  it("keeps Board fallback visible across unrelated replies until the exact question is resolved", async () => {
     const { sqlite, handler } = configuredHandler({
       projects: { app: { workingDir: "/repo" } },
       defaultProject: "app",
     });
     insertFact(sqlite, "needs-answer", "Created", { brief: "ship it", projectId: "app" });
-    insertFact(sqlite, "needs-answer", "Asked", { question: "Approve?" }, "orchestrator");
+    const askedSeq = insertFact(sqlite, "needs-answer", "Asked", { question: "Approve?" }, "orchestrator");
+    insertFact(sqlite, "needs-answer", "Reply", { text: "Also update the README." });
 
     const response = await handler.handle(apiRequest("GET", ["state"]));
     expect(response.status).toBe(200);
     const state = await response.json() as { tasks: Array<{ interventionNotice?: unknown }> };
     expect(state.tasks[0]?.interventionNotice).toEqual({ status: "board_only", boardFallback: true });
+
+    insertFact(sqlite, "needs-answer", "Reply", { text: "Approved", resolvesAskedSeq: askedSeq });
+    const resolved = await handler.handle(apiRequest("GET", ["state"]));
+    const resolvedState = await resolved.json() as { tasks: Array<{ interventionNotice?: unknown }> };
+    expect(resolvedState.tasks[0]?.interventionNotice).toBeUndefined();
     sqlite.close();
   });
 
@@ -204,7 +210,8 @@ function configuredHandler(rawConfig?: Record<string, unknown>) {
   return { sqlite, handler: createApiHandler(ctx, composition), actions };
 }
 
-function insertFact(sqlite: Database.Database, taskId: string, kind: string, payload: unknown, by = "guardian"): void {
-  sqlite.prepare("INSERT INTO conductor__facts (id, task_id, kind, by, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+function insertFact(sqlite: Database.Database, taskId: string, kind: string, payload: unknown, by = "guardian"): number {
+  const result = sqlite.prepare("INSERT INTO conductor__facts (id, task_id, kind, by, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)")
     .run(crypto.randomUUID(), taskId, kind, by, JSON.stringify(payload), Date.now());
+  return Number(result.lastInsertRowid);
 }
