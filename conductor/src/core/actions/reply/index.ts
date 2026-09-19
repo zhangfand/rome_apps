@@ -20,7 +20,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       properties: {
         taskId: {
           type: "string",
-          description: "Task this answers. Read it from conductor:snapshot.",
+          description: "Task this answers. Read it from conductor:list_tasks.",
         },
         text: {
           type: "string",

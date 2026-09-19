@@ -20,7 +20,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       if (!input.ok) return { status: "error", error: input.error };
       const report = String(args.report ?? "").trim();
       if (!report) return { status: "error", error: "report is required" };
-      return writeDecision(appContext, { ...input, source: "conductor:report", fact: { kind: "Reported", payload: { report } } });
+      return writeDecision(appContext, { ...input, source: "conductor:report_to_person", fact: { kind: "Reported", payload: { report } } });
     },
   };
 }

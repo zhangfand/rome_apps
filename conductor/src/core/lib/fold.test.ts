@@ -19,18 +19,50 @@ describe("foldTask", () => {
     expect(task.lastDecision).toBeUndefined();
     expect(needsAttention(task, new Date()).wake).toBe(true);
   });
-  it("a Returned after a Dispatched wakes the orchestrator; Opened does not", () => {
+  it("retains engineering-plan lineage without treating it as a dependency", () => {
+    const task = foldTask([f({
+      kind: "Created",
+      by: "orchestrator",
+      source: "conductor:create_child_tasks",
+      payload: { brief: "slice", parent: { taskId: "parent", planItemId: "slice-1", specRef: "feature/spec.md" } },
+    })]);
+    expect(task.parent).toEqual({ taskId: "parent", planItemId: "slice-1", specRef: "feature/spec.md" });
+    expect(task.state).toBe("open");
+  });
+  it("separates a coordinator Job from runtime dispatch and wakes only for its result", () => {
     const facts = [created(),
-      f({ kind: "Dispatched", by: "orchestrator", payload: { workerId: "w-1", agent: "coding:coding", instructions: "x", prompt: "x" } }),
-      f({ kind: "Opened", by: "w-1", payload: { workerId: "w-1", romeSessionId: "s", sessionType: "t" } })];
+      f({ kind: "JobCreated", by: "orchestrator", payload: { jobId: "j-1", agent: "coding:coding", instructions: "x" } })];
     let task = foldTask(facts);
-    expect(task.liveWorker?.workerId).toBe("w-1");
+    expect(task.pendingJob).toMatchObject({ jobId: "j-1", agent: "coding:coding", instructions: "x" });
     expect(needsAttention(task, new Date()).wake).toBe(false);
-    facts.push(f({ kind: "Returned", by: "w-1", payload: { workerId: "w-1", status: "succeeded", summary: "done", sessionId: "s" } }));
+
+    facts.push(f({ kind: "Dispatched", by: "runtime", payload: { jobId: "j-1", workerId: "w-1", agent: "coding:coding", instructions: "x", prompt: "x" } }));
+    task = foldTask(facts);
+    expect(task.pendingJob).toBeUndefined();
+    expect(task.liveWorker?.workerId).toBe("w-1");
+    expect(task.liveWorker?.jobId).toBe("j-1");
+    expect(needsAttention(task, new Date()).wake).toBe(false);
+
+    facts.push(f({ kind: "Opened", by: "w-1", payload: { jobId: "j-1", workerId: "w-1", romeSessionId: "s", sessionType: "t" } }));
+    task = foldTask(facts);
+    expect(task.liveWorker?.romeSession).toEqual({ id: "s", type: "t" });
+    expect(needsAttention(task, new Date()).wake).toBe(false);
+    facts.push(f({ kind: "Returned", by: "w-1", payload: { jobId: "j-1", workerId: "w-1", status: "succeeded", summary: "done", sessionId: "s" } }));
     task = foldTask(facts);
     expect(task.liveWorker).toBeUndefined();
     expect(needsAttention(task, new Date()).wake).toBe(true);
     expect(task.unseen.map((x) => x.kind)).toEqual(["Returned"]);
+  });
+
+  it("wakes the coordinator when runtime cannot dispatch a Job", () => {
+    const task = foldTask([
+      created(),
+      f({ kind: "JobCreated", by: "orchestrator", payload: { jobId: "j-1", agent: "coding:coding", instructions: "x" } }),
+      f({ kind: "JobFailed", by: "runtime", payload: { jobId: "j-1", agent: "coding:coding", error: "workspace missing" } }),
+    ]);
+    expect(task.pendingJob).toBeUndefined();
+    expect(task.unseen.map((x) => x.kind)).toEqual(["JobFailed"]);
+    expect(needsAttention(task, new Date()).wake).toBe(true);
   });
   it("Waited wakes only when due; a person's reply wakes at once and resets the budget", () => {
     const facts = [created(),
@@ -50,6 +82,18 @@ describe("foldTask", () => {
     const task = foldTask([created(), f({ kind: "Completed", by: "orchestrator", payload: { reason: "merged" } })]);
     expect(task.state).toBe("completed");
     expect(needsAttention(task, new Date()).wake).toBe(false);
+  });
+
+  it("a closed Task exposes no pending Job or live Run", () => {
+    const task = foldTask([
+      created(),
+      f({ kind: "JobCreated", by: "orchestrator", payload: { jobId: "j-1", agent: "coding:coding", instructions: "x" } }),
+      f({ kind: "Dispatched", by: "runtime", payload: { jobId: "j-1", workerId: "w-1", agent: "coding:coding", instructions: "x", prompt: "x" } }),
+      f({ kind: "Completed", by: "person", payload: { reason: "no longer needed" } }),
+    ]);
+    expect(task.state).toBe("completed");
+    expect(task.liveWorker).toBeUndefined();
+    expect(task.pendingJob).toBeUndefined();
   });
 });
 

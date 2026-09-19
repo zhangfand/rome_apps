@@ -2,6 +2,7 @@ import { describe, expect, it } from "@rstest/core";
 import { DEFAULT_SOP } from "../domain/sop.js";
 import { DEFAULT_INTAKE_LABEL } from "../domain/adapters/github/config.js";
 import { DEFAULT_WORKER_AGENTS, mergeAppConfig, parseAppConfig } from "./config.js";
+import { DEFAULT_ORCHESTRATOR_AGENT } from "../core/lib/config.js";
 
 const base = { projects: { app: { workingDir: "/repo" } } };
 
@@ -12,7 +13,18 @@ describe("app config composition", () => {
     if (!parsed.ok) return;
     expect(parsed.config.sop).toBe(DEFAULT_SOP);
     expect(parsed.config.workerAgents).toEqual(DEFAULT_WORKER_AGENTS);
+    expect(parsed.config.orchestratorAgent).toBe(DEFAULT_ORCHESTRATOR_AGENT);
     expect(parsed.config.github).toEqual({ intakeLabel: DEFAULT_INTAKE_LABEL });
+  });
+
+  it("moves the former built-in orchestrator id to the engineering lead without changing a custom coordinator", () => {
+    const migrated = parseAppConfig({ ...base, orchestratorAgent: "conductor:orchestrator" });
+    expect(migrated.ok).toBe(true);
+    if (migrated.ok) expect(migrated.config.orchestratorAgent).toBe("conductor:engineer-lead");
+
+    const custom = parseAppConfig({ ...base, orchestratorAgent: "custom:lead" });
+    expect(custom.ok).toBe(true);
+    if (custom.ok) expect(custom.config.orchestratorAgent).toBe("custom:lead");
   });
 
   it("adds the PM worker to the exact pre-PM worker defaults without changing custom allowlists", () => {

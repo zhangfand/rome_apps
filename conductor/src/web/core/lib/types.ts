@@ -19,7 +19,18 @@ export interface TaskSummary {
   createdAt: string;
   updatedAt: string;
   state: "open" | "completed" | "cancelled";
-  liveWorker?: { workerId: string; agent: string; since: string };
+  liveWorker?: {
+    jobId?: string;
+    workerId: string;
+    agent: string;
+    since: string;
+    romeSession?: { id: string; type: string };
+  };
+  pendingJob?: {
+    jobId: string;
+    agent: string;
+    since: string;
+  };
   lastDecision?: FactJson;
   latest: FactJson;
   waiting?: { reason: string; resumeAfter: string };

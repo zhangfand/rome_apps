@@ -26,7 +26,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
       if (!brief) return { status: "error", error: "brief is required" };
       if (!source) return { status: "error", error: "source is required: pass the person's message verbatim" };
       const settings = createSettingsRepository(appContext.db, composition.parseConfig).get();
-      if (!settings) return { status: "error", error: "Run conductor:setup before creating a task." };
+      if (!settings) return { status: "error", error: "Run conductor:configure_conductor before creating a task." };
       const context = getCurrentActionContext()?.channelContext;
       // Chat creation no longer applies source-specific URL heuristics. Adapter
       // intake still has exact one-task-per-(source,key) dedupe in the ingest seam.

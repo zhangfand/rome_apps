@@ -159,9 +159,9 @@ function StateGate({ feed, board = false, children }: { feed: Feed; board?: bool
         <h2 className="text-display">Nothing to conduct yet.</h2>
         <p className="text-[15px] leading-[1.6] text-muted-foreground">Point Conductor at a working directory and a repository, and it will take in labeled issues from there.</p>
         <div><Button onClick={() => navigateToApp("/config")}>Open settings</Button></div>
-        <p className="text-ui text-muted-foreground">Or set it up in one step with <code className="rounded bg-surface-muted px-1.5 font-mono">conductor:setup</code>.</p>
+        <p className="text-ui text-muted-foreground">Or set it up in one step with <code className="rounded bg-surface-muted px-1.5 font-mono">conductor:configure_conductor</code>.</p>
       </div>
-    ) : <p className="text-ui text-muted-foreground">Nothing to list yet. Run <code className="rounded bg-surface-muted px-1.5 font-mono">conductor:setup</code> first.</p>;
+    ) : <p className="text-ui text-muted-foreground">Nothing to list yet. Run <code className="rounded bg-surface-muted px-1.5 font-mono">conductor:configure_conductor</code> first.</p>;
   }
   return <>{children(feed.state)}</>;
 }

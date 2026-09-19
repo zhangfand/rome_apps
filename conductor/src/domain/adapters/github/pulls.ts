@@ -62,7 +62,7 @@ export interface PullObservation {
   mergedAt?: string;
   headSha?: string;
   reviews?: Array<{ id: number; user: string; state: string; body: string; submittedAt?: string }>;
-  reviewComments?: Array<{ id: number; user: string; path?: string; line?: number; body: string }>;
+  reviewComments?: Array<{ id: number; reviewId?: number; user: string; path?: string; line?: number; body: string }>;
   comments?: Array<{ id: number; user: string; body: string }>;
   checks?: { total: number; completed: number; runs: Array<{ name: string; status: string; conclusion?: string; url?: string }> };
 }
@@ -72,19 +72,49 @@ export function pullEvents(task: TaskView, ref: PullRef, seen: PullObservation):
   const event = (type: string, key: string, summary: string, data: Record<string, unknown>) => {
     out.push({
       op: "push_event", source: "github", taskId: task.id, type, key, summary,
-      cite: `conductor:tick, polling ${ref.url}`,
+      cite: `conductor:reconcile_tasks, polling ${ref.url}`,
       data: { url: ref.url, ...data },
     });
   };
 
+  const commentsByReview = groupReviewComments(seen.reviewComments ?? []);
+  const capturedCommentIds = recordedReviewCommentIds(task);
+  const recordedKeys = recordedGithubEventKeys(task);
   for (const r of seen.reviews ?? []) {
-    if (r.state === "COMMENTED" && !r.body.trim()) continue; // a review shell around inline comments
-    event("pr_review", `review:${r.id}`, `${r.user} reviewed ${ref.url} (${r.state.toLowerCase().replace("_", " ")})${r.body.trim() ? `: ${clip(r.body)}` : ""}`,
-      { reviewer: r.user, state: r.state, body: r.body, submittedAt: r.submittedAt });
+    const comments = commentsByReview.get(r.id) ?? [];
+    commentsByReview.delete(r.id);
+    // GitHub may reveal the authenticated reviewer's own draft. Its comments
+    // are not an outside action yet, and recording the stable review id now
+    // would suppress the eventual submitted state.
+    if (r.state === "PENDING") continue;
+    const reviewKey = `review:${r.id}`;
+    if (!recordedKeys.has(reviewKey)) {
+      // GitHub models a submitted review and all of its inline comments as one
+      // action. Keep that boundary in the ledger instead of turning one review
+      // into N comment events (and N noisy history rows).
+      if (r.state === "COMMENTED" && !r.body.trim() && comments.length === 0) continue;
+      event("pr_review", reviewKey, reviewSummary(ref, r, comments), {
+        reviewer: r.user,
+        state: r.state,
+        body: clip(r.body, 4_000),
+        submittedAt: r.submittedAt,
+        ...reviewCommentsData(comments),
+      });
+      continue;
+    }
+
+    // Upgrade/network-failure compatibility: older versions recorded the
+    // review shell and each comment separately. Normally all comments are
+    // already captured. If the comment read failed during that old poll, keep
+    // the missing feedback without re-announcing the whole review.
+    const missing = comments.filter((comment) => !capturedCommentIds.has(comment.id));
+    if (missing.length) eventReviewCommentBatch(r.id, missing);
   }
-  for (const c of seen.reviewComments ?? []) {
-    event("pr_review_comment", `rc:${c.id}`, `${c.user} commented on ${ref.url}${c.path ? ` at ${c.path}${c.line ? `:${c.line}` : ""}` : ""}: ${clip(c.body)}`,
-      { author: c.user, path: c.path, line: c.line, body: c.body });
+  // A comment should carry pull_request_review_id, but retain feedback from an
+  // incomplete GitHub response instead of dropping it.
+  for (const [reviewId, comments] of commentsByReview) {
+    const missing = comments.filter((comment) => !capturedCommentIds.has(comment.id));
+    if (missing.length) eventReviewCommentBatch(reviewId, missing);
   }
   for (const c of seen.comments ?? []) {
     event("pr_comment", `ic:${c.id}`, `${c.user} commented on ${ref.url}: ${clip(c.body)}`, { author: c.user, body: c.body });
@@ -102,6 +132,99 @@ export function pullEvents(task: TaskView, ref: PullRef, seen: PullObservation):
     event("pr_closed", `closed:${ref.url}`, `${ref.url} was closed without merging`, { headSha: seen.headSha });
   }
   return out;
+
+  function eventReviewCommentBatch(reviewId: number, comments: PullReviewComment[]) {
+    event("pr_review_comments", `review-comments:${reviewId}`, reviewCommentsSummary(ref, comments), {
+      reviewId,
+      authors: [...new Set(comments.map((comment) => comment.user))],
+      ...reviewCommentsData(comments),
+    });
+  }
+}
+
+type PullReview = NonNullable<PullObservation["reviews"]>[number];
+type PullReviewComment = NonNullable<PullObservation["reviewComments"]>[number];
+
+function groupReviewComments(comments: readonly PullReviewComment[]): Map<number, PullReviewComment[]> {
+  const groups = new Map<number, PullReviewComment[]>();
+  for (const comment of comments) {
+    // GitHub supplies this for every review comment. A negative synthetic id
+    // keeps malformed rows together without colliding with a real review.
+    const reviewId = comment.reviewId && comment.reviewId > 0 ? comment.reviewId : -1;
+    groups.set(reviewId, [...(groups.get(reviewId) ?? []), comment]);
+  }
+  return groups;
+}
+
+function recordedGithubEventKeys(task: TaskView): Set<string> {
+  const keys = new Set<string>();
+  for (const fact of task.facts) {
+    if (fact.kind !== "Event" || fact.payload.source !== "github") continue;
+    const key = fact.payload.data?.key;
+    if (typeof key === "string") keys.add(key);
+  }
+  return keys;
+}
+
+function recordedReviewCommentIds(task: TaskView): Set<number> {
+  const ids = new Set<number>();
+  for (const fact of task.facts) {
+    if (fact.kind !== "Event" || fact.payload.source !== "github") continue;
+    const data = fact.payload.data;
+    const legacyKey = typeof data?.key === "string" ? /^rc:(\d+)$/.exec(data.key) : undefined;
+    if (legacyKey) ids.add(Number(legacyKey[1]));
+    if (Array.isArray(data?.commentIds)) {
+      for (const id of data.commentIds) if (typeof id === "number") ids.add(id);
+    }
+  }
+  return ids;
+}
+
+function reviewSummary(ref: PullRef, review: PullReview, comments: readonly PullReviewComment[]): string {
+  const state = review.state.toLowerCase().replaceAll("_", " ");
+  const body = review.body.trim() ? `: ${clip(review.body, 240)}` : "";
+  const inline = comments.length ? `; ${inlineCommentSummary(comments)}` : "";
+  return clip(`${review.user} reviewed ${ref.url} (${state})${body}${inline}`, 950);
+}
+
+function reviewCommentsSummary(ref: PullRef, comments: readonly PullReviewComment[]): string {
+  const authors = [...new Set(comments.map((comment) => comment.user))].join(", ");
+  return clip(`${authors} left ${inlineCommentSummary(comments)} on ${ref.url}`, 950);
+}
+
+function inlineCommentSummary(comments: readonly PullReviewComment[]): string {
+  const shown = comments.slice(0, 3).map((comment) => {
+    const location = comment.path ? `${clip(comment.path, 120)}${comment.line ? `:${comment.line}` : ""}: ` : "";
+    return `${location}${clip(comment.body, 180)}`;
+  });
+  const rest = comments.length - shown.length;
+  return `${comments.length} inline review comment${comments.length === 1 ? "" : "s"} — ${shown.join(" | ")}${rest ? ` | +${rest} more` : ""}`;
+}
+
+/**
+ * Keep common reviews fully self-contained while respecting the ingest seam's
+ * 32 KiB data limit. All ids are retained for durable dedupe; unusually large
+ * review bodies can be read from the PR URL already carried by the event.
+ */
+function reviewCommentsData(comments: readonly PullReviewComment[]) {
+  const detailed: Array<{ id: number; author: string; path?: string; line?: number; body: string }> = [];
+  for (const comment of comments) {
+    const candidate = {
+      id: comment.id,
+      author: comment.user,
+      ...(comment.path ? { path: clip(comment.path, 300) } : {}),
+      ...(comment.line ? { line: comment.line } : {}),
+      body: clip(comment.body, 4_000),
+    };
+    if (JSON.stringify([...detailed, candidate]).length > 22_000) break;
+    detailed.push(candidate);
+  }
+  return {
+    commentCount: comments.length,
+    commentIds: comments.map((comment) => comment.id),
+    comments: detailed,
+    ...(detailed.length < comments.length ? { commentsOmitted: comments.length - detailed.length } : {}),
+  };
 }
 
 function clip(text: string, max = 400): string {
@@ -137,7 +260,7 @@ export function unknownTaskPulls(task: TaskView, openPulls: ReadonlyArray<{ url:
     out.push({
       op: "push_event", source: "github", taskId: task.id, type: "pr_opened", key: `pr_opened:${pr.url}`,
       summary: `${pr.url} is open from this task's branch ${pr.headRef} (worker ${workerId}); no fact on this task mentioned it yet`,
-      cite: "conductor:tick, listing pull requests on the task's branches",
+      cite: "conductor:reconcile_tasks, listing pull requests on the task's branches",
       data: { url: pr.url, branch: pr.headRef, workerId },
     });
   }

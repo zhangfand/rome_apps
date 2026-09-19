@@ -12,6 +12,8 @@ import {
 import { type GitWorktreeWorkspace, gitWorktreeProvider } from "../../domain/workspaces/git-worktree.js";
 import { noWorkspaceProvider } from "../../core/workspaces/none.js";
 import { providerFor } from "./index.js";
+import { PRODUCT_SPEC_CONTRACT } from "../../domain/product-spec-contract.js";
+import { WORK_REPO_CONTRACT } from "../../domain/work-repo-contract.js";
 
 let seq = 0;
 const t0 = Date.parse("2026-09-14T00:00:00Z");
@@ -123,6 +125,37 @@ describe("prompts follow the workspace kind", () => {
     const args = { config: config.config, now: new Date(t0), why: "new facts", freeSlots: 3 };
     expect(buildOrchestratorPrompt({ ...args, task: gitTask, providerFor, defaultWorkspaceKind: "git-worktree" })).toContain("Workers get their own checkout");
     expect(buildOrchestratorPrompt({ ...args, task, providerFor, defaultWorkspaceKind: "git-worktree" })).not.toContain("Workers get their own checkout");
+  });
+
+  it("injects the identical shared product contract for the lead and workers", () => {
+    const worker = buildWorkerPrompt({
+      task,
+      instructions: "write the spec",
+      workspace: { kind: "none" },
+      resuming: false,
+      providerFor,
+      defaultWorkspaceKind: "git-worktree",
+      sharedContracts: [
+        { name: "product-spec-contract.md", content: PRODUCT_SPEC_CONTRACT },
+        { name: "work-repo-contract.md", content: WORK_REPO_CONTRACT },
+      ],
+    });
+    const lead = buildOrchestratorPrompt({
+      task,
+      config: config.config,
+      now: new Date(t0),
+      why: "new facts",
+      providerFor,
+      defaultWorkspaceKind: "git-worktree",
+      sharedContracts: [
+        { name: "product-spec-contract.md", content: PRODUCT_SPEC_CONTRACT },
+        { name: "work-repo-contract.md", content: WORK_REPO_CONTRACT },
+      ],
+    });
+    expect(worker).toContain(PRODUCT_SPEC_CONTRACT.trim());
+    expect(lead).toContain(PRODUCT_SPEC_CONTRACT.trim());
+    expect(worker).toContain(WORK_REPO_CONTRACT.trim());
+    expect(lead).toContain(WORK_REPO_CONTRACT.trim());
   });
 });
 

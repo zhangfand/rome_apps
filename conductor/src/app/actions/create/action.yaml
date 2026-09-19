@@ -1,10 +1,7 @@
-name: create
+name: create_task
 type: custom
 description: >-
-  Record a new task the person just asked for. `brief` is what to do, in your
-  words; `source` is the person's own message, verbatim. Use this when their
-  words describe work that is not already a task. Pass projectId from snapshot.projects;
-  ask when the target project is ambiguous. The target is pinned for all retries.
+  Create a Task from a brief, source message, and project.
 entry: ./index.ts
 complexity: simple
 speed: fast

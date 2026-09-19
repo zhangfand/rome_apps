@@ -27,7 +27,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       if (!reason) return { status: "error", error: "reason is required" };
       if (!Number.isFinite(minutes)) return { status: "error", error: "minutes must be a number" };
       const resumeAfter = new Date(Date.now() + minutes * 60_000).toISOString();
-      return writeDecision(appContext, { ...input, source: "conductor:wait", fact: { kind: "Waited", payload: { reason, resumeAfter } } });
+      return writeDecision(appContext, { ...input, source: "conductor:wait_for_task_update", fact: { kind: "Waited", payload: { reason, resumeAfter } } });
     },
   };
 }

@@ -18,15 +18,15 @@ import type { ProjectBinding } from "./projects.js";
 export const PERSON_KINDS = ["Created", "Reply", "Completed", "Cancelled"] as const;
 
 /** Written by the orchestrator. Every one of these is a decision. */
-export const DECISION_KINDS = ["Dispatched", "Asked", "Reported", "Waited", "Completed", "Cancelled", "Noted", "Lost"] as const;
+export const DECISION_KINDS = ["JobCreated", "Asked", "Reported", "Waited", "Completed", "Cancelled", "Noted"] as const;
 
 /** Written by the runtime or a worker: things that happened. */
-export const RUNTIME_KINDS = ["Opened", "Returned", "Failed", "Lost", "Event"] as const;
+export const RUNTIME_KINDS = ["Dispatched", "JobFailed", "Opened", "Returned", "Failed", "Lost", "Event"] as const;
 
 export const FACT_KINDS = [
   "Created", "Reply", "Completed", "Cancelled",
-  "Dispatched", "Asked", "Reported", "Waited", "Noted",
-  "Opened", "Returned", "Failed", "Lost", "Event",
+  "JobCreated", "Dispatched", "Asked", "Reported", "Waited", "Noted",
+  "JobFailed", "Opened", "Returned", "Failed", "Lost", "Event",
 ] as const;
 
 export type FactKind = (typeof FACT_KINDS)[number];
@@ -98,12 +98,30 @@ export interface IssueOrigin {
   label: string;
 }
 
+/**
+ * A separate outcome Task materialized by an engineering lead from a larger
+ * delivery Task. Agent handoffs within one outcome are Jobs, not child Tasks.
+ * This is lineage, not a dependency edge: the lead decides when work is
+ * runnable and only then creates it.
+ */
+export interface TaskParent {
+  taskId: string;
+  /** Stable id for this unit inside the lead's evolving engineering plan. */
+  planItemId: string;
+  /** Durable product contract this unit helps deliver, when one exists. */
+  specRef?: string;
+  /** Durable engineering plan the lead is reconciling, when one exists. */
+  planRef?: string;
+}
+
 // ---- person facts -------------------------------------------------------
 
 export type CreatedFact = FactOf<"Created", {
   brief: string;
   projectId?: string;
   project?: ProjectBinding["project"];
+  /** Present when an engineering lead created this separate outcome Task. */
+  parent?: TaskParent;
   /** Set when a source adapter opened the task rather than a person in chat. */
   origin?: TaskOrigin;
   /** Legacy shape of the above, kept for facts already in the ledger. */
@@ -120,11 +138,36 @@ export type CancelledFact = FactOf<"Cancelled", { reason?: string }>;
 export const WORKER_STATUSES = ["succeeded", "failed", "blocked", "waiting", "unparsed"] as const;
 export type WorkerStatus = (typeof WORKER_STATUSES)[number];
 
+/**
+ * One bounded request from the task's coordinator to a logical agent. The
+ * coordinator chooses the work and the agent role; runtime infrastructure
+ * later chooses a concrete worker/session and records Dispatched.
+ */
+export type JobCreatedFact = FactOf<"JobCreated", {
+  jobId: string;
+  /** Canonical logical agent id, an `app:agent` id. */
+  agent: string;
+  /** The coordinator's self-contained direction to that agent. */
+  instructions: string;
+  /** Why this job is the next useful work; shown to people. */
+  note?: string;
+}>;
+
+export type AskedFact = FactOf<"Asked", { question: string }>;
+export type ReportedFact = FactOf<"Reported", { report: string }>;
+export type WaitedFact = FactOf<"Waited", { reason: string; resumeAfter: string }>;
+export type NotedFact = FactOf<"Noted", { note: string }>;
+
+// ---- runtime / worker facts ---------------------------------------------
+
+/** The runtime materialization of a JobCreated fact into a concrete run. */
 export type DispatchedFact = FactOf<"Dispatched", {
+  /** Absent only on facts written before Jobs were introduced. */
+  jobId?: string;
   workerId: string;
   /** Canonical agent id the worker runs, an `app:agent` id. */
   agent: string;
-  /** The orchestrator's own words to the worker. */
+  /** Copied from the Job so a historical run remains self-describing. */
   instructions: string;
   /** The full prompt the worker was launched with (instructions + runtime framing). */
   prompt: string;
@@ -137,15 +180,10 @@ export type DispatchedFact = FactOf<"Dispatched", {
   projectId?: string;
   project?: ProjectBinding["project"];
 }>;
-export type AskedFact = FactOf<"Asked", { question: string }>;
-export type ReportedFact = FactOf<"Reported", { report: string }>;
-export type WaitedFact = FactOf<"Waited", { reason: string; resumeAfter: string }>;
-export type NotedFact = FactOf<"Noted", { note: string }>;
-
-// ---- runtime / worker facts ---------------------------------------------
-
-export type OpenedFact = FactOf<"Opened", { workerId: string; romeSessionId: string; sessionType: string }>;
+export type JobFailedFact = FactOf<"JobFailed", { jobId: string; agent: string; error: string }>;
+export type OpenedFact = FactOf<"Opened", { jobId?: string; workerId: string; romeSessionId: string; sessionType: string }>;
 export type ReturnedFact = FactOf<"Returned", {
+  jobId?: string;
   workerId: string;
   status: WorkerStatus;
   summary: string;
@@ -157,8 +195,8 @@ export type ReturnedFact = FactOf<"Returned", {
   /** The requested session could not be resumed; the worker ran fresh. */
   restarted?: boolean;
 }>;
-export type FailedFact = FactOf<"Failed", { workerId: string; error: string; sessionId?: string; restarted?: boolean }>;
-export type LostFact = FactOf<"Lost", { workerId: string; why: string }>;
+export type FailedFact = FactOf<"Failed", { jobId?: string; workerId: string; error: string; sessionId?: string; restarted?: boolean }>;
+export type LostFact = FactOf<"Lost", { jobId?: string; workerId: string; why: string }>;
 /** Something outside the ledger happened. The orchestrator decides what it means. */
 export type EventFact = FactOf<"Event", {
   /** Where it came from: an adapter slug or `runtime`. */
@@ -172,8 +210,8 @@ export type EventFact = FactOf<"Event", {
 
 export type Fact =
   | CreatedFact | ReplyFact | CompletedFact | CancelledFact
-  | DispatchedFact | AskedFact | ReportedFact | WaitedFact | NotedFact
-  | OpenedFact | ReturnedFact | FailedFact | LostFact | EventFact;
+  | JobCreatedFact | AskedFact | ReportedFact | WaitedFact | NotedFact
+  | DispatchedFact | JobFailedFact | OpenedFact | ReturnedFact | FailedFact | LostFact | EventFact;
 
 export type NewFact = Omit<Fact, "seq" | "id" | "createdAt">;
 
@@ -214,18 +252,26 @@ export function describeFact(fact: Fact, opts: { full?: boolean } = {}): string 
   const body = (() => {
     switch (fact.kind) {
       case "Created":
-        return fact.payload.brief;
+        return fact.payload.parent
+          ? `${fact.payload.brief}\nMaterialized by parent ${fact.payload.parent.taskId} as plan item ${fact.payload.parent.planItemId}${fact.payload.parent.specRef ? ` from ${fact.payload.parent.specRef}` : ""}`
+          : fact.payload.brief;
       case "Reply":
         return fact.payload.text;
       case "Completed":
         return [fact.payload.reason, fact.payload.evidence ? `evidence: ${fact.payload.evidence}` : ""].filter(Boolean).join(" — ");
       case "Cancelled":
         return fact.payload.reason ?? "";
+      case "JobCreated": {
+        const note = fact.payload.note ? `${fact.payload.note}\n` : "";
+        const text = opts.full ? fact.payload.instructions : clip(fact.payload.instructions, 600);
+        return `${note}job ${fact.payload.jobId} for ${fact.payload.agent}\nInstructions:\n${text}`;
+      }
       case "Dispatched": {
         const resume = fact.payload.resumeWorkerId ? ` (continuing ${fact.payload.resumeWorkerId}'s session)` : "";
         const note = fact.payload.note ? `${fact.payload.note}\n` : "";
         const text = opts.full ? fact.payload.instructions : clip(fact.payload.instructions, 600);
-        return `${note}worker ${fact.payload.workerId} as ${fact.payload.agent}${resume}\nInstructions:\n${text}`;
+        const job = fact.payload.jobId ? ` for job ${fact.payload.jobId}` : "";
+        return `${note}worker ${fact.payload.workerId}${job} as ${fact.payload.agent}${resume}\nInstructions:\n${text}`;
       }
       case "Asked":
         return fact.payload.question;
@@ -235,6 +281,8 @@ export function describeFact(fact: Fact, opts: { full?: boolean } = {}): string 
         return `until ${fact.payload.resumeAfter}: ${fact.payload.reason}`;
       case "Noted":
         return fact.payload.note;
+      case "JobFailed":
+        return `job ${fact.payload.jobId} for ${fact.payload.agent}: ${fact.payload.error}`;
       case "Opened":
         return `worker ${fact.payload.workerId} runs in session ${fact.payload.romeSessionId}`;
       case "Returned": {

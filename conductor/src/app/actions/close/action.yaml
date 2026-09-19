@@ -1,7 +1,7 @@
-name: close
+name: close_task
 type: custom
 description: >-
-  Decision: end the task as completed or cancelled. Give the reason and the evidence the SOP asks for.
+  Close a Task as completed or cancelled with a reason and evidence.
 entry: ./index.ts
 complexity: simple
 speed: fast

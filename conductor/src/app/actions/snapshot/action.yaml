@@ -1,10 +1,7 @@
-name: snapshot
+name: list_tasks
 type: custom
 description: >-
-  Read every task and where it stands: its state, its brief, the orchestrator's
-  latest decision, and the last few facts on it. Read this before writing
-  anything, so you name the task the person means rather than opening a second
-  one for the same work.
+  Return the configured projects and all Tasks with their current state.
 entry: ./index.ts
 complexity: simple
 speed: fast

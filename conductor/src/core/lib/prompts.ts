@@ -1,4 +1,5 @@
 import type { ConductorConfig } from "./config.js";
+import type { SharedPromptContract } from "./composition.js";
 import { sopFor } from "./config.js";
 import { describeFact } from "./facts.js";
 import type { TaskView } from "./fold.js";
@@ -12,6 +13,8 @@ import { projectWorkspaceKind, type Workspace, workspaceKind, type WorkspaceProv
  */
 export function buildWorkerPrompt(input: {
   task: TaskView;
+  /** Absent only for legacy Dispatched facts. */
+  jobId?: string;
   instructions: string;
   workspace: Workspace;
   /** True when the worker continues a session that already holds the framing. */
@@ -19,22 +22,29 @@ export function buildWorkerPrompt(input: {
   providerFor(kind: string): WorkspaceProvider;
   defaultWorkspaceKind: string;
   projectNote?: string;
+  sharedContracts?: readonly SharedPromptContract[];
 }): string {
   const { task, instructions, workspace, resuming, providerFor } = input;
   const lines: string[] = [];
   if (resuming) {
-    lines.push(`You are continuing your work on task ${task.id}. New instructions from the orchestrator follow.`, "");
+    lines.push(`You are continuing with job ${input.jobId ?? "(legacy)"} on task ${task.id}. New instructions from the task coordinator follow.`, "");
   } else {
     lines.push(
-      `You are a worker on task ${task.id}${input.projectNote ?? ""}.`,
-      "An orchestrator coordinates this task; it wrote the instructions below and will read your reply. You do not talk to the requester directly.",
+      `You are running job ${input.jobId ?? "(legacy)"} on task ${task.id}${input.projectNote ?? ""}.`,
+      "A lead coordinates the durable Task; it created this bounded Job and will read your result. You do not talk to the requester directly.",
       "",
       "## Original request",
       task.brief,
       "",
     );
   }
-  lines.push("## Instructions from the orchestrator", instructions, "");
+  if (input.sharedContracts?.length) {
+    lines.push("## Shared artifact contracts", "");
+    for (const contract of input.sharedContracts) {
+      lines.push(`### ${contract.name}`, contract.content.trim(), "");
+    }
+  }
+  lines.push("## Job instructions from the task coordinator", instructions, "");
   // A workspace kind with nothing to say adds no section: a worker on a task
   // that touches no files is never told about checkouts or branches.
   const workspaceBlock = providerFor(workspaceKind(workspace, input.defaultWorkspaceKind)).instructions(workspace);
@@ -51,20 +61,22 @@ function workspaceNote(task: TaskView, providerFor: (kind: string) => WorkspaceP
 
 /**
  * The orchestrator's prompt for one wake. Everything it can know: the SOP,
- * the task's whole ledger, what agents it may dispatch, how many worker
- * slots are free, and the seq it must cite so a stale decision is refused.
+ * the task's whole ledger, what agents it may create Jobs for, and the seq it
+ * must cite so a stale decision is refused. Worker scheduling is not exposed.
  */
 export function buildOrchestratorPrompt(input: {
   task: TaskView;
+  /** Tasks this lead materialized; empty for an ordinary execution task. */
+  children?: readonly TaskView[];
   config: ConductorConfig;
   now: Date;
   why: string;
-  freeSlots: number;
   providerFor(kind: string): WorkspaceProvider;
   defaultWorkspaceKind: string;
   projectNote?: string;
+  sharedContracts?: readonly SharedPromptContract[];
 }): string {
-  const { task, config, now, why, freeSlots } = input;
+  const { task, config, now, why } = input;
   const seenSeq = task.latest.seq;
   const lines: string[] = [];
   lines.push(
@@ -74,17 +86,43 @@ export function buildOrchestratorPrompt(input: {
     `Why you were woken: ${why}`,
     `Project: ${task.projectId ?? "(none)"}${input.projectNote ?? ""}.${workspaceNote(task, input.providerFor, input.defaultWorkspaceKind)}`,
     `Requested by: ${task.createdBy}`,
-    `Live worker: ${task.liveWorker ? `${task.liveWorker.workerId} (${task.liveWorker.agent}, since ${task.liveWorker.startedAt.toISOString()})` : "none"}`,
-    `Free worker slots: ${freeSlots} of ${config.maxWorkers}`,
+    `Job execution: ${task.liveWorker ? `${task.liveWorker.jobId ?? "legacy job"} is running as ${task.liveWorker.agent} (worker ${task.liveWorker.workerId}, since ${task.liveWorker.startedAt.toISOString()})` : task.pendingJob ? `${task.pendingJob.jobId} is waiting for runtime dispatch as ${task.pendingJob.agent}` : "none"}`,
     `Decisions you have made since the person last spoke: ${task.decisionsSinceLastPersonFact}`,
     `seenSeq: ${seenSeq}  ← pass this on every decision action`,
     "",
-    "## Agents you may dispatch a worker as",
+    "## Agents you may create a Job for",
     ...Object.entries(config.workerAgents).map(([agent, description]) => `- \`${agent}\`: ${description}`),
     "",
     "## SOP",
     sopFor(config, task.projectId),
     "",
+    ...(input.sharedContracts?.length ? [
+      "## Shared artifact contracts",
+      "",
+      ...input.sharedContracts.flatMap((contract) => [
+        `### ${contract.name}`,
+        contract.content.trim(),
+        "",
+      ]),
+    ] : []),
+    ...(input.task.parent ? [
+      "## Delivery lineage",
+      `Parent task: ${input.task.parent.taskId}`,
+      `Engineering-plan item: ${input.task.parent.planItemId}`,
+      ...(input.task.parent.specRef ? [`Spec: ${input.task.parent.specRef}`] : []),
+      ...(input.task.parent.planRef ? [`Engineering plan: ${input.task.parent.planRef}`] : []),
+      "",
+    ] : []),
+    ...((input.children?.length ?? 0) > 0 ? [
+      "## Materialized tasks",
+      ...input.children!.map((child) => {
+        const result = child.state === "open"
+          ? child.liveWorker ? `running as ${child.liveWorker.agent}` : child.lastDecision ? `open; last decision ${child.lastDecision.kind}#${child.lastDecisionSeq}` : "open; not picked up yet"
+          : child.state;
+        return `- ${child.parent!.planItemId}: ${child.id} — ${result} — ${child.brief}`;
+      }),
+      "",
+    ] : []),
     "## Ledger (every fact on this task, oldest first)",
     ...task.facts.map((fact) => describeFact(fact, { full: fact.seq > task.lastDecisionSeq || fact.kind === "Created" })),
     "",

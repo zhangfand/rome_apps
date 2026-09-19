@@ -21,6 +21,7 @@ import {
 } from "../lib/facts";
 import { formatDuration, formatRelative, truncate } from "../lib/format";
 import { LightMarkdown } from "./light-markdown";
+import { WorkerLink } from "./worker-link";
 import type { StateJson, TaskDetailJson, TaskSummary } from "../lib/types";
 
 const QUICK_REPLIES = {
@@ -44,6 +45,8 @@ export function Board({
 }) {
   const needsYou = state.tasks.filter((task) => bucketTask(task) === "needs-you");
   const running = state.tasks.filter((task) => bucketTask(task) === "running");
+  const activeWorkers = running.filter((task) => task.liveWorker).length;
+  const queuedJobs = running.filter((task) => task.pendingJob && !task.liveWorker).length;
   const resting = state.tasks.filter((task) => bucketTask(task) === "resting");
   const [replyOpen, setReplyOpen] = useState<Record<string, boolean>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -206,7 +209,11 @@ export function Board({
       <section className="flex flex-col gap-[18px]" aria-labelledby="running-heading">
         <div className="flex items-baseline gap-2.5">
           <SectionHeading id="running-heading">Running</SectionHeading>
-          {state.maxWorkers > 0 && <span className="font-mono text-[11px] text-subtle-foreground">{running.length} of {state.maxWorkers} at once</span>}
+          {state.maxWorkers > 0 && (
+            <span className="font-mono text-[11px] text-subtle-foreground">
+              {activeWorkers} of {state.maxWorkers} workers{queuedJobs ? ` · ${queuedJobs} queued` : ""}
+            </span>
+          )}
         </div>
         <Card className="gap-0 py-0">
           {!running.length ? (
@@ -223,8 +230,21 @@ export function Board({
                 <CardContent className="relative flex flex-wrap items-center gap-2.5 py-4">
                   {freshIds.has(task.id) && <FreshEdge />}
                   <Button variant="link" size="xs" className="px-0 text-foreground" onClick={() => navigateToApp(`/${task.id}`)}>{taskTitle(task)}</Button>
+                  {task.liveWorker?.romeSession && (
+                    <WorkerLink
+                      workerId={task.liveWorker.workerId}
+                      session={task.liveWorker.romeSession}
+                      label="worker session"
+                      icon
+                      className="text-aux text-muted-foreground"
+                    />
+                  )}
                   <span className="max-w-[52ch] truncate text-aux text-muted-foreground">{truncate(phase, 140)}</span>
-                  <span className="ml-auto text-aux">{formatDuration(now - new Date(task.liveWorker!.since).getTime())}</span>
+                  <span className="ml-auto text-aux">
+                    {task.liveWorker
+                      ? formatDuration(now - new Date(task.liveWorker.since).getTime())
+                      : `queued ${formatDuration(now - new Date(task.pendingJob!.since).getTime())}`}
+                  </span>
                 </CardContent>
               </Fragment>
             );

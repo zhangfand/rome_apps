@@ -36,14 +36,14 @@ export interface ConfigExtensions {
 export type ParseConfigResult = { ok: true; config: ConductorConfig } | { ok: false; error: string };
 export type ConfigParser = (raw: unknown) => ParseConfigResult;
 
-export const DEFAULT_ORCHESTRATOR_AGENT = "conductor:orchestrator";
+export const DEFAULT_ORCHESTRATOR_AGENT = "conductor:engineer-lead";
 export const DEFAULT_MAX_WORKERS = 3;
 export const DEFAULT_INTERVAL_MINUTES = 5;
 export const DEFAULT_REUSE_SESSIONS = true;
 export const DEFAULT_MAX_DECISIONS_PER_TURN = 25;
 export const CONFIG_KEY = "conductor_config";
 export const TICK_ROUTINE_KEY = "conductor-tick";
-export const TICK_ROUTINE_NAME = "Conductor: tick";
+export const TICK_ROUTINE_NAME = "Conductor: reconcile tasks";
 
 function positiveInt(value: unknown, fallback: number, max: number): number {
   const n = Math.round(Number(value));

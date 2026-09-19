@@ -1,7 +1,7 @@
-name: ledger
+name: read_task_history
 type: custom
 description: >-
-  Read one task's whole ledger: every fact, oldest first, plus the current seq to cite as seenSeq. Call this when a decision was refused because the ledger advanced.
+  Return a Task's complete chronological history and latest sequence number.
 entry: ./index.ts
 complexity: simple
 speed: fast

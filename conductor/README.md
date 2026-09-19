@@ -6,7 +6,7 @@ Manager decides what happens next in `reconcile.ts`: a `switch` on the latest
 fact kind, with phases, retry caps and hook wiring in code. Conductor keeps the
 same bones — an append-only ledger, isolated worktrees, heartbeat-supervised
 workers, GitHub issue intake — and replaces the decision code with an
-**orchestrator agent** that reads a task's whole ledger plus a standard
+**engineering-lead agent** that reads a task's whole ledger plus a standard
 operating procedure (SOP) and records one decision per wake. Change the SOP and
 the same app runs a different kind of work.
 
@@ -24,25 +24,36 @@ Core never imports domain or app, and domain never imports app. The boundary is
 checked by `src/core/boundary.test.ts`. A future employee app copies `src/core/`
 verbatim and supplies its own domain and app composition.
 
-## The three parties
+## Task, Job and Run
 
 ```
-person / any source ──► ingest seam ──► ledger ◄── worker (via run_worker)
-                                          ▲
-                                          │ reads everything, writes one decision
-                                     orchestrator
+person / any source ──► Task ledger ◄── Job result ── Worker Run
+                             ▲                 ▲
+                             │                 │ runtime dispatches
+                 engineering lead ── creates Job
 ```
 
-- **Runtime** (`tick`, `orchestrate`, `run_worker`, `dispatch`): observes and
+A **Task** is the durable outcome and may pass through many agents. It is not
+assigned wholesale to one agent. The engineering lead creates a bounded
+**Job** for a logical agent; lower-level runtime infrastructure dispatches that
+Job into a concrete **Run**, selecting or resuming the Worker Session,
+preparing the workspace and enforcing global capacity. One Job may have more
+than one Run/attempt over its lifetime.
+
+- **Runtime** (`tick`, `orchestrate`, `run_worker`, the Job scheduler): observes and
   transcribes. Expires silent workers (`Lost`), asks every source adapter what
-  it saw, hands the batch to the ingest seam (`Created` / `Event`), launches
-  workers, records what they said (`Returned` / `Failed`), and wakes the
+  it saw, hands the batch to the ingest seam (`Created` / `Event`), dispatches
+  pending Jobs, records what workers said (`Returned` / `Failed`), and wakes the
   orchestrator for any open task with facts it has not decided on. It decides
   nothing about a task.
-- **Orchestrator** (`src/app/agents/orchestrator.yaml`): woken per task. Gets the SOP,
-  every fact on the task, the agents it may use and the free worker slots.
-  Records exactly one of `Dispatched / Asked / Reported / Waited / Completed /
-  Cancelled / Noted` (optionally preceded by `stop` → `Lost`).
+- **Engineering lead** (`src/app/agents/engineer-lead.yaml`): the software-domain
+  orchestrator, woken per task. It decides whether product definition needs PM,
+  consumes a ready spec, maintains the evolving engineering plan, materializes
+  only runnable tasks, judges review evidence and owns delivery through
+  ready-to-merge. It records exactly one decision per wake.
+- **PM and execution workers**: PM owns product definition and returns a durable
+  `Status: ready` spec. Coding and verification workers receive bounded
+  handoffs; their returns are claims the lead reconciles with evidence.
 - **Conductor** (`src/app/agents/conductor.yaml`): the front desk in chat. Turns what a
   person says into `Created / Reply / Completed / Cancelled`.
 
@@ -51,8 +62,9 @@ person / any source ──► ingest seam ──► ledger ◄── worker (via
 | by | kinds |
 |---|---|
 | person (`<channel user>` or `github:<login>`) | `Created`, `Reply`, `Completed`, `Cancelled` |
-| `orchestrator` | `Dispatched`, `Asked`, `Reported`, `Waited`, `Completed`, `Cancelled`, `Noted`, `Lost` (stop) |
-| `runtime` / worker id | `Opened`, `Returned`, `Failed`, `Lost`, `Event` |
+| `orchestrator` | `JobCreated`, `Asked`, `Reported`, `Waited`, `Completed`, `Cancelled`, `Noted` |
+| `runtime` | `Dispatched`, `JobFailed`, `Lost`, `Event` |
+| worker id | `Opened`, `Returned`, `Failed` |
 
 `Returned` is semi-structured: `status ∈ succeeded | failed | blocked |
 waiting | unparsed`, a one-paragraph `summary`, free `detail`. Nothing is
@@ -66,8 +78,10 @@ rejected; an unparseable reply is recorded as `unparsed` with the raw text.
 - **Optimistic concurrency**: every decision action takes `seenSeq`; if the
   ledger moved, the decision is refused with the new facts and the
   orchestrator decides again.
-- **Slots and isolation**: `maxWorkers`, one live worker per task, one
-  workspace per worker, heartbeat leases.
+- **Job scheduling, slots and isolation**: the lead chooses a Job's logical
+  agent and instructions; runtime chooses the Worker Session, workspace and
+  slot. `maxWorkers`, one live Run per task, one workspace per worker, and
+  heartbeat leases are infrastructure constraints.
 - **Safety valve**: `maxDecisionsPerTurn` decisions since a person last spoke,
   after which the runtime writes a `circuit_breaker` Event and stops waking
   the task until someone replies.
@@ -77,16 +91,29 @@ rejected; an unparseable reply is recorded as `unparsed` with the raw text.
 
 | layer | says | lives in |
 |---|---|---|
-| orchestrator system prompt | who it is, its responsibility and limits, how workers cooperate (what they see, what they return), what each tool means, "you only speak through the ledger" | `src/app/agents/orchestrator.yaml` — app-owned |
+| engineering-lead system prompt | who owns delivery, the PM/coding/review boundaries, what workers see and what each decision tool means | `src/app/agents/engineer-lead.yaml` — app-owned |
 | SOP | the goal and quality bar (not "a PR" but "a PR independently verified against the request"), what *done* means, the domain's hard lines, the shape the work usually takes | `src/domain/sop.ts` default; config / per project |
-| wake prompt | facts only: ledger, live worker, free slots, agents, `seenSeq` | built by `src/core/lib/prompts.ts` |
+| wake prompt | facts only: ledger, Job execution status, available logical agents, `seenSeq` | built by `src/core/lib/prompts.ts` |
 
 The SOP is deliberately not a recipe. It does not enumerate what to do when
 a worker fails / blocks / waits; the ledger can hold combinations no list
 foresees, and a model with the goal in front of it handles them better than
-one matching cases. Behaviour is bounded by tools instead: the orchestrator
-has no shell, no GitHub, no channel to a worker — every action it owns
-writes one fact.
+one matching cases. Behaviour is bounded by tools instead: the engineering
+lead has no hidden channel to a worker. `dispatch` records a `JobCreated`
+decision; runtime separately records `Dispatched` when it chooses the concrete
+Run. `create-tasks` is reserved for genuinely separate outcomes and records
+the bounded child Tasks named by that decision—not PM/coding/review stages of
+one Task.
+
+## Lead-owned task materialization
+
+The runtime does not store or schedule a dependency graph. For complex work the
+engineering lead keeps a living plan in the project's agent work repository and
+calls `create-tasks` only for bounded items it judges executable now. Each child
+records its parent, stable plan-item id, and optional spec/plan references. When
+a child completes, the runtime observes that fact on the parent; the lead then
+reconciles the actual result and decides what, if anything, becomes runnable
+next. Obsolete created work is cancelled or superseded rather than deleted.
 
 ## Setup
 
@@ -113,7 +140,7 @@ GitHub identity.
 The same settings remain available programmatically:
 
 ```
-conductor:setup {
+conductor:configure_conductor {
   projects: {
     playground: {
       workingDir: "/abs/path",
@@ -135,11 +162,12 @@ The SOP is editable on the Configuration page; a project may carry its own
 
 ### PM worker
 
-`conductor:pm` is a specialist worker backed by the bundled PM skill from
-`zhangfand/software-factory`. The orchestrator may send it a broad or ambiguous
-feature request before coding. It researches the codebase read-only and writes
+`conductor:pm` is a specialist worker whose complete role, judgment boundary,
+durable spec contract and Conductor handoff live in its system prompt. The
+engineering lead sends it work whose product
+behavior, scope or acceptance is not yet safe for engineering. It researches the codebase read-only and writes
 `<slug>/spec.md` to the project's agent work repository. Questions return as a
-blocked worker result; the orchestrator asks the person and resumes the same PM
+blocked worker result; the lead asks the person and resumes the same PM
 session. A successful return names a pushed, `Status: ready` spec that a coding
 worker can consume.
 
@@ -159,7 +187,7 @@ follow, and they are why the loop can be trusted with input it did not author:
 
 | property | what it means |
 |---|---|
-| a narrower vocabulary than the ledger | a source may `open_task` (`Created`) or `push_event` (`Event`). There is no shape that produces `Dispatched`, `Reported`, `Waited` or `Completed`, so no input can make the runtime appear to have decided something. A person's `Reply` is excluded too: replies come from the guardian's own routes, not from a machine claiming to be a person. |
+| a narrower vocabulary than the ledger | a source may `open_task` (`Created`) or `push_event` (`Event`). There is no shape that produces `JobCreated`, `Dispatched`, `Reported`, `Waited` or `Completed`, so no input can make the coordinator or runtime appear to have acted. A person's `Reply` is excluded too: replies come from the guardian's own routes, not from a machine claiming to be a person. |
 | authorship is computed, never accepted | `by` is derived — `source` or `source:actor` for a `Created`, always `runtime` for an `Event`. `runtime` and `orchestrator` are reserved slugs; an Event can never read as a person speaking and reset the circuit breaker. |
 | idempotency is the seam's job | one task per `(source, key)` ever; one event per `(source, key)` per task. A retried webhook, a poll that lists the same issue twice, and two adapters watching one system all write once. |
 
@@ -200,7 +228,7 @@ before the worker starts and what the prompt tells it. `git-worktree` is real
 isolation because the tree is real and the prompt points at it; `none` is the
 absence of both, not a sandbox.
 
-The runtime still fails closed. A `Dispatched` fact always records a workspace,
+The runtime still fails closed. A `Dispatched` fact always records the Job and a workspace,
 `{ kind: "none" }` included, so a worker with no workspace *by design* never
 looks like one whose worktree went missing — the second is still refused.
 
@@ -218,8 +246,9 @@ checks and branch names lives under `src/domain/adapters/github/` and nowhere
 else.
 It reports, once each: a task per issue carrying the intake label
 (`Created`, author `github:<login>`); `issue_closed` on any issue an open task
-names; on any PR mentioned in the task's facts — `pr_review`,
-`pr_review_comment`, `pr_comment`, `checks_completed` (success/failure per
+names; on any PR mentioned in the task's facts — `pr_review` (one event for a
+submitted review together with all of its inline comments), `pr_comment`,
+`checks_completed` (success/failure per
 head), `pr_merged`, `pr_closed`; and `pr_opened` for any open PR whose head
 branch is `conductor/<taskId>/…` that no fact mentions yet (a worker declared
 Lost may still have pushed). What an event means for the task is the
@@ -250,13 +279,15 @@ when the orchestrator narrates a decision instead of recording it, and the
 
 ```
 #1  Created     github:zhangfand   issue #1 taken in
-#2  Dispatched  orchestrator       w-… as coding:coding
-#4  Returned    w-…                succeeded: PR #2 at fc621e0
-#5  Dispatched  orchestrator       w-… as assistant:assistant (read-only verify)
-#7  Returned    w-…                waiting: CI pending / no checks recorded
-#8  Waited      orchestrator       15 min
-#9  Reply       zhangfan           "no CI here, proceed"
-#10 Reported    orchestrator       PR #2 delivered, please review and merge
-#11 Event       runtime            github/issue_closed (completed)
-#12 Completed   orchestrator       evidence: Event #11, PR #2
+#2  JobCreated  orchestrator       j-… for coding:coding
+#3  Dispatched  runtime            j-… as worker w-…
+#5  Returned    w-…                succeeded: PR #2 at fc621e0
+#6  JobCreated  orchestrator       j-… for assistant:assistant (read-only verify)
+#7  Dispatched  runtime            j-… as worker w-…
+#9  Returned    w-…                waiting: CI pending / no checks recorded
+#10 Waited      orchestrator       15 min
+#11 Reply       zhangfan           "no CI here, proceed"
+#12 Reported    orchestrator       PR #2 delivered, please review and merge
+#13 Event       runtime            github/issue_closed (completed)
+#14 Completed   orchestrator       evidence: Event #13, PR #2
 ```

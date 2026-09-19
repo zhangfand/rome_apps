@@ -68,8 +68,8 @@ export class WorkerHealthRepository {
         ? `worker heartbeat expired (last heartbeat ${new Date(heartbeat.lastHeartbeatAt).toISOString()}, lease expired ${new Date(heartbeat.expiresAt).toISOString()}); wrapper liveness unconfirmed`
         : "worker startup heartbeat missing past grace period";
       return ledger.appendWorkerOutcome({
-        taskId, kind: "Lost", by: "runtime", source: "conductor:tick, observing worker heartbeat",
-        payload: { workerId, why },
+        taskId, kind: "Lost", by: "runtime", source: "conductor:reconcile_tasks, observing worker heartbeat",
+        payload: { ...(started.payload.jobId ? { jobId: started.payload.jobId } : {}), workerId, why },
       });
     }, { behavior: "immediate" });
   }

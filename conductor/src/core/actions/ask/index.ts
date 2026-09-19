@@ -20,7 +20,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       if (!input.ok) return { status: "error", error: input.error };
       const question = String(args.question ?? "").trim();
       if (!question) return { status: "error", error: "question is required" };
-      return writeDecision(appContext, { ...input, source: "conductor:ask", fact: { kind: "Asked", payload: { question } } });
+      return writeDecision(appContext, { ...input, source: "conductor:ask_person", fact: { kind: "Asked", payload: { question } } });
     },
   };
 }

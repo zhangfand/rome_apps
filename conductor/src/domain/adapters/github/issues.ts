@@ -59,7 +59,7 @@ export function issueEvents(task: TaskView, refs: readonly IssueRef[], statuses:
       type: "issue_closed",
       key: `closed:${stamp}`,
       summary: `${ref.url} was closed (state_reason: ${reason}${status.closedAt ? `, at ${status.closedAt}` : ""})`,
-      cite: `conductor:tick, polling ${ref.url}`,
+      cite: `conductor:reconcile_tasks, polling ${ref.url}`,
       data: { url: ref.url, closedAt: status.closedAt, stateReason: status.stateReason },
     });
   }

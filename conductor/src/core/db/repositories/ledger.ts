@@ -61,6 +61,19 @@ export class LedgerRepository {
   }
 
   /**
+   * Append a lead decision and the tasks it materializes under one write
+   * reservation. The checked task is the parent; facts may also open child
+   * task ids. Keeping this atomic prevents a wake from seeing half a batch.
+   */
+  appendManyIfLatest(checkTaskId: string, facts: readonly NewFact[], expectedSeq: number): Fact[] | undefined {
+    return this.db.transaction((tx) => {
+      const ledger = new LedgerRepository(tx as unknown as DrizzleDb, this.tablePrefix);
+      if (ledger.factsFor(checkTaskId).at(-1)?.seq !== expectedSeq) return undefined;
+      return facts.map((fact) => ledger.append(fact));
+    }, { behavior: "immediate" });
+  }
+
+  /**
    * Append a worker's own outcome, unless the runtime already closed that
    * worker. The orchestrator records a stop as a Lost fact, and the stopped worker
    * keeps running and eventually reports back; without this guard that late

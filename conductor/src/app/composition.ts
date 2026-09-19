@@ -8,6 +8,8 @@ import { cloneConfigRoute } from "../domain/config/clone.js";
 import { workRepoPromptNote } from "../domain/work-repo.js";
 import { createWorkRepoConfigRoute, setupWorkRepoConfigRoute } from "../domain/config/work-repo.js";
 import { githubRepositoriesConfigRoute } from "../domain/config/github-repositories.js";
+import { PRODUCT_SPEC_PROMPT_CONTRACT } from "../domain/product-spec-contract.js";
+import { WORK_REPO_PROMPT_CONTRACT } from "../domain/work-repo-contract.js";
 
 export const APP_COMPOSITION: CoreComposition = {
   parseConfig: parseAppConfig,
@@ -17,6 +19,7 @@ export const APP_COMPOSITION: CoreComposition = {
   providerFor,
   setupSchema,
   projectPromptNote: (task, audience) => `${githubPromptNote(task, audience)}${workRepoPromptNote(task, audience)}`,
+  sharedPromptContracts: [PRODUCT_SPEC_PROMPT_CONTRACT, WORK_REPO_PROMPT_CONTRACT],
   projectPresentation: githubPresentation,
   mergeConfig: mergeAppConfig,
   initialConfig: initialAppConfig,

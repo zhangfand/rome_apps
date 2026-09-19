@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   createConfigParser,
   DEFAULT_INTERVAL_MINUTES,
@@ -13,6 +14,8 @@ import { defaultWorkRepo, workRepoFor } from "../domain/work-repo.js";
 import type { ConfigExtensions } from "../core/lib/config.js";
 
 const PM_AGENT_DESCRIPTION = "Product manager for broad or ambiguous feature requests. Researches the codebase and product precedents, decides defaults, and writes a bounded, implementation-ready spec in the project's agent work repo. Use before coding when scope or user-visible behavior is not clear; if it returns questions, ask the person and resume the same worker.";
+const LEGACY_ORCHESTRATOR_AGENT = "conductor:orchestrator";
+const LEGACY_DEFAULT_SOP_SHA256 = "e4890d96b2624dc1640871f496b42c43f59ebcb7db462f582320f93643291d8d";
 
 const LEGACY_DEFAULT_WORKER_AGENTS: Record<string, string> = {
   "coding:coding": "Writes code in the task's worktree: implements, tests, commits, pushes, opens pull requests. Has a shell and git.",
@@ -34,10 +37,21 @@ export function parseAppConfig(raw: unknown) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return parseConfig(raw);
   const value = raw as Record<string, unknown>;
   const workers = value.workerAgents;
-  const migrated = workers && typeof workers === "object" && !Array.isArray(workers) && sameRecord(workers as Record<string, unknown>, LEGACY_DEFAULT_WORKER_AGENTS)
-    ? { ...value, workerAgents: DEFAULT_WORKER_AGENTS }
-    : value;
+  const migrated = { ...value };
+  if (workers && typeof workers === "object" && !Array.isArray(workers) && sameRecord(workers as Record<string, unknown>, LEGACY_DEFAULT_WORKER_AGENTS)) {
+    migrated.workerAgents = DEFAULT_WORKER_AGENTS;
+  }
+  if (migrated.orchestratorAgent === LEGACY_ORCHESTRATOR_AGENT) {
+    migrated.orchestratorAgent = DEFAULT_ORCHESTRATOR_AGENT;
+  }
+  if (typeof migrated.sop === "string" && sha256(migrated.sop) === LEGACY_DEFAULT_SOP_SHA256) {
+    migrated.sop = DEFAULT_SOP;
+  }
   return parseConfig(migrated);
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 /** UI-only defaults for an install that has not persisted settings yet. */

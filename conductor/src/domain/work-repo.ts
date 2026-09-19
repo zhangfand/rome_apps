@@ -32,10 +32,8 @@ export function defaultWorkRepo(
   };
 }
 
-export function workRepoPromptNote(task: TaskView, audience: "worker" | "orchestrator"): string {
+export function workRepoPromptNote(task: TaskView, _audience: "worker" | "orchestrator"): string {
   const workRepo = workRepoFor(task.project);
   if (!workRepo) return "";
-  return audience === "worker"
-    ? ` (agent work repository ${workRepo.repo}, local checkout ${workRepo.workingDir})`
-    : ` (agent work repo ${workRepo.repo})`;
+  return ` (agent work repository ${workRepo.repo}, local checkout ${workRepo.workingDir})`;
 }

@@ -1,7 +1,8 @@
-name: report
+name: report_to_person
 type: custom
 description: >-
-  Decision: tell the person a result (what was delivered, where, what they should do next). The task then waits for a reply or an external event.
+  Record a report for the person and leave the Task waiting for a reply or
+  external event.
 entry: ./index.ts
 complexity: simple
 speed: fast

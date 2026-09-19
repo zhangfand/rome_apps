@@ -31,8 +31,8 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       const worker = loaded.task.liveWorker;
       if (!worker) return { status: "error", error: "no worker is live on this task" };
       const written = createLedgerRepository(appContext.db).appendIfLatest({
-        taskId: input.taskId, kind: "Lost", by: ORCHESTRATOR, source: "conductor:stop",
-        payload: { workerId: worker.workerId, why: `stopped by orchestrator: ${why}` },
+        taskId: input.taskId, kind: "Lost", by: ORCHESTRATOR, source: "conductor:stop_worker",
+        payload: { ...(worker.jobId ? { jobId: worker.jobId } : {}), workerId: worker.workerId, why: `stopped by orchestrator: ${why}` },
       }, input.seenSeq);
       if (!written) return { status: "error", error: "The ledger changed while writing; read it and decide again." };
       return { status: "ok", data: { taskId: input.taskId, stopped: worker.workerId, seq: written.seq, seenSeq: written.seq } };

@@ -25,7 +25,7 @@ export async function writePersonFact(
 
   const fact = ledger.append({ ...unstamped, by: personFromContext() } as NewFact);
 
-  if (tickNow) await appContext.runAction("conductor:tick", {}, { detached: true });
+  if (tickNow) await appContext.runAction("conductor:reconcile_tasks", {}, { detached: true });
 
   return { status: "ok", data: summarize(fact, ledger.factsFor(unstamped.taskId)) };
 }

@@ -60,7 +60,7 @@ gated on `prefers-reduced-motion`.
 **Settings** (`/config`) holds what the guardian changes; **Runtime**
 (`/runtime`) holds what the loop is doing and the limits it runs under
 (coordinator, max workers, tick interval, session reuse, decisions per turn,
-heartbeat lease — read-only, set with `conductor:setup`), plus the worker
+heartbeat lease — read-only, set with `conductor:configure_conductor`), plus the worker
 agents and the live workers from the same state feed the board polls.
 
 **Settings** is one `lg` `Dialog` opened from a gear `IconButton` beside the

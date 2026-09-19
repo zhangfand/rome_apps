@@ -1,9 +1,7 @@
-name: complete
+name: complete_task
 type: custom
 description: >-
-  Close a task as done, on a person's say-so. Only a person ends a task, so call
-  this only when their words approve the result — never on your own reading of
-  what a worker returned. `source` is their message, verbatim.
+  Close a Task as completed with the person's message as its source.
 entry: ./index.ts
 complexity: simple
 speed: fast

@@ -18,9 +18,9 @@ import { browseDirectories, DirectoryBrowserError } from "../lib/directory-brows
  *   POST tasks/:id/events  a source reports something happened (ingest seam)
  *   GET tasks/:id          one task with every fact
  *   GET tasks/:id/<domain> app-owned, guardian-only task reads
- *   POST tasks/:id/reply   a person's reply, through conductor:reply
- *   POST tasks/:id/complete close as done, through conductor:complete
- *   POST tasks/:id/cancel  close as not wanted, through conductor:cancel
+ *   POST tasks/:id/reply   a person's reply, through conductor:record_person_reply
+ *   POST tasks/:id/complete close as done, through conductor:complete_task
+ *   POST tasks/:id/cancel  close as not wanted, through conductor:cancel_task
  *   GET|PATCH config       settings; projects.<id>: null deletes (force=1 overrides the open-task guard)
  *   GET config/inspect     inspect one working directory through its workspace provider
  *   GET config/directories browse directories on the Rome host
@@ -75,7 +75,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
         const body = readJsonBody<{ text?: unknown }>(request);
         if (!body || typeof body.text !== "string" || !body.text.trim()) return json({ error: "Enter a reply." }, 400);
-        const result = await this.ctx.runAction("conductor:reply", { taskId: request.path[1], text: body.text.trim(), source: body.text.trim() });
+        const result = await this.ctx.runAction("conductor:record_person_reply", { taskId: request.path[1], text: body.text.trim(), source: body.text.trim() });
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `reply returned ${result.status}` }, 502);
         return json(result.data ?? {});
       }
@@ -83,7 +83,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
         if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
         const taskId = request.path[1];
-        const result = await this.ctx.runAction("conductor:complete", { taskId, source: "Mark complete" });
+        const result = await this.ctx.runAction("conductor:complete_task", { taskId, source: "Mark complete" });
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `complete returned ${result.status}` }, 502);
         return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get());
       }
@@ -91,7 +91,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
         if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
         const taskId = request.path[1];
-        const result = await this.ctx.runAction("conductor:cancel", { taskId, source: "Cancel task" });
+        const result = await this.ctx.runAction("conductor:cancel_task", { taskId, source: "Cancel task" });
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `cancel returned ${result.status}` }, 502);
         return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get());
       }
@@ -182,7 +182,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
       }
       if (route === "tick" && request.method === "POST") {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
-        const result = await this.ctx.runAction("conductor:tick", {});
+        const result = await this.ctx.runAction("conductor:reconcile_tasks", {});
         return json(result.status === "ok" ? (result.data ?? {}) : { error: result.status === "error" ? result.error : result.status }, result.status === "ok" ? 200 : 502);
       }
       return json({ error: "not_found" }, 404);
@@ -204,7 +204,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
     request: IngestRequest,
   ): Response {
     const config = settings.get();
-    if (!config) return json({ error: "Run conductor:setup first." }, 409);
+    if (!config) return json({ error: "Run conductor:configure_conductor first." }, 409);
     if (!ledger.reachable()) return json({ error: "the ledger is unreachable" }, 503);
     const plans = planIngest({ snapshot: fold(new Date(), ledger.all()), config, requests: [request] });
     const [outcome] = applyIngest(ledger, plans);
@@ -279,7 +279,18 @@ function taskSummary(task: TaskView, now: Date, composition: CoreComposition, co
     createdAt: task.facts[0].createdAt.toISOString(),
     updatedAt: task.latest.createdAt.toISOString(),
     state: task.state,
-    liveWorker: task.liveWorker ? { workerId: task.liveWorker.workerId, agent: task.liveWorker.agent, since: task.liveWorker.startedAt.toISOString() } : undefined,
+    liveWorker: task.liveWorker ? {
+      jobId: task.liveWorker.jobId,
+      workerId: task.liveWorker.workerId,
+      agent: task.liveWorker.agent,
+      since: task.liveWorker.startedAt.toISOString(),
+      romeSession: task.liveWorker.romeSession,
+    } : undefined,
+    pendingJob: task.pendingJob ? {
+      jobId: task.pendingJob.jobId,
+      agent: task.pendingJob.agent,
+      since: task.pendingJob.createdAt.toISOString(),
+    } : undefined,
     lastDecision: task.lastDecision ? factJson(task.lastDecision) : undefined,
     latest: factJson(task.latest),
     waiting: task.waiting,

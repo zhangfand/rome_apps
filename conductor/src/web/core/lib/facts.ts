@@ -42,7 +42,9 @@ export const TONE_TEXT: Record<Tone, string> = {
 const LABELS: Record<string, string> = {
   Created: "request",
   Reply: "reply",
+  JobCreated: "job",
   Dispatched: "started work",
+  JobFailed: "job failed",
   Opened: "session",
   Returned: "came back",
   Waited: "waiting",
@@ -78,7 +80,7 @@ export function hasOutstandingPersonDecision(task: TaskSummary): boolean {
 /** The four user-facing task groups are derived solely from TaskSummary. */
 export function bucketTask(task: TaskSummary): TaskBucket {
   if (task.state !== "open") return "closed";
-  if (task.liveWorker) return "running";
+  if (task.liveWorker || task.pendingJob) return "running";
   if (task.waiting) return "resting";
   if (isSafetyEvent(task.latest) || hasOutstandingPersonDecision(task)) {
     return "needs-you";
@@ -88,7 +90,7 @@ export function bucketTask(task: TaskSummary): TaskBucket {
 
 export function taskStateLabel(task: TaskSummary): string {
   const bucket = bucketTask(task);
-  if (bucket === "running") return "running";
+  if (bucket === "running") return task.liveWorker ? "running" : "queued";
   if (bucket === "resting") return "waiting";
   if (bucket === "closed") return task.state === "completed" ? "completed" : "cancelled";
   if (isSafetyEvent(task.latest)) return "paused";
@@ -113,15 +115,17 @@ export function factTone(fact: FactJson): Tone {
   switch (fact.kind) {
     case "Created":
     case "Reply": return "person";
-    case "Dispatched":
+    case "JobCreated":
     case "Waited":
     case "Returned": return "neutral";
+    case "Dispatched":
     case "Opened":
     case "Noted":
     case "Cancelled": return "quiet";
     case "Asked": return "question";
     case "Reported": return "report";
     case "Completed": return "success";
+    case "JobFailed":
     case "Failed":
     case "Lost": return "destructive";
     case "Event": return "info";
@@ -132,12 +136,13 @@ export function factTone(fact: FactJson): Tone {
 /** Raw identities become the four plain author labels used by the detail views. */
 export function authorLabel(by: string, kind?: string): string {
   if (by === "orchestrator") return "conductor";
+  if (by === "runtime") return "runtime";
   if (/^w-[0-9a-z-]+$/i.test(by)) return "worker";
   return webDomain().authorLabel(by, kind) ?? "you";
 }
 
 export function authorLane(fact: FactJson): 1 | 2 | 3 | 4 {
-  if (fact.kind === "Event") return 4;
+  if (fact.kind === "Event" || fact.by === "runtime") return 4;
   const author = authorLabel(fact.by, fact.kind);
   if (author === "conductor") return 2;
   if (author === "worker") return 3;
@@ -145,11 +150,11 @@ export function authorLane(fact: FactJson): 1 | 2 | 3 | 4 {
 }
 
 export function isRoutine(fact: FactJson): boolean {
-  return fact.kind === "Opened" || fact.kind === "Noted";
+  return fact.kind === "Opened" || fact.kind === "Noted" || (fact.kind === "Dispatched" && typeof fact.payload.jobId === "string");
 }
 
 export function expandedTextLabel(fact: FactJson): "instructions" | "detail" {
-  return fact.kind === "Dispatched" ? "instructions" : "detail";
+  return fact.kind === "JobCreated" || fact.kind === "Dispatched" ? "instructions" : "detail";
 }
 
 export interface FactContent {
@@ -167,6 +172,11 @@ export function factBody(fact: FactJson): FactContent {
     case "Reply": return { title: "", body: s("text") };
     case "Completed": return { title: "", body: [s("reason"), s("evidence") ? `Evidence: ${s("evidence")}` : ""].filter(Boolean).join("\n\n") };
     case "Cancelled": return { title: "", body: s("reason") };
+    case "JobCreated": return {
+      title: [value(p, "jobId"), value(p, "agent") ? `for ${value(p, "agent")}` : ""].filter(Boolean).join(" "),
+      body: s("note") || "Conductor created the next bounded job.",
+      extra: s("instructions") || undefined,
+    };
     case "Dispatched": return {
       title: [value(p, "workerId"), value(p, "agent") ? `as ${value(p, "agent")}` : ""].filter(Boolean).join(" "),
       body: s("note") || "Work started on this request.",
@@ -179,6 +189,7 @@ export function factBody(fact: FactJson): FactContent {
       body: s("reason"),
     };
     case "Noted": return { title: "", body: s("note") };
+    case "JobFailed": return { title: `Job ${s("jobId")} could not start`, body: s("error") };
     case "Opened": return { title: value(p, "romeSessionId") ? `Session ${value(p, "romeSessionId")}` : "Session opened", body: "" };
     case "Returned": return { title: sentenceCase(value(p, "status")), body: s("summary"), extra: s("detail") || undefined };
     case "Failed": return { title: "Work failed", body: s("error") };
@@ -219,6 +230,8 @@ export function safeText(text: string): string {
     .replace(/\bwoken\b/gi, "picked up")
     .replace(/\bfacts?\b/gi, (word) => word.toLowerCase().endsWith("s") ? "events" : "event")
     .replace(/\bDispatched\b/g, "Started work")
+    .replace(/\bJobCreated\b/g, "Created job")
+    .replace(/\bJobFailed\b/g, "Job failed")
     .replace(/\bReturned\b/g, "Came back")
     .replace(/\bNoted\b/g, "Updated")
     .replace(/\bLost\b/g, "Stopped");

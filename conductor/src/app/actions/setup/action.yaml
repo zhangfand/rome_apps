@@ -1,12 +1,8 @@
-name: setup
+name: configure_conductor
 type: custom
 description: >-
-  Configure the Conductor and register its recurring tick. Takes a projects map
-  (id → workingDir, optional github {repo, intakeLabel, projectLabel, enabled},
-  workspace and sop override; legacy flat GitHub fields remain accepted), an optional
-  global SOP prompt, the agents the
-  orchestrator may dispatch workers as, and caps. Safe to run again — it updates
-  the config and re-registers the routine only when the cadence changed.
+  Validate and store Conductor configuration and register or update its
+  recurring tick.
 entry: ./index.ts
 complexity: simple
 speed: fast

@@ -20,7 +20,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       if (!input.ok) return { status: "error", error: input.error };
       const note = String(args.note ?? "").trim();
       if (!note) return { status: "error", error: "note is required" };
-      return writeDecision(appContext, { ...input, source: "conductor:note", fact: { kind: "Noted", payload: { note } } });
+      return writeDecision(appContext, { ...input, source: "conductor:add_task_note", fact: { kind: "Noted", payload: { note } } });
     },
   };
 }

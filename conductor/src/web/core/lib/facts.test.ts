@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@rstest/core";
-import { authorLabel, bucketTask, factLabel } from "./facts.js";
+import { authorLabel, bucketTask, factLabel, taskStateLabel } from "./facts.js";
 import type { FactJson, TaskSummary } from "./types.js";
 
 const item = (kind: string, payload: Record<string, unknown> = {}): FactJson => ({
@@ -35,6 +35,12 @@ describe("bucketTask", () => {
     expect(bucketTask(task({ waiting: { reason: "check later", resumeAfter: "2026-09-12T00:00:00.000Z" }, lastDecision: item("Reported"), decisionsSinceLastPersonFact: 1 }))).toBe("resting");
   });
 
+  it("shows a queued Job as active before runtime has selected a worker", () => {
+    const queued = task({ pendingJob: { jobId: "j-1", agent: "coding:coding", since: "2026-09-11T00:00:00.000Z" } });
+    expect(bucketTask(queued)).toBe("running");
+    expect(taskStateLabel(queued)).toBe("queued");
+  });
+
   it("recognises questions, reports, and the safety event as needing the person", () => {
     expect(bucketTask(task({ lastDecision: item("Asked"), decisionsSinceLastPersonFact: 1 }))).toBe("needs-you");
     expect(bucketTask(task({ lastDecision: item("Reported"), decisionsSinceLastPersonFact: 1 }))).toBe("needs-you");
@@ -58,10 +64,10 @@ describe("bucketTask", () => {
 describe("user-facing label maps", () => {
   it("maps every stored kind to its plain user-facing label", () => {
     expect([
-      "Created", "Reply", "Dispatched", "Opened", "Returned", "Waited", "Asked",
+      "Created", "Reply", "JobCreated", "Dispatched", "JobFailed", "Opened", "Returned", "Waited", "Asked",
       "Reported", "Completed", "Cancelled", "Failed", "Lost", "Event",
     ].map(factLabel)).toEqual([
-      "request", "reply", "started work", "session", "came back", "waiting", "question",
+      "request", "reply", "job", "started work", "job failed", "session", "came back", "waiting", "question",
       "report", "done", "cancelled", "failed", "lost", "source",
     ]);
   });
@@ -70,7 +76,7 @@ describe("user-facing label maps", () => {
     expect(authorLabel("orchestrator")).toBe("conductor");
     expect(authorLabel("w-12ab34cd")).toBe("worker");
     expect(authorLabel("source:octo")).toBe("source");
-    expect(authorLabel("runtime", "Event")).toBe("source");
+    expect(authorLabel("runtime", "Event")).toBe("runtime");
     expect(authorLabel("guardian-id")).toBe("you");
   });
 });

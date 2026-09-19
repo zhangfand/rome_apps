@@ -24,10 +24,10 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       const evidence = typeof args.evidence === "string" ? args.evidence.trim() : undefined;
       if (!reason) return { status: "error", error: "reason is required" };
       if (args.outcome === "completed") {
-        return writeDecision(appContext, { ...input, source: "conductor:close", fact: { kind: "Completed", payload: { reason, ...(evidence ? { evidence } : {}) } } });
+        return writeDecision(appContext, { ...input, source: "conductor:close_task", fact: { kind: "Completed", payload: { reason, ...(evidence ? { evidence } : {}) } } });
       }
       if (args.outcome === "cancelled") {
-        return writeDecision(appContext, { ...input, source: "conductor:close", fact: { kind: "Cancelled", payload: { reason } } });
+        return writeDecision(appContext, { ...input, source: "conductor:close_task", fact: { kind: "Cancelled", payload: { reason } } });
       }
       return { status: "error", error: "outcome must be completed or cancelled" };
     },

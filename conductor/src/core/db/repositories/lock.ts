@@ -3,6 +3,7 @@ import type { AppDbContext, DrizzleDb } from "@rome-os/app-runtime";
 import { createAppDbSchema } from "../schema.js";
 
 export const TICK_LOCK = "tick";
+export const JOB_SCHEDULER_LOCK = "job-scheduler";
 /** Per-task lease while an orchestrator wake is in flight. */
 export function orchestrateLock(taskId: string): string { return `orchestrate:${taskId}`; }
 

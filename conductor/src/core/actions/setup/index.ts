@@ -22,7 +22,8 @@ import {
   tickTrigger,
 } from "../../lib/config.js";
 
-const log = createAppLogger("conductor:setup");
+const log = createAppLogger("conductor:configure_conductor");
+const RECONCILE_ACTION_NAME = "conductor:reconcile_tasks";
 
 export type RoutineOutcome = "created" | "replaced" | "unchanged";
 
@@ -51,12 +52,12 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         sop: { type: "string", description: "The global standard operating procedure the orchestrator follows, as prose. Omit to use the app default." },
         workerAgents: {
           type: "object", additionalProperties: { type: "string" },
-          description: "Agents the orchestrator may dispatch a worker as (agent id → one-line description). Uses the app defaults when omitted.",
+          description: "Logical agents the coordinator may create Jobs for (agent id → one-line description). Uses the app defaults when omitted.",
         },
         orchestratorAgent: { type: "string", description: `Orchestrator agent id. Defaults to ${DEFAULT_ORCHESTRATOR_AGENT}.` },
         maxWorkers: { type: "number", description: `Workers allowed to run at once across every task. Defaults to ${DEFAULT_MAX_WORKERS}.` },
         intervalMinutes: { type: "number", description: `How often the tick routine fires. Defaults to ${DEFAULT_INTERVAL_MINUTES}.` },
-        reuseSessions: { type: "boolean", description: `Whether the orchestrator may continue an earlier worker's session. Defaults to ${DEFAULT_REUSE_SESSIONS}.` },
+        reuseSessions: { type: "boolean", description: `Whether runtime may continue an earlier compatible worker session. Defaults to ${DEFAULT_REUSE_SESSIONS}.` },
         ...(composition.setupSchema?.rootProperties ?? {}),
         maxDecisionsPerTurn: { type: "number", description: `Safety valve: orchestrator decisions allowed on a task since a person last spoke. Defaults to ${DEFAULT_MAX_DECISIONS_PER_TURN}.` },
       },
@@ -109,7 +110,9 @@ export async function ensureRoutine(
 
   if (existing) {
     const current = existing.trigger as { rrule?: string };
-    if (current.rrule === trigger.rrule) return { ok: true, outcome: "unchanged" };
+    if (current.rrule === trigger.rrule && existing.actionName === RECONCILE_ACTION_NAME) {
+      return { ok: true, outcome: "unchanged" };
+    }
     const deleted = await appContext.runAction("system:delete_routine", { routineId: existing.id });
     if (deleted.status !== "ok") {
       const reason = deleted.status === "error" ? deleted.error : `returned ${deleted.status}`;
@@ -121,7 +124,7 @@ export async function ensureRoutine(
     name: TICK_ROUTINE_NAME,
     key: TICK_ROUTINE_KEY,
     trigger,
-    actionName: "conductor:tick",
+    actionName: RECONCILE_ACTION_NAME,
     args: {},
   });
   if (created.status !== "ok") {

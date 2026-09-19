@@ -108,7 +108,14 @@ async function pollPulls(ctx: AdapterPollContext): Promise<IngestRequest[]> {
         const reviews = await githubGet(ctx, paths.reviews, { pull: ref.url });
         if (Array.isArray(reviews)) seen.reviews = reviews.map((r) => ({ id: Number(r.id), user: login(r.user), state: str(r.state), body: str(r.body), submittedAt: str(r.submitted_at) || undefined }));
         const rcs = await githubGet(ctx, paths.reviewComments, { pull: ref.url });
-        if (Array.isArray(rcs)) seen.reviewComments = rcs.map((c) => ({ id: Number(c.id), user: login(c.user), path: str(c.path) || undefined, line: typeof c.line === "number" ? c.line : undefined, body: str(c.body) }));
+        if (Array.isArray(rcs)) seen.reviewComments = rcs.map((c) => ({
+          id: Number(c.id),
+          reviewId: typeof c.pull_request_review_id === "number" ? c.pull_request_review_id : undefined,
+          user: login(c.user),
+          path: str(c.path) || undefined,
+          line: typeof c.line === "number" ? c.line : undefined,
+          body: str(c.body),
+        }));
         const ics = await githubGet(ctx, paths.comments, { pull: ref.url });
         if (Array.isArray(ics)) seen.comments = ics.map((c) => ({ id: Number(c.id), user: login(c.user), body: str(c.body) }));
         if (seen.headSha) {

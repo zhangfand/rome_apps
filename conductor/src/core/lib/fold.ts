@@ -1,6 +1,7 @@
 import {
   type DispatchedFact,
   type Fact,
+  type JobCreatedFact,
   type WaitedFact,
   isTerminalKind,
   isWorkerTerminalKind,
@@ -18,16 +19,31 @@ import {
 export type TaskState = "open" | "completed" | "cancelled";
 
 export interface WorkerRef {
+  /** The Job this concrete worker run materializes; absent on legacy runs. */
+  jobId?: string;
   workerId: string;
   agent: string;
   startedAt: Date;
   startedSeq: number;
+  /** Durable Rome session, once the worker has actually opened one. */
+  romeSession?: { id: string; type: string };
+}
+
+export interface JobRef {
+  jobId: string;
+  agent: string;
+  instructions: string;
+  note?: string;
+  createdAt: Date;
+  createdSeq: number;
 }
 
 export interface TaskView {
   id: string;
   projectId?: string;
   project?: import("./projects.js").ProjectBinding["project"];
+  /** Lead-owned delivery Task and plan item that materialized this outcome. */
+  parent?: import("./facts.js").TaskParent;
   brief: string;
   createdBy: string;
   state: TaskState;
@@ -36,6 +52,8 @@ export interface TaskView {
   facts: readonly Fact[];
   /** A Dispatched with no Returned/Failed/Lost for that worker after it. */
   liveWorker?: WorkerRef;
+  /** A JobCreated that is still the newest fact and has not been dispatched. */
+  pendingJob?: JobRef;
   /** Seq of the newest fact the orchestrator wrote; 0 if none yet. */
   lastDecisionSeq: number;
   /** The newest orchestrator fact, if any. */
@@ -46,7 +64,7 @@ export interface TaskView {
   decisionsSinceLastPersonFact: number;
   /** Set when the last decision was Waited. */
   waiting?: { reason: string; resumeAfter: string };
-  /** Facts newer than the last decision, oldest first (Opened excluded — it is a pointer, not news). */
+  /** Facts newer than the last decision, oldest first (dispatch/session progress excluded). */
   unseen: readonly Fact[];
 }
 
@@ -81,7 +99,20 @@ export function foldTask(facts: readonly Fact[]): TaskView {
     else if (fact.kind === "Cancelled") state = "cancelled";
 
     if (fact.kind === "Dispatched") {
-      liveWorker = { workerId: fact.payload.workerId, agent: fact.payload.agent, startedAt: fact.createdAt, startedSeq: fact.seq };
+      liveWorker = {
+        ...(fact.payload.jobId ? { jobId: fact.payload.jobId } : {}),
+        workerId: fact.payload.workerId,
+        agent: fact.payload.agent,
+        startedAt: fact.createdAt,
+        startedSeq: fact.seq,
+      };
+    } else if (fact.kind === "Opened" && liveWorker?.workerId === fact.payload.workerId) {
+      // A rejected resume can open a second session for the same worker. The
+      // newest Opened fact is the session the worker is currently using.
+      liveWorker = {
+        ...liveWorker,
+        romeSession: { id: fact.payload.romeSessionId, type: fact.payload.sessionType },
+      };
     } else if (isWorkerTerminalKind(fact.kind) && liveWorker) {
       const named = (fact.payload as { workerId?: string }).workerId;
       if (named === liveWorker.workerId) liveWorker = undefined;
@@ -97,7 +128,11 @@ export function foldTask(facts: readonly Fact[]): TaskView {
     }
   }
 
-  const unseen = ordered.filter((f) => f.seq > lastDecisionSeq && f.kind !== "Opened");
+  // Dispatch and session-open are runtime progress for a Job the coordinator
+  // already decided on. Only its outcome (Returned/Failed/Lost) is new input
+  // for the next coordination decision.
+  const unseen = ordered.filter((f) => f.seq > lastDecisionSeq && f.kind !== "Dispatched" && f.kind !== "Opened");
+  const pendingJob = jobRef(ordered.at(-1));
   // A person's reply supersedes a prior wait immediately, before the
   // orchestrator has had time to record its next decision. Keeping the old
   // wait here makes the UI claim that the task is still sleeping after the
@@ -110,18 +145,33 @@ export function foldTask(facts: readonly Fact[]): TaskView {
     id: created.taskId,
     projectId: created.payload.projectId,
     project: created.payload.project,
+    parent: created.payload.parent,
     brief: created.payload.brief,
     createdBy: created.by,
     state,
     latest: ordered.at(-1)!,
     facts: ordered,
-    liveWorker,
+    liveWorker: state === "open" ? liveWorker : undefined,
+    pendingJob: state === "open" ? pendingJob : undefined,
     lastDecisionSeq,
     lastDecision,
     lastPersonFactSeq,
     decisionsSinceLastPersonFact,
     waiting: state === "open" ? waiting : undefined,
     unseen,
+  };
+}
+
+function jobRef(fact: Fact | undefined): JobRef | undefined {
+  if (fact?.kind !== "JobCreated") return undefined;
+  const job = fact as JobCreatedFact;
+  return {
+    jobId: job.payload.jobId,
+    agent: job.payload.agent,
+    instructions: job.payload.instructions,
+    ...(job.payload.note ? { note: job.payload.note } : {}),
+    createdAt: job.createdAt,
+    createdSeq: job.seq,
   };
 }
 

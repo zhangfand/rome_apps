@@ -3,7 +3,7 @@ import type { AppDbContext, DrizzleDb } from "@rome-os/app-runtime";
 import { CONFIG_KEY, type ConfigParser, type ConductorConfig } from "../../lib/config.js";
 import { createAppDbSchema } from "../schema.js";
 
-/** The one config row `conductor:setup` writes and every other action reads. */
+/** The one config row `conductor:configure_conductor` writes and every other action reads. */
 export class SettingsRepository {
   private readonly tables;
 

@@ -19,7 +19,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
     inputSchema: {
       type: "object",
       properties: {
-        taskId: { type: "string", description: "Task to close. Read it from conductor:snapshot." },
+        taskId: { type: "string", description: "Task to close. Read it from conductor:list_tasks." },
         reason: { type: "string", description: "Why it is done, if the person said." },
         source: {
           type: "string",

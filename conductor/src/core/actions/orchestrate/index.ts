@@ -8,7 +8,7 @@ import { fold, foldTask, needsAttention } from "../../lib/fold.js";
 import { buildOrchestratorPrompt } from "../../lib/prompts.js";
 import { readSummonOutput } from "../run-worker/index.js";
 
-const log = createAppLogger("conductor:orchestrate");
+const log = createAppLogger("conductor:wake_task_coordinator");
 
 /** How long one wake may hold the task. */
 const WAKE_LEASE_MS = 15 * 60_000;
@@ -23,7 +23,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
       const taskId = String(args.taskId ?? "").trim();
       if (!taskId) return { status: "error", error: "taskId is required" };
       const settings = createSettingsRepository(appContext.db, composition.parseConfig).get();
-      if (!settings) return { status: "error", error: "Conductor is not configured. Run conductor:setup first." };
+      if (!settings) return { status: "error", error: "Conductor is not configured. Run conductor:configure_conductor first." };
       const ledger = createLedgerRepository(appContext.db);
       const locks = createLockRepository(appContext.db);
       if (!locks.tryAcquire(orchestrateLock(taskId), WAKE_LEASE_MS)) {
@@ -42,15 +42,16 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         if (task.decisionsSinceLastPersonFact >= settings.maxDecisionsPerTurn) {
           const already = task.facts.some((f) => f.seq > task.lastPersonFactSeq && f.kind === "Event" && f.payload.type === "circuit_breaker");
           if (!already) {
-            ledger.append({ taskId, kind: "Event", by: RUNTIME, source: "conductor:orchestrate",
+            ledger.append({ taskId, kind: "Event", by: RUNTIME, source: "conductor:wake_task_coordinator",
               payload: { source: "runtime", type: "circuit_breaker",
                 summary: `${task.decisionsSinceLastPersonFact} orchestrator decisions since a person last spoke; the runtime will not wake the orchestrator again until a person replies` } });
           }
           return { status: "ok", data: { taskId, skipped: "circuit breaker" } };
         }
 
-        const running = fold(now, ledger.all()).tasks.filter((t) => t.liveWorker).length;
-        const prompt = buildOrchestratorPrompt({ task, config: settings, now, why: attention.why, freeSlots: Math.max(0, settings.maxWorkers - running), providerFor: composition.providerFor, defaultWorkspaceKind: composition.defaultWorkspaceKind, projectNote: composition.projectPromptNote?.(task, "orchestrator") });
+        const snapshot = fold(now, ledger.all());
+        const children = snapshot.tasks.filter((candidate) => candidate.parent?.taskId === task.id);
+        const prompt = buildOrchestratorPrompt({ task, children, config: settings, now, why: attention.why, providerFor: composition.providerFor, defaultWorkspaceKind: composition.defaultWorkspaceKind, projectNote: composition.projectPromptNote?.(task, "orchestrator"), sharedContracts: composition.sharedPromptContracts });
         log.info("waking orchestrator", { taskId, seenSeq: task.latest.seq, why: attention.why });
 
         const summon = (p: string, sessionId?: string) => appContext.runAction("system:summon", { agentName: settings.orchestratorAgent, prompt: p, ...(sessionId ? { sessionId } : {}) })
@@ -79,7 +80,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
           // No decision was recorded. Note the reply so the same facts do not
           // wake it again; a person can see what it thought.
           const note = error ? `Orchestrator wake failed: ${error}` : `No decision was recorded. Orchestrator said: ${reply.trim() || "(nothing)"}`;
-          ledger.append({ taskId, kind: "Noted", by: ORCHESTRATOR, source: "conductor:orchestrate, no decision action was called", payload: { note } });
+          ledger.append({ taskId, kind: "Noted", by: ORCHESTRATOR, source: "conductor:wake_task_coordinator, no decision action was called", payload: { note } });
         }
         log.info("orchestrator wake finished", { taskId, decided, error });
         return { status: "ok", data: { taskId, decided, decision: decided ? after.lastDecision?.kind : undefined, error } };

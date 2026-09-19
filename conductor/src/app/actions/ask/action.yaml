@@ -1,7 +1,7 @@
-name: ask
+name: ask_person
 type: custom
 description: >-
-  Decision: ask the person a question. The task then waits for their reply. Use when only the requester can decide something.
+  Record a question for the person and leave the Task waiting for their reply.
 entry: ./index.ts
 complexity: simple
 speed: fast

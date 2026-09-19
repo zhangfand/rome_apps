@@ -1,7 +1,7 @@
-name: stop
+name: stop_worker
 type: custom
 description: >-
-  Stop the live worker on a task (recorded as Lost). Call this before dispatching a new worker when the current one must change course. The worker's later reply is dropped.
+  Mark a Task's live Worker as lost and ignore its later return.
 entry: ./index.ts
 complexity: simple
 speed: fast

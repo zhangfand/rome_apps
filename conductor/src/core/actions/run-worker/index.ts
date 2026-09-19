@@ -19,11 +19,11 @@ interface SummonSessionStartedEvent {
   romeSession: { _romeSessionId: string; _type: string };
 }
 
-const log = createAppLogger("conductor:run_worker");
+const log = createAppLogger("conductor:run_job");
 
 /**
  * A worker. `system:summon` runs an agent to completion and returns its
- * reply, so the detachment lives one level up: dispatch runs *this action*
+ * reply, so the detachment lives one level up: the Job scheduler runs *this action*
  * detached and the action holds the blocking summon. It writes the worker's
  * own facts — Opened, Returned, Failed — because the worker agent has no
  * tools on this ledger and should not need any. It interprets nothing: the
@@ -56,7 +56,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
       if (ledger.factsFor(taskId).some((f) => isWorkerTerminalKind(f.kind) && (f.payload as { workerId?: string }).workerId === workerId)) {
         return { status: "ok", data: { taskId, workerId, outcome: "skipped (worker already closed)" } };
       }
-      const source = "conductor:run_worker, on the worker's behalf";
+      const source = "conductor:run_job, on the worker's behalf";
 
       const health = createWorkerHealthRepository(appContext.db);
       const ownerId = crypto.randomUUID();
@@ -80,13 +80,13 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
           const parsed = parseWorkerReply(run.reply);
           const written = ledger.appendWorkerOutcome({
             taskId, kind: "Returned", by: workerId, source,
-            payload: { workerId, ...parsed, sessionId: run.sessionId, ...(restarted ? { restarted } : {}) },
+            payload: { ...(dispatched.payload.jobId ? { jobId: dispatched.payload.jobId } : {}), workerId, ...parsed, sessionId: run.sessionId, ...(restarted ? { restarted } : {}) },
           });
           outcome = written ? `Returned(${parsed.status})` : "dropped (worker already closed)";
         } else {
           const written = ledger.appendWorkerOutcome({
             taskId, kind: "Failed", by: workerId, source,
-            payload: { workerId, error: run.error, sessionId: run.sessionId, ...(restarted ? { restarted } : {}) },
+            payload: { ...(dispatched.payload.jobId ? { jobId: dispatched.payload.jobId } : {}), workerId, error: run.error, sessionId: run.sessionId, ...(restarted ? { restarted } : {}) },
           });
           outcome = written ? "Failed" : "dropped (worker already closed)";
         }
@@ -94,7 +94,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
       } catch (error) {
         const written = ledger.appendWorkerOutcome({
           taskId, kind: "Failed", by: workerId, source,
-          payload: { workerId, error: error instanceof Error ? error.message : String(error) },
+          payload: { ...(dispatched.payload.jobId ? { jobId: dispatched.payload.jobId } : {}), workerId, error: error instanceof Error ? error.message : String(error) },
         });
         outcome = written ? "Failed" : "dropped (worker already closed)";
       } finally {
@@ -102,7 +102,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
       }
 
       // A new fact exists: wake the orchestrator now rather than on the next tick.
-      await appContext.runAction("conductor:tick", {});
+      await appContext.runAction("conductor:reconcile_tasks", {});
       return { status: "ok", data: { taskId, workerId, outcome, sessionId, restarted } };
     },
   };
@@ -134,7 +134,18 @@ async function summonWithFallback(input: {
   }
 
   const onSession = (session: { id: string; type: string }) => {
-    ledger.append({ taskId, kind: "Opened", by: workerId, source, payload: { workerId, romeSessionId: session.id, sessionType: session.type } });
+    ledger.append({
+      taskId,
+      kind: "Opened",
+      by: workerId,
+      source,
+      payload: {
+        ...(dispatched.payload.jobId ? { jobId: dispatched.payload.jobId } : {}),
+        workerId,
+        romeSessionId: session.id,
+        sessionType: session.type,
+      },
+    });
   };
 
   const first = await summon(appContext, agent, prompt, resumeSessionId, onSession);

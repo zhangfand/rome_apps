@@ -30,8 +30,10 @@ import {
 } from "../lib/facts";
 import { formatRelative, formatStamp, formatTime } from "../lib/format";
 import type { FactJson, TaskDetailJson, TaskSummary } from "../lib/types";
+import { workerSessions, type WorkerSession } from "../lib/workers";
 import { webDomain } from "../domain";
 import { StateChip, taskTitle } from "./board";
+import { WorkerLink } from "./worker-link";
 
 type HistoryView = "Stream" | "Lanes" | "Table";
 const VIEW_KEY = "conductor-history-view";
@@ -115,6 +117,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
 
   const visible = task.facts.filter((item) => !(hideRoutine && isRoutine(item)));
   const rounds = groupRounds(visible);
+  const sessions = workerSessions(task.facts);
   const now = Date.now();
   const created = task.facts.find((item) => item.kind === "Created");
   // Where the task came from, whichever source opened it. Facts written before
@@ -155,7 +158,18 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
           <Alert variant="info">
             <AlertTitle>Where it stands</AlertTitle>
             <AlertDescription>
-              <LightMarkdown markdown={whereItStands(task)} compact className="max-w-[78ch]" />
+              <div className="flex flex-col items-start gap-2">
+                <LightMarkdown markdown={whereItStands(task)} compact className="max-w-[78ch]" />
+                {task.liveWorker?.romeSession && (
+                  <WorkerLink
+                    workerId={task.liveWorker.workerId}
+                    session={task.liveWorker.romeSession}
+                    label="Open worker session"
+                    icon
+                    className="text-aux"
+                  />
+                )}
+              </div>
             </AlertDescription>
           </Alert>
         </CardContent>
@@ -188,11 +202,11 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
       </div>
 
       {historyView === "Stream" ? (
-        <StreamView rounds={rounds} openEntries={openEntries} toggle={(seq) => setOpenEntries((current) => toggleSet(current, seq))} />
+        <StreamView rounds={rounds} sessions={sessions} openEntries={openEntries} toggle={(seq) => setOpenEntries((current) => toggleSet(current, seq))} />
       ) : historyView === "Lanes" ? (
-        <LanesView entries={visible} />
+        <LanesView entries={visible} sessions={sessions} />
       ) : (
-        <TableView entries={visible} openEntries={openEntries} toggle={(seq) => setOpenEntries((current) => toggleSet(current, seq))} />
+        <TableView entries={visible} sessions={sessions} openEntries={openEntries} toggle={(seq) => setOpenEntries((current) => toggleSet(current, seq))} />
       )}
 
       {task.state === "open" && (
@@ -217,7 +231,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
   );
 }
 
-function StreamView({ rounds, openEntries, toggle }: { rounds: Array<{ stamp: string; entries: FactJson[] }>; openEntries: Set<number>; toggle: (seq: number) => void }) {
+function StreamView({ rounds, sessions, openEntries, toggle }: { rounds: Array<{ stamp: string; entries: FactJson[] }>; sessions: ReadonlyMap<string, WorkerSession>; openEntries: Set<number>; toggle: (seq: number) => void }) {
   return (
     <div className="flex flex-col gap-4">
       {rounds.map((round, index) => (
@@ -234,13 +248,13 @@ function StreamView({ rounds, openEntries, toggle }: { rounds: Array<{ stamp: st
                 <div className="flex flex-col gap-[3px]">
                   <span className="font-mono text-[11px] text-subtle-foreground">#{item.seq} · {formatTime(item.createdAt)}</span>
                   {item.kind !== "Event" && (
-                    <span className={cn("font-mono text-[10.5px] font-semibold", who === "you" ? "text-info-fg" : who === "conductor" ? "text-foreground" : "text-muted-foreground")}>{who}</span>
+                    <FactAuthor item={item} sessions={sessions} className={cn("font-mono text-[10.5px] font-semibold", who === "you" ? "text-info-fg" : who === "conductor" ? "text-foreground" : "text-muted-foreground")} />
                   )}
                 </div>
                 <div className="flex min-w-0 flex-col gap-[5px]">
                   <div className="flex flex-wrap items-center gap-2">
                     <HistoryChip item={item} />
-                    {content.title && <span className="text-[15px] font-semibold">{content.title}</span>}
+                    {content.title && <HistoryTitle item={item} title={content.title} sessions={sessions} />}
                   </div>
                   {content.body && <LightMarkdown markdown={content.body} className="max-w-[76ch] text-[14.5px] leading-[1.6]" />}
                   {content.extra && (
@@ -267,7 +281,7 @@ function StreamView({ rounds, openEntries, toggle }: { rounds: Array<{ stamp: st
   );
 }
 
-function LanesView({ entries }: { entries: FactJson[] }) {
+function LanesView({ entries, sessions }: { entries: FactJson[]; sessions: ReadonlyMap<string, WorkerSession> }) {
   const laneClass = { 1: "col-start-1", 2: "col-start-2", 3: "col-start-3", 4: "col-start-4" } as const;
   return (
     <Card className="overflow-x-auto px-3.5">
@@ -283,6 +297,9 @@ function LanesView({ entries }: { entries: FactJson[] }) {
                 <div className="flex items-center gap-1.5">
                   <span className="font-mono text-[10.5px] text-subtle-foreground">#{item.seq}</span>
                   <HistoryChip item={item} />
+                  {authorLabel(item.by, item.kind) === "worker" && (
+                    <FactAuthor item={item} sessions={sessions} className="font-mono text-[10px] text-muted-foreground" />
+                  )}
                   <span className="ml-auto font-mono text-[10px] text-subtle-foreground">{formatTime(item.createdAt)}</span>
                 </div>
                 <span className="truncate text-[12.5px] leading-[1.4] font-medium">{content.title || content.body || "Update"}</span>
@@ -295,7 +312,7 @@ function LanesView({ entries }: { entries: FactJson[] }) {
   );
 }
 
-function TableView({ entries, openEntries, toggle }: { entries: FactJson[]; openEntries: Set<number>; toggle: (seq: number) => void }) {
+function TableView({ entries, sessions, openEntries, toggle }: { entries: FactJson[]; sessions: ReadonlyMap<string, WorkerSession>; openEntries: Set<number>; toggle: (seq: number) => void }) {
   return (
     <Card className="overflow-hidden py-0">
       <Table>
@@ -318,7 +335,7 @@ function TableView({ entries, openEntries, toggle }: { entries: FactJson[]; open
                 <TableRow className="cursor-pointer" aria-expanded={open} onClick={() => toggle(item.seq)}>
                   <TableCell className="text-aux text-muted-foreground">#{item.seq}</TableCell>
                   <TableCell><HistoryChip item={item} /></TableCell>
-                  <TableCell className="text-aux text-muted-foreground">{authorLabel(item.by, item.kind)}</TableCell>
+                  <TableCell className="text-aux text-muted-foreground"><FactAuthor item={item} sessions={sessions} /></TableCell>
                   <TableCell className="max-w-0 truncate">{oneLine}</TableCell>
                   <TableCell className="text-right text-aux text-muted-foreground">{formatTime(item.createdAt)}</TableCell>
                 </TableRow>
@@ -342,10 +359,34 @@ function HistoryChip({ item }: { item: FactJson }) {
   return <Badge variant={TONE_BADGE[factTone(item)]} className="w-fit">{factLabel(item.kind)}</Badge>;
 }
 
+function FactAuthor({ item, sessions, className }: { item: FactJson; sessions: ReadonlyMap<string, WorkerSession>; className?: string }) {
+  const label = authorLabel(item.by, item.kind);
+  if (label !== "worker") return <span className={className}>{label}</span>;
+  return <WorkerLink workerId={item.by} session={sessions.get(item.by)} label={label} className={className} />;
+}
+
+function HistoryTitle({ item, title, sessions }: { item: FactJson; title: string; sessions: ReadonlyMap<string, WorkerSession> }) {
+  const workerId = typeof item.payload.workerId === "string" ? item.payload.workerId : "";
+  if (item.kind === "Dispatched" && workerId) {
+    const agent = typeof item.payload.agent === "string" ? item.payload.agent : "";
+    return (
+      <span className="inline-flex flex-wrap items-center gap-1 text-[15px] font-semibold">
+        <WorkerLink workerId={workerId} session={sessions.get(workerId)} label={workerId} />
+        {agent ? <span>as {agent}</span> : null}
+      </span>
+    );
+  }
+  if (item.kind === "Opened" && workerId) {
+    return <WorkerLink workerId={workerId} session={sessions.get(workerId)} label={title} icon className="text-[15px] font-semibold" />;
+  }
+  return <span className="text-[15px] font-semibold">{title}</span>;
+}
+
 function whereItStands(task: TaskDetailJson): string {
   if (task.state === "completed") return `This task is complete. ${latestText(task)}`;
   if (task.state === "cancelled") return `This task was cancelled. ${latestText(task)}`;
   if (task.liveWorker) return `Work is moving now. ${latestText(task)}`;
+  if (task.pendingJob) return `Job ${task.pendingJob.jobId} is queued for ${task.pendingJob.agent}. Runtime will choose a worker when capacity is available.`;
   if (task.waiting) return `${safeText(task.waiting.reason)} It will continue after ${formatStamp(task.waiting.resumeAfter)}.`;
   if (isSafetyEvent(task.latest)) return `${factBody(task.latest).title}. ${attentionText(task)}`;
   if (hasOutstandingPersonDecision(task) && task.lastDecision?.kind === "Asked") return `${attentionText(task)} Conductor is waiting for your answer.`;

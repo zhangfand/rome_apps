@@ -1,7 +1,7 @@
-name: wait
+name: wait_for_task_update
 type: custom
 description: >-
-  Decision: do nothing for a while. You will be woken after the given minutes, or sooner if something happens on the task.
+  Put a Task in a timed wait that ends at its deadline or on a new fact.
 entry: ./index.ts
 complexity: simple
 speed: fast

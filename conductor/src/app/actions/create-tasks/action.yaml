@@ -1,0 +1,10 @@
+name: create_child_tasks
+type: custom
+description: >-
+  Create child Tasks from plan items and record their parent, spec, and plan
+  references.
+entry: ./index.ts
+complexity: moderate
+speed: fast
+reliability: high
+sideEffects: write

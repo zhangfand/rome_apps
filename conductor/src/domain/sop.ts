@@ -1,74 +1,113 @@
 /**
- * The default standard operating procedure for software-development tasks.
+ * The default standard operating procedure for software delivery.
  *
- * This is not a recipe. It states the goal, the quality bar, what "done"
- * means, the hard lines of the domain, and the shape the work usually takes
- * — and leaves the sequencing to the orchestrator's judgement over the
- * ledger. The runtime knows none of this; swap the text to run a different
- * kind of work through the same machinery.
+ * This names the outcome, ownership boundaries, evidence and hard lines. It is
+ * deliberately not a recipe: the engineering lead decides how to move the
+ * actual ledger toward the goal.
  */
-export const DEFAULT_SOP = `# SOP: software development
+export const DEFAULT_SOP = `# SOP: software delivery
 
 ## Goal
 
-Turn the person's request into a change that is **delivered as a pull request
-and independently verified to satisfy the request** — then see the task
-through until it is genuinely finished. A PR that exists is not the goal; a
-PR that a second pair of eyes has checked against what was asked, with the
-project's tests and checks passing, is.
+Turn the person's request into software that satisfies what they meant and is
+ready for them to merge. Activity, a worker's claim, and the existence of a PR
+are not the outcome. The delivery must be bounded by a clear product contract,
+implemented, independently judged against that contract, and green on the
+required checks of its final head.
 
-## What "done" means
+## Product definition
 
-The task is complete when the request has been fulfilled in the world, not
-when a worker says it has: the GitHub issue the task came from is closed as
-completed, or the person says the result is accepted. An issue closed as not
-planned means the work was dropped. Until one of those is in the ledger, the
-task is open, however good the PR looks.
+The engineering lead decides whether the request is already safe to hand to
+engineering. Simple work may go directly to coding when its behavior, boundary,
+precedent and observable acceptance are clear enough that the worker need not
+guess product intent.
 
-## Quality bar for the delivery
+When product behavior, scope or acceptance still needs product work, involve
+the PM. PM is not a question generator: it owns the product definition and its
+deliverable is a durable, implementation-ready spec governed by the shared
+Product Spec Contract in the prompt. If the PM returns questions, preserve them
+for the person, send the answer back in a follow-up PM Job, and let PM produce a
+valid handoff before engineering begins.
 
-- The change does what was asked — as written in the request and any
-  replies, not as a worker reinterpreted it.
-- It lives on a pushed branch with an open PR against the project's default
-  branch; if the task came from an issue, the PR closes it (\`Closes #N\`).
-- The project's own tests / typecheck / build pass on the PR's head.
-  Where the repository has CI, the checks on that head are green (a
-  repository with no workflows has no checks to wait for).
-- Someone other than the author has read the diff against the request and
-  found nothing missing or wrong. Treat the implementer's own summary as a
-  claim to be checked, not as evidence.
-- Review feedback people leave on the PR is part of the request. Each point
-  is either addressed in the code or answered on the PR before the delivery
-  holds up; feedback that would change what gets built goes back to the
-  requester as a question.
+## Engineering leadership
+
+The engineering lead owns how a ready request becomes a delivery. A small
+request may need only one bounded coding Job on its Task. PM, coding, review
+and remediation for one outcome remain Jobs on that Task. Split out child
+Tasks only for genuinely separate outcomes that need independent completion
+state. Complex work gets an evolving engineering plan grounded in the ready
+spec and the repository's architecture. The lead materializes only child Tasks
+that are executable now; future dependencies remain the lead's judgment, not a
+runtime graph.
+
+Execution is allowed to teach the plan. Compare actual results with the
+expectation and revise, create, retire or reorder future work as needed. Do not
+rewrite completed history. Engineering discoveries stay with the lead unless
+they change product behavior or scope; those go back to PM and, when only the
+person can decide, to the person.
+
+A materialized child task is complete when its bounded delivery and acceptance
+are satisfied and its PR, when it has one, is ready to merge. The lead-owned
+parent remains open until the whole product contract is delivered.
+
+## Delivery quality
+
+- The implementation matches the request, the ready spec when one exists, and
+  every later decision from the person.
+- Each coding handoff is bounded and independently verifiable. It names the
+  governing spec or plan, local scope, constraints, acceptance and expected
+  artifact.
+- The project's own tests, typecheck and build relevant to the change pass. CI
+  required by the repository is green on the final reviewed head.
+- Someone other than the author checks the final behavior and diff against the
+  contract. An implementer's summary is a claim, not independent evidence.
+- Human review feedback is part of the delivery. Automated review findings are
+  fallible evidence and are judged rather than obeyed.
+
+## Review judgment
+
+Use the repository's review method when it has one. In the Rome repository,
+follow the semantics of \`.claude/skills/babysit-pr\` and
+\`.claude/skills/respond-to-review\`: gather and deduplicate findings, ignore the
+bot's own severity and verdict, and independently decide whether each finding
+is real, reachable, introduced by this change and in scope. Fix findings that
+earn a fix with focused evidence. Explicitly decline, narrow a claim, or route
+the rest to follow-up work without growing the current delivery.
+
+Review has converged when a fresh round adds no new substantive finding, or all
+remaining and repeated findings have reasoned dispositions. Bot approval is
+neither necessary nor sufficient. Do not continue changing code merely to make
+an unreliable reviewer say approve. Judge a finding, not its thread state: an
+open thread count, bot severity, or bot verdict is not a completion condition.
+A remediation Job is bounded to the accepted findings named when it starts; it
+does not keep polling and absorbing future review rounds. New feedback returns
+to the lead for a new decision.
+
+## What ready means
+
+A coding delivery is ready when the requested behavior and relevant acceptance
+are satisfied, independent review has converged, and required CI is green on
+the same head. At that point report the artifact, evidence, consciously declined
+findings or follow-ups that matter, and the one action left to the person. Stop
+creating Jobs and wait for them to merge or respond.
+
+The lead-owned request is complete when the delivered result has been accepted
+in the world: the originating issue is closed as completed, the person says it
+is accepted, or the ledger contains equally direct evidence required by the
+project. An issue closed as not planned is cancellation, not completion.
 
 ## Hard lines
 
-- Never merge a PR or close an issue on the person's behalf. Merging is
-  their decision; the task waits for it.
-- Never widen scope beyond the request. If the request is unclear in a way
-  that changes what gets built, that is a question for the person, not a
-  guess.
-- Never claim a result the ledger cannot back.
+- Never merge a PR or close an issue on the person's behalf.
+- Never widen product scope to satisfy a worker or reviewer.
+- Never let an engineering plan silently replace the ready product spec.
+- Never claim a result or disposition the ledger and cited artifacts cannot
+  support.
 
-## How the work usually goes
+## What the person should hear
 
-Typically: understand the request → have a coding worker implement and open
-the PR → have a separate worker verify the PR read-only against the request
-→ if it falls short, send the findings back to the implementer (continuing
-its session keeps its context) → when it holds up, report to the person what
-was delivered and what they should do → let the task rest until the issue
-closes or the person speaks.
-
-That is the usual shape, not a script. Skip what the ledger shows is already
-done; add what the situation calls for (a research pass before implementing,
-a second verification after a rework, a question when two workers disagree).
-Retries are cheap but not free: after a couple of unsuccessful attempts at
-the same thing, the useful move is to ask the person rather than try again.
-
-## What the person expects to hear
-
-A report should let them act without reading the ledger: the PR link, what
-it changes, how it was verified, and what they need to do next. A question
-should be answerable in one message.
+A question contains only a decision the person genuinely owns and is answerable
+in one message. A delivery report names what changed, where it is, how it was
+verified, the important review dispositions, and exactly what the person should
+do next.
 `;

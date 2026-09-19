@@ -12,7 +12,7 @@ import type { ConfigJson, RuntimeJson, StateJson } from "../lib/types";
 
 /**
  * The Runtime tab: what the loop is set to and what it is doing right now.
- * The limits are read-only here — they are set with `conductor:setup` — and
+ * The limits are read-only here — they are set with `conductor:configure_conductor` — and
  * the live part comes from the same state feed the board polls.
  */
 export function Runtime({ state }: { state: StateJson | null }) {
@@ -89,7 +89,7 @@ export function Runtime({ state }: { state: StateJson | null }) {
         <SectionHeader>
           <SectionHeading>
             <SectionTitle>Limits</SectionTitle>
-            <SectionDescription>Set with <code className="rounded bg-surface-muted px-1.5 font-mono">conductor:setup</code>.</SectionDescription>
+            <SectionDescription>Set with <code className="rounded bg-surface-muted px-1.5 font-mono">conductor:configure_conductor</code>.</SectionDescription>
           </SectionHeading>
         </SectionHeader>
         <FormRows>
