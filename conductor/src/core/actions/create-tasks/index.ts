@@ -1,6 +1,6 @@
 import type { Action, ActionConfig, ActionResult, AppActionRuntimeDeps } from "@rome-os/app-runtime";
 import { createLedgerRepository } from "../../db/repositories/ledger.js";
-import { loadOpenTask, readDecisionInput } from "../../lib/decision.js";
+import { conflictActionResult, loadOpenTask, readDecisionInput } from "../../lib/decision.js";
 import { fold } from "../../lib/fold.js";
 import { ORCHESTRATOR, type NewFact, type TaskParent } from "../../lib/facts.js";
 
@@ -47,7 +47,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       const input = readDecisionInput(args);
       if (!input.ok) return { status: "error", error: input.error };
       const loaded = loadOpenTask(appContext, input.taskId, input.seenSeq);
-      if (!loaded.ok) return { status: "error", error: loaded.error };
+      if (!loaded.ok) return loaded.result;
       const note = String(args.note ?? "").trim();
       if (!note) return { status: "error", error: "note is required" };
       if (!Array.isArray(args.tasks) || args.tasks.length < 1 || args.tasks.length > MAX_TASKS_PER_DECISION) {
@@ -114,8 +114,9 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
           note: `${note}\nRunnable tasks: ${[...already, ...created].map((item) => `${item.planItemId}=${item.taskId}`).join(", ")}`,
         },
       };
-      const written = ledger.appendManyIfLatest(input.taskId, [...childFacts, decision], input.seenSeq);
-      if (!written) return { status: "error", error: "The ledger changed while writing; read it and decide again." };
+      const result = ledger.compareAndAppend(input.taskId, input.seenSeq, [...childFacts, decision]);
+      if (result.status === "conflict") return conflictActionResult(result);
+      const written = result.facts;
       await appContext.runAction("conductor:reconcile_tasks", {}, { detached: true });
       return { status: "ok", data: { parentTaskId: input.taskId, created, existing: already, decisionSeq: written.at(-1)!.seq } };
     },

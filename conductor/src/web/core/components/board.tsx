@@ -63,9 +63,17 @@ export function Board({
       const response = await fetchAppApi(`tasks/${encodeURIComponent(task.id)}/reply`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, seenSeq: task.latest.seq }),
       });
       if (!response.ok) {
+        if (response.status === 409) {
+          await reload();
+          setErrors((current) => ({
+            ...current,
+            [task.id]: "This task changed before your reply was recorded. Review the new activity and send it again if it still applies.",
+          }));
+          return;
+        }
         const message = await responseError(response);
         setErrors((current) => ({ ...current, [task.id]: message }));
         return;
@@ -82,8 +90,20 @@ export function Board({
     setBusy(task.id, true);
     setErrors((current) => ({ ...current, [task.id]: "" }));
     try {
-      const response = await fetchAppApi(`tasks/${encodeURIComponent(task.id)}/${action}`, { method: "POST" });
+      const response = await fetchAppApi(`tasks/${encodeURIComponent(task.id)}/${action}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ seenSeq: task.latest.seq }),
+      });
       if (!response.ok) {
+        if (response.status === 409) {
+          await reload();
+          setErrors((current) => ({
+            ...current,
+            [task.id]: "This task changed before it could be closed. Review the new activity and try again if closing it still applies.",
+          }));
+          return;
+        }
         const message = await responseError(response);
         setErrors((current) => ({ ...current, [task.id]: message }));
         return;

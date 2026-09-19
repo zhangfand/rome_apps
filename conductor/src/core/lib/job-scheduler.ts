@@ -102,14 +102,14 @@ export async function dispatchPendingJobs(input: {
           projectId: task.projectId,
           project,
         };
-        const written = ledger.appendIfLatest({
+        const write = ledger.compareAndAppend(task.id, job.createdSeq, [{
           taskId: task.id,
           kind: "Dispatched",
           by: RUNTIME,
           source: "conductor:job-scheduler",
           payload,
-        }, job.createdSeq);
-        if (!written) {
+        }]);
+        if (write.status === "conflict") {
           outcome.pending.push({ taskId: task.id, jobId: job.jobId });
           continue;
         }
@@ -146,13 +146,13 @@ function appendJobFailure(
 ): boolean {
   const job = task.pendingJob!;
   const payload: JobFailedFact["payload"] = { jobId: job.jobId, agent: job.agent, error };
-  return Boolean(ledger.appendIfLatest({
+  return ledger.compareAndAppend(task.id, job.createdSeq, [{
     taskId: task.id,
     kind: "JobFailed",
     by: RUNTIME,
     source: "conductor:job-scheduler",
     payload,
-  }, job.createdSeq));
+  }]).status === "written";
 }
 
 /** The newest cleanly returned session for this logical agent, if one exists. */

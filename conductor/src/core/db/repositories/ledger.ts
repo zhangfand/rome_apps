@@ -51,26 +51,40 @@ export class LedgerRepository {
     return toFact(row);
   }
 
-  /** Compare-and-append under a SQLite write reservation; safe against human edits too. */
-  appendIfLatest(fact: NewFact, expectedSeq: number): Fact | undefined {
+  /** Run a ledger operation while holding SQLite's write reservation. */
+  immediate<T>(operation: (ledger: LedgerRepository) => T): T {
     return this.db.transaction((tx) => {
       const ledger = new LedgerRepository(tx as unknown as DrizzleDb, this.tablePrefix);
-      if (ledger.factsFor(fact.taskId).at(-1)?.seq !== expectedSeq) return undefined;
-      return ledger.append(fact);
+      return operation(ledger);
     }, { behavior: "immediate" });
   }
 
   /**
-   * Append a lead decision and the tasks it materializes under one write
-   * reservation. The checked task is the parent; facts may also open child
-   * task ids. Keeping this atomic prevents a wake from seeing half a batch.
+   * The conditional ledger write. `expectedSeq` is the global seq of the newest
+   * fact the caller saw on `taskId`; because the comparison is scoped to that
+   * Task, unrelated Tasks never conflict. Facts may include atomic side records
+   * on other Task ids (for example child creation).
    */
-  appendManyIfLatest(checkTaskId: string, facts: readonly NewFact[], expectedSeq: number): Fact[] | undefined {
-    return this.db.transaction((tx) => {
-      const ledger = new LedgerRepository(tx as unknown as DrizzleDb, this.tablePrefix);
-      if (ledger.factsFor(checkTaskId).at(-1)?.seq !== expectedSeq) return undefined;
-      return facts.map((fact) => ledger.append(fact));
-    }, { behavior: "immediate" });
+  compareAndAppend(checkTaskId: string, expectedSeq: number, facts: readonly NewFact[]): CompareAndAppendResult {
+    if (!facts.some((fact) => fact.taskId === checkTaskId)) {
+      throw new Error(`conditional write for ${checkTaskId} must append a fact to that Task`);
+    }
+    return this.immediate((ledger) => {
+      const current = ledger.factsFor(checkTaskId);
+      const currentSeq = current.at(-1)?.seq ?? 0;
+      if (currentSeq !== expectedSeq) {
+        return {
+          status: "conflict",
+          taskId: checkTaskId,
+          expectedSeq,
+          currentSeq,
+          delta: current.filter((fact) => fact.seq > expectedSeq),
+        };
+      }
+      const written = facts.map((fact) => ledger.append(fact));
+      const nextSeq = ledger.factsFor(checkTaskId).at(-1)?.seq ?? currentSeq;
+      return { status: "written", taskId: checkTaskId, currentSeq: nextSeq, facts: written };
+    });
   }
 
   /**
@@ -117,6 +131,10 @@ export class LedgerRepository {
       .map(toFact);
   }
 }
+
+export type CompareAndAppendResult =
+  | { status: "written"; taskId: string; currentSeq: number; facts: Fact[] }
+  | { status: "conflict"; taskId: string; expectedSeq: number; currentSeq: number; delta: Fact[] };
 
 type FactRow = {
   seq: number;

@@ -32,6 +32,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
           projectId: task.projectId,
           createdBy: task.createdBy,
           state: task.state,
+          latestSeq: task.latest.seq,
           liveWorker: task.liveWorker?.workerId,
           latestDecision: task.lastDecision ? describeFact(task.lastDecision) : undefined,
           waiting: task.waiting,

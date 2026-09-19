@@ -1,6 +1,6 @@
 import type { ConductorConfig } from "./config.js";
-import { type CreatedFact, type EventFact, type NewFact, originOf, RUNTIME, type TaskOrigin } from "./facts.js";
-import type { LedgerSnapshot, TaskView } from "./fold.js";
+import { type CreatedFact, type EventFact, type Fact, type NewFact, originOf, RUNTIME, type TaskOrigin } from "./facts.js";
+import { fold, type LedgerSnapshot, type TaskView } from "./fold.js";
 import { resolveHumanProject } from "./projects.js";
 
 /**
@@ -280,6 +280,36 @@ function clip(text: string, max: number, url?: string): string {
 /** The ledger writes a plan needs. Narrow on purpose: appends, nothing else. */
 export interface IngestLedger {
   append(fact: NewFact): { seq: number };
+}
+
+export interface AtomicIngestLedger extends IngestLedger {
+  all(): Fact[];
+  immediate<T>(operation: (ledger: AtomicIngestLedger) => T): T;
+}
+
+/**
+ * Re-plan and append an observation batch while holding SQLite's write
+ * reservation. A concurrent intake winner is therefore visible to the loser
+ * as a duplicate rather than allowing two facts planned from stale snapshots.
+ */
+export function ingestAtomically(
+  ledger: AtomicIngestLedger,
+  input: {
+    config: ConductorConfig;
+    requests: readonly IngestRequest[];
+    claimed?: ReadonlyMap<string, string>;
+    now?: Date;
+  },
+): IngestOutcome[] {
+  return ledger.immediate((reserved) => {
+    const plans = planIngest({
+      snapshot: fold(input.now ?? new Date(), reserved.all()),
+      config: input.config,
+      requests: input.requests,
+      claimed: input.claimed,
+    });
+    return applyIngest(reserved, plans);
+  });
 }
 
 /**

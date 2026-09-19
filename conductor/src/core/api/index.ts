@@ -8,7 +8,7 @@ import type { CoreComposition } from "../lib/composition.js";
 import type { ConductorConfig } from "../lib/config.js";
 import { type Fact } from "../lib/facts.js";
 import { fold, foldTask, needsAttention, type TaskView } from "../lib/fold.js";
-import { applyIngest, type IngestRequest, planIngest } from "../lib/ingest.js";
+import { ingestAtomically, type IngestRequest } from "../lib/ingest.js";
 import { HEARTBEAT_LEASE_MS } from "../lib/worker-health.js";
 import { browseDirectories, DirectoryBrowserError } from "../lib/directory-browser.js";
 import { createFrontdeskShadowRepository } from "../db/repositories/frontdesk-shadow.js";
@@ -83,26 +83,34 @@ class ConductorApiHandler implements RomeAppApiHandler {
       if (request.path[0] === "tasks" && request.path[2] === "reply" && request.path.length === 3) {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
         if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-        const body = readJsonBody<{ text?: unknown }>(request);
+        const body = readJsonBody<{ text?: unknown; seenSeq?: unknown }>(request);
         if (!body || typeof body.text !== "string" || !body.text.trim()) return json({ error: "Enter a reply." }, 400);
-        const result = await this.ctx.runAction("conductor:record_person_reply", { taskId: request.path[1], text: body.text.trim(), source: body.text.trim() });
+        if (!Number.isInteger(body.seenSeq)) return json({ error: "seenSeq is required." }, 400);
+        const result = await this.ctx.runAction("conductor:record_person_reply", { taskId: request.path[1], seenSeq: body.seenSeq, text: body.text.trim(), source: body.text.trim() });
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `reply returned ${result.status}` }, 502);
+        if (isConflictData(result.data)) return json(result.data, 409);
         return json(result.data ?? {});
       }
       if (request.path[0] === "tasks" && request.path[2] === "complete" && request.path.length === 3) {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
         if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+        const body = readJsonBody<{ seenSeq?: unknown }>(request);
+        if (!body || !Number.isInteger(body.seenSeq)) return json({ error: "seenSeq is required." }, 400);
         const taskId = request.path[1];
-        const result = await this.ctx.runAction("conductor:complete_task", { taskId, source: "Mark complete" });
+        const result = await this.ctx.runAction("conductor:complete_task", { taskId, seenSeq: body.seenSeq, source: "Mark complete" });
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `complete returned ${result.status}` }, 502);
+        if (isConflictData(result.data)) return json(result.data, 409);
         return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get());
       }
       if (request.path[0] === "tasks" && request.path[2] === "cancel" && request.path.length === 3) {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
         if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+        const body = readJsonBody<{ seenSeq?: unknown }>(request);
+        if (!body || !Number.isInteger(body.seenSeq)) return json({ error: "seenSeq is required." }, 400);
         const taskId = request.path[1];
-        const result = await this.ctx.runAction("conductor:cancel_task", { taskId, source: "Cancel task" });
+        const result = await this.ctx.runAction("conductor:cancel_task", { taskId, seenSeq: body.seenSeq, source: "Cancel task" });
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `cancel returned ${result.status}` }, 502);
+        if (isConflictData(result.data)) return json(result.data, 409);
         return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get());
       }
       // The ingest seam over HTTP. Any system that can reach Rome can open a
@@ -216,8 +224,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
     const config = settings.get();
     if (!config) return json({ error: "Run conductor:configure_conductor first." }, 409);
     if (!ledger.reachable()) return json({ error: "the ledger is unreachable" }, 503);
-    const plans = planIngest({ snapshot: fold(new Date(), ledger.all()), config, requests: [request] });
-    const [outcome] = applyIngest(ledger, plans);
+    const [outcome] = ingestAtomically(ledger, { config, requests: [request] });
     if (outcome.status === "rejected") return json({ error: outcome.reason, status: "rejected" }, 400);
     this.ctx.log.info("ingest", { ...outcome });
     return json({
@@ -316,6 +323,10 @@ function factJson(fact: Fact) {
 
 function safe<T>(fn: () => T): T | undefined {
   try { return fn(); } catch { return undefined; }
+}
+
+function isConflictData(data: unknown): data is { status: "conflict" } {
+  return Boolean(data && typeof data === "object" && (data as { status?: unknown }).status === "conflict");
 }
 
 function readJsonBody<T>(request: RomeAppApiRequest): T | null {

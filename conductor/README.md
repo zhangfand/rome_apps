@@ -75,9 +75,12 @@ rejected; an unparseable reply is recorded as `unparsed` with the raw text.
 - **Freshness** (`fold.ts` → `needsAttention`): wake the orchestrator when
   there are facts after its last decision, when a `Waited` is due, or after a
   `stop` with no follow-up. That is all the fold knows.
-- **Optimistic concurrency**: every decision action takes `seenSeq`; if the
-  ledger moved, the decision is refused with the new facts and the
-  orchestrator decides again.
+- **Two ledger writes**: observations append; state-dependent commands compare
+  and append. A conditional write identifies a Task plus the global `seq` of
+  the newest fact the caller saw on that Task. Unrelated Tasks never conflict.
+  A stale caller receives the current Task seq and only the intervening facts,
+  then decides again. Coordinator decisions and person reply/complete/cancel
+  commands all use this same primitive.
 - **Job scheduling, slots and isolation**: the lead chooses a Job's logical
   agent and instructions; runtime chooses the Worker Session, workspace and
   slot. `maxWorkers`, one live Run per task, one workspace per worker, and
@@ -216,7 +219,7 @@ follow, and they are why the loop can be trusted with input it did not author:
 |---|---|
 | a narrower vocabulary than the ledger | a source may `open_task` (`Created`) or `push_event` (`Event`). There is no shape that produces `JobCreated`, `Dispatched`, `Reported`, `Waited` or `Completed`, so no input can make the coordinator or runtime appear to have acted. A person's `Reply` is excluded too: replies come from the guardian's own routes, not from a machine claiming to be a person. |
 | authorship is computed, never accepted | `by` is derived — `source` or `source:actor` for a `Created`, always `runtime` for an `Event`. `runtime` and `orchestrator` are reserved slugs; an Event can never read as a person speaking and reset the circuit breaker. |
-| idempotency is the seam's job | one task per `(source, key)` ever; one event per `(source, key)` per task. A retried webhook, a poll that lists the same issue twice, and two adapters watching one system all write once. |
+| idempotency is the seam's job | one task per `(source, key)` ever; one event per `(source, key)` per task. Planning and append share one SQLite write reservation, so concurrent intake sees the winner rather than writing from the same stale snapshot. |
 
 `tick` never treats a source specially — it iterates the registry in
 `src/app/adapters/index.ts`, hands the batch to the seam, then wakes. Over HTTP the same seam is two routes, guardian /

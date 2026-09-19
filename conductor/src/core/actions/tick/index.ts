@@ -6,7 +6,7 @@ import { createSettingsRepository } from "../../db/repositories/settings.js";
 import { createWorkerHealthRepository, type WorkerHealthRepository } from "../../db/repositories/worker-health.js";
 import { fold, needsAttention } from "../../lib/fold.js";
 import { isTerminalKind, RUNTIME } from "../../lib/facts.js";
-import { applyIngest, describeOutcome, type IngestRequest, planIngest } from "../../lib/ingest.js";
+import { describeOutcome, ingestAtomically, type IngestRequest } from "../../lib/ingest.js";
 import { dispatchPendingJobs } from "../../lib/job-scheduler.js";
 
 const log = createAppLogger("conductor:reconcile_tasks");
@@ -70,8 +70,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
 
         // 2. ingest
         if (requests.length) {
-          const plans = planIngest({ snapshot: fold(new Date(), ledger.all()), config: conductorConfig, requests, claimed });
-          for (const outcome of applyIngest(ledger, plans)) {
+          for (const outcome of ingestAtomically(ledger, { config: conductorConfig, requests, claimed })) {
             if (outcome.status === "recorded") applied.push(describeOutcome(outcome));
             else if (outcome.status === "rejected") log.warn("ingest rejected an observation", { ...outcome });
           }

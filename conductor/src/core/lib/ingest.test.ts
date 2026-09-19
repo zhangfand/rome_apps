@@ -1,8 +1,11 @@
 import { describe, expect, it } from "@rstest/core";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
 import type { ConductorConfig } from "./config.js";
 import type { Fact, NewFact } from "./facts.js";
 import { fold } from "./fold.js";
-import { applyIngest, type IngestRequest, planIngest } from "./ingest.js";
+import { applyIngest, ingestAtomically, type IngestRequest, planIngest } from "./ingest.js";
+import { LedgerRepository } from "../db/repositories/ledger.js";
 
 let seq = 0;
 const t0 = Date.parse("2026-09-14T00:00:00Z");
@@ -158,5 +161,30 @@ describe("applying a plan", () => {
     expect(outcomes.map((o) => o.status)).toEqual(["recorded", "duplicate", "rejected"]);
     expect(appended).toHaveLength(1);
     expect(outcomes[0]).toMatchObject({ kind: "Created", taskId: "t-1", seq: 1 });
+  });
+
+  it("re-plans keyed intake under the write reservation so a later caller sees the winner", () => {
+    const sqlite = new Database(":memory:");
+    sqlite.exec(`
+      CREATE TABLE conductor__facts (
+        seq integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+        id text NOT NULL,
+        task_id text NOT NULL,
+        kind text NOT NULL,
+        by text NOT NULL,
+        source text,
+        payload text NOT NULL,
+        created_at integer NOT NULL
+      );
+    `);
+    const ledger = new LedgerRepository(drizzle(sqlite), "conductor");
+
+    const [first] = ingestAtomically(ledger, { config, requests: [openTask()] });
+    const [second] = ingestAtomically(ledger, { config, requests: [openTask({ brief: "same origin, later caller" })] });
+
+    expect(first).toMatchObject({ status: "recorded", kind: "Created" });
+    expect(second).toMatchObject({ status: "duplicate", taskId: first.taskId });
+    expect(ledger.all().filter((fact) => fact.kind === "Created")).toHaveLength(1);
+    sqlite.close();
   });
 });

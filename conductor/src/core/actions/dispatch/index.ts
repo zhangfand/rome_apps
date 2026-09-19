@@ -2,7 +2,7 @@ import type { Action, ActionConfig, ActionResult, AppActionRuntimeDeps } from "@
 import type { CoreComposition } from "../../lib/composition.js";
 import { createLedgerRepository } from "../../db/repositories/ledger.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
-import { loadOpenTask, readDecisionInput } from "../../lib/decision.js";
+import { conflictActionResult, loadOpenTask, readDecisionInput } from "../../lib/decision.js";
 import { type JobCreatedFact, ORCHESTRATOR } from "../../lib/facts.js";
 import { dispatchPendingJobs } from "../../lib/job-scheduler.js";
 
@@ -44,7 +44,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
       }
 
       const loaded = loadOpenTask(appContext, input.taskId, input.seenSeq);
-      if (!loaded.ok) return { status: "error", error: loaded.error };
+      if (!loaded.ok) return loaded.result;
       if (loaded.task.liveWorker) {
         return { status: "error", error: `job ${loaded.task.liveWorker.jobId ?? "(legacy)"} is already running; wait for its result before deciding the next Job` };
       }
@@ -56,14 +56,15 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         instructions,
         ...(note ? { note } : {}),
       };
-      const written = createLedgerRepository(appContext.db).appendIfLatest({
+      const result = createLedgerRepository(appContext.db).compareAndAppend(loaded.task.id, input.seenSeq, [{
         taskId: loaded.task.id,
         kind: "JobCreated",
         by: ORCHESTRATOR,
         source: "conductor:create_job",
         payload,
-      }, input.seenSeq);
-      if (!written) return { status: "error", error: "The ledger changed while writing; read it and decide again." };
+      }]);
+      if (result.status === "conflict") return conflictActionResult(result);
+      const written = result.facts[0];
 
       // This is an infrastructure call, not part of the coordinator decision.
       // It may leave the Job pending when all global worker slots are occupied.

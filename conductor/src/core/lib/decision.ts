@@ -1,5 +1,5 @@
 import type { ActionResult, RomeAppContext } from "@rome-os/app-runtime";
-import { createLedgerRepository } from "../db/repositories/ledger.js";
+import { createLedgerRepository, type CompareAndAppendResult } from "../db/repositories/ledger.js";
 import { describeFact, type NewFact, ORCHESTRATOR } from "./facts.js";
 import { foldTask, type TaskView } from "./fold.js";
 
@@ -22,19 +22,46 @@ export function readDecisionInput(args: DecisionInput): { ok: true; taskId: stri
   return { ok: true, taskId, seenSeq };
 }
 
-export function loadOpenTask(appContext: RomeAppContext, taskId: string, seenSeq: number): { ok: true; task: TaskView } | { ok: false; error: string } {
+export function loadOpenTask(
+  appContext: RomeAppContext,
+  taskId: string,
+  seenSeq: number,
+): { ok: true; task: TaskView } | { ok: false; result: ActionResult } {
   const ledger = createLedgerRepository(appContext.db);
   const facts = ledger.factsFor(taskId);
-  if (!facts.length) return { ok: false, error: `no task ${taskId}` };
+  if (!facts.length) return { ok: false, result: { status: "error", error: `no task ${taskId}` } };
   const task = foldTask(facts);
-  if (task.state !== "open") return { ok: false, error: `task ${taskId} is already ${task.state}; nothing more can be decided on it` };
-  if (task.latest.seq !== seenSeq) return { ok: false, error: staleMessage(task, seenSeq) };
+  if (task.latest.seq !== seenSeq) return { ok: false, result: conflictActionResult({
+    status: "conflict",
+    taskId,
+    expectedSeq: seenSeq,
+    currentSeq: task.latest.seq,
+    delta: task.facts.filter((fact) => fact.seq > seenSeq),
+  }) };
+  if (task.state !== "open") return { ok: false, result: { status: "error", error: `task ${taskId} is already ${task.state}; nothing more can be decided on it` } };
   return { ok: true, task };
 }
 
-function staleMessage(task: TaskView, seenSeq: number): string {
-  const newer = task.facts.filter((f) => f.seq > seenSeq).map((f) => describeFact(f));
-  return `The ledger advanced past #${seenSeq} (now #${task.latest.seq}). Read what is new, then decide again with seenSeq=${task.latest.seq}:\n${newer.join("\n")}`;
+export function conflictActionResult(conflict: Extract<CompareAndAppendResult, { status: "conflict" }>): ActionResult {
+  return {
+    status: "ok",
+    data: {
+      status: "conflict",
+      scope: `task:${conflict.taskId}`,
+      taskId: conflict.taskId,
+      expectedSeq: conflict.expectedSeq,
+      currentSeq: conflict.currentSeq,
+      delta: conflict.delta.map((fact) => ({
+        seq: fact.seq,
+        kind: fact.kind,
+        by: fact.by,
+        source: fact.source,
+        payload: fact.payload,
+        createdAt: fact.createdAt.toISOString(),
+        description: describeFact(fact, { full: true }),
+      })),
+    },
+  };
 }
 
 /** Append one decision, or say why not. */
@@ -44,14 +71,11 @@ export function writeDecision(
 ): ActionResult {
   const ledger = createLedgerRepository(appContext.db);
   const loaded = loadOpenTask(appContext, input.taskId, input.seenSeq);
-  if (!loaded.ok) return { status: "error", error: loaded.error };
-  const written = ledger.appendIfLatest(
+  if (!loaded.ok) return loaded.result;
+  const result = ledger.compareAndAppend(input.taskId, input.seenSeq, [
     { ...input.fact, taskId: input.taskId, by: ORCHESTRATOR, source: input.source } as NewFact,
-    input.seenSeq,
-  );
-  if (!written) {
-    const again = loadOpenTask(appContext, input.taskId, input.seenSeq);
-    return { status: "error", error: again.ok ? "The ledger changed while writing; decide again." : again.error };
-  }
+  ]);
+  if (result.status === "conflict") return conflictActionResult(result);
+  const written = result.facts[0];
   return { status: "ok", data: { taskId: written.taskId, wrote: written.kind, seq: written.seq } };
 }

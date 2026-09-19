@@ -3,7 +3,7 @@ import type { CoreComposition } from "../../lib/composition.js";
 import { createLedgerRepository } from "../../db/repositories/ledger.js";
 import { createLockRepository, orchestrateLock } from "../../db/repositories/lock.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
-import { ORCHESTRATOR, RUNTIME } from "../../lib/facts.js";
+import { RUNTIME, type NewFact } from "../../lib/facts.js";
 import { fold, foldTask, needsAttention } from "../../lib/fold.js";
 import { buildOrchestratorPrompt } from "../../lib/prompts.js";
 import { readSummonOutput } from "../run-worker/index.js";
@@ -77,10 +77,10 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
           decided = after.lastDecisionSeq > task.lastDecisionSeq || after.state !== "open";
         }
         if (!decided) {
-          // No decision was recorded. Note the reply so the same facts do not
-          // wake it again; a person can see what it thought.
-          const note = error ? `Orchestrator wake failed: ${error}` : `No decision was recorded. Orchestrator said: ${reply.trim() || "(nothing)"}`;
-          ledger.append({ taskId, kind: "Noted", by: ORCHESTRATOR, source: "conductor:wake_task_coordinator, no decision action was called", payload: { note } });
+          // The runtime observed a failed/incomplete wake; it must not turn that
+          // observation into an orchestrator-authored decision. Keeping this as
+          // an unseen runtime Event also leaves the Task eligible for retry.
+          ledger.append(coordinatorWakeMissedFact(taskId, { error, reply }));
         }
         log.info("orchestrator wake finished", { taskId, decided, error });
         return { status: "ok", data: { taskId, decided, decision: decided ? after.lastDecision?.kind : undefined, error } };
@@ -89,4 +89,36 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
       }
     },
   };
+}
+
+/** A wake that produced no durable decision is runtime evidence, never an Agent decision. */
+export function coordinatorWakeMissedFact(
+  taskId: string,
+  result: { error?: string; reply?: string },
+): NewFact {
+  const error = result.error?.trim();
+  const reply = result.reply?.trim();
+  return {
+    taskId,
+    kind: "Event",
+    by: RUNTIME,
+    source: "conductor:wake_task_coordinator",
+    payload: error
+      ? {
+          source: "runtime",
+          type: "coordinator_wake_failed",
+          summary: `Task coordinator wake failed; runtime will retry. ${clip(error)}`,
+          data: { error },
+        }
+      : {
+          source: "runtime",
+          type: "coordinator_no_decision",
+          summary: `Task coordinator returned without recording a decision; runtime will retry.${reply ? ` Previous reply: ${clip(reply)}` : ""}`,
+          ...(reply ? { data: { reply } } : {}),
+        },
+  };
+}
+
+function clip(value: string, max = 600): string {
+  return value.length > max ? `${value.slice(0, max)}…` : value;
 }

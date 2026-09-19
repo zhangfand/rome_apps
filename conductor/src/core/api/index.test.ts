@@ -93,6 +93,28 @@ describe("front desk shadow reads", () => {
   });
 });
 
+describe("person Task writes", () => {
+  it("requires a Task revision and maps a conditional-write conflict to HTTP 409", async () => {
+    const { sqlite, handler, actions } = configuredHandler(
+      { projects: { app: { workspace: "none" } }, defaultProject: "app" },
+      async () => ({
+        status: "ok" as const,
+        data: { status: "conflict", scope: "task:t-1", taskId: "t-1", expectedSeq: 1, currentSeq: 2, delta: [{ seq: 2, kind: "Event" }] },
+      }),
+    );
+
+    const missing = await handler.handle(apiRequest("POST", ["tasks", "t-1", "reply"], { text: "continue" }));
+    expect(missing.status).toBe(400);
+    expect(actions).toEqual([]);
+
+    const stale = await handler.handle(apiRequest("POST", ["tasks", "t-1", "reply"], { text: "continue", seenSeq: 1 }));
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ status: "conflict", currentSeq: 2, delta: [{ seq: 2 }] });
+    expect(actions).toEqual(["conductor:record_person_reply"]);
+    sqlite.close();
+  });
+});
+
 describe("configuration writes", () => {
   it("lets only the guardian browse host directories", async () => {
     const { sqlite, handler } = configuredHandler(undefined);
@@ -168,7 +190,7 @@ function configRequest(method: "GET" | "PATCH", body?: unknown): RomeAppApiReque
   return apiRequest(method, ["config"], body);
 }
 
-function apiRequest(method: "GET" | "PATCH", path: string[], body?: unknown): RomeAppApiRequest {
+function apiRequest(method: "GET" | "PATCH" | "POST", path: string[], body?: unknown): RomeAppApiRequest {
   return {
     method, path, headers: {}, query: new URLSearchParams(),
     caller: { kind: "guardian", userId: "g1", via: "cookie" },
@@ -194,7 +216,10 @@ const initialConfig = {
   maxDecisionsPerTurn: 25,
 };
 
-function configuredHandler(rawConfig?: Record<string, unknown>) {
+function configuredHandler(
+  rawConfig?: Record<string, unknown>,
+  runActionOverride?: (name: string, args: Record<string, unknown>) => Promise<{ status: "ok"; data?: unknown }>,
+) {
   const sqlite = new Database(":memory:");
   sqlite.exec(`
     CREATE TABLE conductor__facts (seq integer PRIMARY KEY AUTOINCREMENT NOT NULL, id text NOT NULL, task_id text NOT NULL, kind text NOT NULL, by text NOT NULL, source text, payload text NOT NULL, created_at integer NOT NULL);
@@ -242,7 +267,10 @@ function configuredHandler(rawConfig?: Record<string, unknown>) {
     db: { connection: drizzle(sqlite), tablePrefix: "conductor", tableName: (name: string) => `conductor__${name}` },
     log: { error: () => undefined, info: () => undefined },
     listRoutines: async () => [],
-    runAction: async (name: string) => { actions.push(name); return { status: "ok", data: {} }; },
+    runAction: async (name: string, args: Record<string, unknown>) => {
+      actions.push(name);
+      return runActionOverride ? runActionOverride(name, args) : { status: "ok" as const, data: {} };
+    },
   } as unknown as RomeAppContext;
   return { sqlite, handler: createApiHandler(ctx, composition), actions };
 }

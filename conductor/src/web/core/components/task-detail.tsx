@@ -73,16 +73,21 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
   }, [historyView]);
 
   const send = async () => {
-    if (!reply.trim()) return;
+    if (!reply.trim() || !task) return;
     setSending(true);
     setError(null);
     try {
       const response = await fetchAppApi(`tasks/${encodeURIComponent(taskId)}/reply`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: reply }),
+        body: JSON.stringify({ text: reply, seenSeq: task.latest.seq }),
       });
       if (!response.ok) {
+        if (response.status === 409) {
+          await load();
+          setError("This task changed before your reply was recorded. Review the new activity and send it again if it still applies.");
+          return;
+        }
         setError(await responseError(response));
         return;
       }
@@ -94,11 +99,21 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
   };
 
   const closeTask = async (action: "complete" | "cancel") => {
+    if (!task) return;
     setSending(true);
     setError(null);
     try {
-      const response = await fetchAppApi(`tasks/${encodeURIComponent(taskId)}/${action}`, { method: "POST" });
+      const response = await fetchAppApi(`tasks/${encodeURIComponent(taskId)}/${action}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ seenSeq: task.latest.seq }),
+      });
       if (!response.ok) {
+        if (response.status === 409) {
+          await load();
+          setError("This task changed before it could be closed. Review the new activity and try again if closing it still applies.");
+          return;
+        }
         setError(await responseError(response));
         return;
       }

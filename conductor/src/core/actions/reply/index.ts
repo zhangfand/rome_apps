@@ -4,7 +4,8 @@ import type {
   ActionResult,
   AppActionRuntimeDeps,
 } from "@rome-os/app-runtime";
-import { loadTask, rejectIfClosed, writePersonFact } from "../../lib/person-fact.js";
+import { writePersonFact } from "../../lib/person-fact.js";
+import { loadOpenTask } from "../../lib/decision.js";
 
 /**
  * A person's words on an open task. The orchestrator is woken to read them;
@@ -22,6 +23,10 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
           type: "string",
           description: "Task this answers. Read it from conductor:list_tasks.",
         },
+        seenSeq: {
+          type: "number",
+          description: "The seq of the newest fact on this Task when the person's message was resolved.",
+        },
         text: {
           type: "string",
           description: "What the person said, as an instruction or answer, in a sentence or two.",
@@ -31,7 +36,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
           description: "The person's message, verbatim. Recorded as the fact's citation.",
         },
       },
-      required: ["taskId", "text", "source"],
+      required: ["taskId", "seenSeq", "text", "source"],
       additionalProperties: false,
     },
 
@@ -39,23 +44,23 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       const taskId = String(args.taskId ?? "").trim();
       const text = String(args.text ?? "").trim();
       const source = String(args.source ?? "").trim();
+      const seenSeq = Number(args.seenSeq);
       if (!taskId) return { status: "error", error: "taskId is required" };
+      if (!Number.isInteger(seenSeq)) return { status: "error", error: "seenSeq is required" };
       if (!text) return { status: "error", error: "text is required" };
       if (!source) {
         return { status: "error", error: "source is required: pass the person's message verbatim" };
       }
 
-      const found = loadTask(appContext, taskId);
-      if (!found.ok) return { status: "error", error: found.error };
-      const closed = rejectIfClosed(found.task);
-      if (closed) return { status: "error", error: closed };
+      const found = loadOpenTask(appContext, taskId, seenSeq);
+      if (!found.ok) return found.result;
 
       return await writePersonFact(appContext, {
         taskId,
         kind: "Reply",
         source,
         payload: { text },
-      });
+      }, seenSeq);
     },
   };
 }

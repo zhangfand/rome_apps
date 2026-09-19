@@ -1,5 +1,5 @@
 import type { Action, ActionConfig, ActionResult, AppActionRuntimeDeps } from "@rome-os/app-runtime";
-import { loadOpenTask, readDecisionInput } from "../../lib/decision.js";
+import { conflictActionResult, loadOpenTask, readDecisionInput } from "../../lib/decision.js";
 import { createLedgerRepository } from "../../db/repositories/ledger.js";
 import { ORCHESTRATOR } from "../../lib/facts.js";
 
@@ -27,14 +27,15 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       if (!input.ok) return { status: "error", error: input.error };
       const why = String(args.why ?? "").trim() || "stopped by orchestrator";
       const loaded = loadOpenTask(appContext, input.taskId, input.seenSeq);
-      if (!loaded.ok) return { status: "error", error: loaded.error };
+      if (!loaded.ok) return loaded.result;
       const worker = loaded.task.liveWorker;
       if (!worker) return { status: "error", error: "no worker is live on this task" };
-      const written = createLedgerRepository(appContext.db).appendIfLatest({
+      const result = createLedgerRepository(appContext.db).compareAndAppend(input.taskId, input.seenSeq, [{
         taskId: input.taskId, kind: "Lost", by: ORCHESTRATOR, source: "conductor:stop_worker",
         payload: { ...(worker.jobId ? { jobId: worker.jobId } : {}), workerId: worker.workerId, why: `stopped by orchestrator: ${why}` },
-      }, input.seenSeq);
-      if (!written) return { status: "error", error: "The ledger changed while writing; read it and decide again." };
+      }]);
+      if (result.status === "conflict") return conflictActionResult(result);
+      const written = result.facts[0];
       return { status: "ok", data: { taskId: input.taskId, stopped: worker.workerId, seq: written.seq, seenSeq: written.seq } };
     },
   };
