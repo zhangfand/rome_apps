@@ -3,7 +3,7 @@ description: >-
   Product manager for one feature. Researches broad or ambiguous intent and
   turns it into a bounded, implementation-ready spec in the project's agent
   work repository before engineering begins.
-tier: medium
+tier: large
 reasoningEffort: high
 permissionMode: bypassPermissions
 tools:

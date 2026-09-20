@@ -82,6 +82,7 @@ describe("Conductor agent boundaries", () => {
 
   it("does not give the PM the global action catalog", () => {
     const pm = read("pm.yaml");
+    expect(pm).toContain("tier: large");
     expect(pm).not.toMatch(/actions:\s*\n\s*-\s*["']?\*["']?/);
     expect(pm).toContain("one bounded PM Job");
     expect(pm).toContain("## Product responsibility");
