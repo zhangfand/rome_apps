@@ -172,9 +172,12 @@ turn, Conductor records Jev's typed intent / task / project decision together
 with the person fact the LLM actually wrote, if any.
 
 Shadow evaluation is enabled in app configuration by default but makes no
-external request unless the Rome process has a `TYPESAFE_API_KEY` environment
-variable. The key is read from the process environment and is never stored in
-Conductor's config or database. Disable the experiment with:
+external request unless Rome has a `TYPESAFE_API_KEY`. Add or replace it from
+Conductor's **Shadow** page. Rome stores the guardian-entered value as an app
+key, never returns the value to Conductor's UI, injects it into the app runtime,
+and reloads the shadow hook without a restart. An operator-supplied process
+environment variable with the same name takes precedence. Disable the
+experiment with:
 
 ```json
 {
@@ -189,6 +192,30 @@ The report treats a no-write LLM turn as agreement with Jev's `ask_status`,
 ledger alone. Shadow rows include the user's input and compact open-task state,
 so enabling the experiment sends that state to TypeSafe and keeps a local copy
 for evaluation.
+
+### Hybrid Engineer Lead routing
+
+Before the Engineer Lead's first decision, Conductor asks Jev five atomic,
+typed questions about product readiness, acceptance clarity, technical
+uncertainty, scope shape, and the likely first handler. Deterministic policy
+combines those answers with conservative confidence gates and injects the
+result into the lead's wake prompt. Jev never writes a Job: the lead LLM still
+owns the decision and generates the PM, coding, or investigation handoff. Later
+wakes stay entirely with the lead because they require planning and evidence
+reconciliation rather than classification.
+
+The router is enabled by default when the TypeSafe app key or environment
+variable is present and fails open to the lead LLM. Configure it independently
+from the front-desk shadow:
+
+```json
+{
+  "leadRouting": { "enabled": false, "model": "jev-latest" }
+}
+```
+
+See [docs/engineer-lead-routing.md](docs/engineer-lead-routing.md) for the
+decision policy and the Jev/LLM boundary.
 
 ### PM worker
 

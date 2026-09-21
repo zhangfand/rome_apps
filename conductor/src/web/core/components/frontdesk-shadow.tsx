@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { fetchAppApi } from "@rome-os/app-web-sdk";
 import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
 import { Badge } from "@rome-os/ui/badge";
 import { Button } from "@rome-os/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@rome-os/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@rome-os/ui/card";
 import { EmptyState, EmptyStateDescription, EmptyStateTitle } from "@rome-os/ui/empty-state";
+import { Field, FieldDescription, FieldLabel } from "@rome-os/ui/field";
 import { Input } from "@rome-os/ui/input";
 import { Section, SectionDescription, SectionHeader, SectionHeading, SectionTitle } from "@rome-os/ui/page";
 import { SegmentedControl } from "@rome-os/ui/segmented-control";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rome-os/ui/table";
+import { readJevApiKey, saveJevApiKey, type AppKeyMetadata } from "../lib/app-keys";
 import { formatStamp, truncate } from "../lib/format";
 import type { FrontdeskShadowReport, FrontdeskShadowRun } from "../lib/types";
 
@@ -99,12 +101,7 @@ export function FrontdeskShadow() {
           <Button variant="outline" size="sm" disabled={loading} onClick={() => void load()}>{loading ? "Refreshing…" : "Refresh"}</Button>
         </SectionHeader>
 
-        <Alert>
-          <AlertTitle>Credentials stay outside Conductor</AlertTitle>
-          <AlertDescription>
-            Provide <code className="rounded bg-surface-muted px-1.5 font-mono">TYPESAFE_API_KEY</code> through Rome's deployment environment. This app intentionally never accepts, displays, or stores the key. Rows marked “No key” confirm that a turn was observed but not sent to Jev.
-          </AlertDescription>
-        </Alert>
+        <JevApiKeyCard />
       </Section>
 
       {error && (
@@ -144,6 +141,122 @@ export function FrontdeskShadow() {
         </div>
       </Section>
     </div>
+  );
+}
+
+function JevApiKeyCard() {
+  const [metadata, setMetadata] = useState<AppKeyMetadata | undefined>();
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setMetadata(await readJevApiKey());
+      setError(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The Jev API key status could not be read.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!value) {
+      setError("Enter a Jev API key.");
+      return;
+    }
+    setSaving(true);
+    setSaved(false);
+    try {
+      await saveJevApiKey(value);
+      setValue("");
+      setEditing(false);
+      setSaved(true);
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The Jev API key could not be saved.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancel = () => {
+    setValue("");
+    setEditing(false);
+    setError(null);
+  };
+
+  const status = loading ? "Checking…" : metadata?.overridden ? "Environment override" : metadata ? "Connected" : "Not configured";
+  const tone: "warning" | "success" | "muted" = metadata?.overridden ? "warning" : metadata ? "success" : "muted";
+
+  return (
+    <Card className="gap-4 py-5">
+      <CardHeader className="px-5">
+        <div>
+          <CardTitle>Jev API key</CardTitle>
+          <CardDescription className="mt-1">
+            Stored by Rome as an app key. The value is hidden after saving and becomes available to Conductor without a restart.
+          </CardDescription>
+        </div>
+        <CardAction><Badge variant={tone}>{status}</Badge></CardAction>
+      </CardHeader>
+      <CardContent className="px-5">
+        {editing ? (
+          <form className="flex flex-col gap-3" onSubmit={(event) => void save(event)}>
+            <Field>
+              <FieldLabel htmlFor="jev-api-key">API key</FieldLabel>
+              <Input
+                id="jev-api-key"
+                type="password"
+                value={value}
+                onChange={(event) => { setValue(event.target.value); setError(null); }}
+                autoComplete="off"
+                autoFocus
+                placeholder="Paste your TypeSafe key"
+                className="max-w-xl font-mono"
+              />
+              <FieldDescription>Conductor sends compact front-desk state and the current message to TypeSafe while shadow mode is enabled.</FieldDescription>
+            </Field>
+            {error && <p className="text-ui text-destructive-fg" role="alert">{error}</p>}
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" size="sm" disabled={saving}>{saving ? "Saving…" : "Save key"}</Button>
+              <Button type="button" variant="outline" size="sm" disabled={saving} onClick={cancel}>Cancel</Button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-ui text-muted-foreground">
+              {metadata?.overridden
+                ? "A deployment environment value currently takes precedence. Saving here replaces the stored fallback, not the live override."
+                : metadata
+                  ? <>Saved {formatStamp(metadata.updatedAt)}. Rome never returns the key value to this page.</>
+                  : "Add a key to start Jev shadow evaluations. Until then, observed turns are recorded as No key."}
+            </p>
+            <Button variant="outline" size="sm" disabled={loading} onClick={() => { setEditing(true); setSaved(false); setError(null); }}>
+              {metadata ? "Replace key" : "Add key"}
+            </Button>
+          </div>
+        )}
+        {!editing && error && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertTitle>The key status could not be read.</AlertTitle>
+            <AlertDescription className="flex flex-col items-start gap-3">
+              {error}
+              <Button variant="outline" size="sm" onClick={() => void load()}>Try again</Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        {!editing && saved && !error && <p className="mt-3 text-ui text-success-fg" role="status">Jev API key saved.</p>}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -216,7 +329,7 @@ function ComparisonTable({ runs, waiting, filtered }: { runs: FrontdeskShadowRun
           <EmptyStateDescription>
             {filtered
               ? "Change the filter or search to see other runs."
-              : "Send a message to the Conductor front desk. The next turn will appear here; without an externally configured key it will be marked No key."}
+              : "Send a message to the Conductor front desk. The next turn will appear here; without a configured key it will be marked No key."}
           </EmptyStateDescription>
         </EmptyState>
       )}

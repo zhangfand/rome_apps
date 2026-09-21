@@ -16,6 +16,18 @@ describe("app config composition", () => {
     expect(parsed.config.orchestratorAgent).toBe(DEFAULT_ORCHESTRATOR_AGENT);
     expect(parsed.config.github).toEqual({ intakeLabel: DEFAULT_INTAKE_LABEL });
     expect(parsed.config.frontdeskShadow).toEqual({ enabled: true, model: "jev-latest" });
+    expect(parsed.config.leadRouting).toEqual({ enabled: true, model: "jev-latest" });
+  });
+
+  it("validates Jev lead-routing settings without accepting an endpoint or key", () => {
+    const parsed = parseAppConfig({ ...base, leadRouting: { enabled: false, model: "jev-1.13.0" } });
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(parsed.config.leadRouting).toEqual({ enabled: false, model: "jev-1.13.0" });
+    expect(parseAppConfig({ ...base, leadRouting: "on" })).toEqual({ ok: false, error: "leadRouting must be an object" });
+    expect(parseAppConfig({ ...base, leadRouting: { model: "bad model" } })).toEqual({
+      ok: false,
+      error: "leadRouting.model must be a model id using letters, numbers, dots, underscores, or hyphens",
+    });
   });
 
   it("validates front-desk shadow settings without accepting an endpoint or key", () => {
