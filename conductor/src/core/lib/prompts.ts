@@ -75,8 +75,6 @@ export function buildOrchestratorPrompt(input: {
   defaultWorkspaceKind: string;
   projectNote?: string;
   sharedContracts?: readonly SharedPromptContract[];
-  /** App-owned advisory evidence; the coordinator still owns the decision. */
-  coordinatorAdvice?: string;
 }): string {
   const { task, config, now, why } = input;
   const seenSeq = task.latest.seq;
@@ -95,11 +93,6 @@ export function buildOrchestratorPrompt(input: {
     "## Agents you may create a Job for",
     ...Object.entries(config.workerAgents).map(([agent, description]) => `- \`${agent}\`: ${description}`),
     "",
-    ...(input.coordinatorAdvice ? [
-      "## Fast initial-routing assessment",
-      input.coordinatorAdvice,
-      "",
-    ] : []),
     "## SOP",
     sopFor(config, task.projectId),
     "",

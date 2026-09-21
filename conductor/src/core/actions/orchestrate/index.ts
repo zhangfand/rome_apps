@@ -52,13 +52,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
 
         const snapshot = fold(now, ledger.all());
         const children = snapshot.tasks.filter((candidate) => candidate.parent?.taskId === task.id);
-        let coordinatorAdvice: string | undefined;
-        try {
-          coordinatorAdvice = await composition.coordinatorAdvice?.(task, settings);
-        } catch (error) {
-          log.warn("coordinator advice unavailable; continuing", { taskId, error: error instanceof Error ? error.message : String(error) });
-        }
-        const prompt = buildOrchestratorPrompt({ task, children, config: settings, now, why: attention.why, providerFor: composition.providerFor, defaultWorkspaceKind: composition.defaultWorkspaceKind, projectNote: composition.projectPromptNote?.(task, "orchestrator"), sharedContracts: composition.sharedPromptContracts, coordinatorAdvice });
+        const prompt = buildOrchestratorPrompt({ task, children, config: settings, now, why: attention.why, providerFor: composition.providerFor, defaultWorkspaceKind: composition.defaultWorkspaceKind, projectNote: composition.projectPromptNote?.(task, "orchestrator"), sharedContracts: composition.sharedPromptContracts });
         log.info("waking orchestrator", { taskId, seenSeq: task.latest.seq, why: attention.why });
 
         const taskSessions = createTaskSessionRepository(appContext.db);

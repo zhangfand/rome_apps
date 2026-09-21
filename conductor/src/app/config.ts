@@ -12,7 +12,6 @@ import { DEFAULT_SOP } from "../domain/sop.js";
 import { DEFAULT_INTAKE_LABEL, githubConfigExtensions, githubProject, githubRepo, githubRoot } from "../domain/adapters/github/config.js";
 import { defaultWorkRepo, workRepoFor } from "../domain/work-repo.js";
 import type { ConfigExtensions } from "../core/lib/config.js";
-import type { LeadRoutingConfig } from "../domain/lead-routing/types.js";
 
 const PM_AGENT_DESCRIPTION = "Product manager for broad or ambiguous feature requests. Researches the codebase and product precedents, decides defaults, and writes a bounded, implementation-ready spec in the project's agent work repo. Use before coding when scope or user-visible behavior is not clear; if it returns questions, ask the person and resume the same worker.";
 const LEGACY_ORCHESTRATOR_AGENT = "conductor:orchestrator";
@@ -24,11 +23,6 @@ export interface FrontdeskShadowConfig {
 }
 
 export const DEFAULT_FRONTDESK_SHADOW: FrontdeskShadowConfig = {
-  enabled: true,
-  model: "jev-latest",
-};
-
-export const DEFAULT_LEAD_ROUTING: LeadRoutingConfig = {
   enabled: true,
   model: "jev-latest",
 };
@@ -81,7 +75,6 @@ export const initialAppConfig: ConductorConfig = {
   reuseSessions: DEFAULT_REUSE_SESSIONS,
   maxDecisionsPerTurn: DEFAULT_MAX_DECISIONS_PER_TURN,
   frontdeskShadow: DEFAULT_FRONTDESK_SHADOW,
-  leadRouting: DEFAULT_LEAD_ROUTING,
   github: { intakeLabel: DEFAULT_INTAKE_LABEL },
 };
 
@@ -127,15 +120,6 @@ export const setupSchema = {
       type: "object",
       additionalProperties: false,
       description: "Compare Jev's front-desk routing decision with the existing LLM without changing behavior. Add TYPESAFE_API_KEY from Conductor's Shadow page or the Rome process environment.",
-      properties: {
-        enabled: { type: "boolean" },
-        model: { type: "string" },
-      },
-    },
-    leadRouting: {
-      type: "object",
-      additionalProperties: false,
-      description: "Use Jev's typed judgments as confidence-gated advice for the engineering lead's first handoff. The lead LLM remains authoritative. Add TYPESAFE_API_KEY from Conductor's Shadow page or the Rome process environment.",
       properties: {
         enabled: { type: "boolean" },
         model: { type: "string" },
@@ -190,15 +174,12 @@ function appConfigExtensions(): ConfigExtensions {
       }
       const frontdeskShadow = parseFrontdeskShadow(raw.frontdeskShadow);
       if (!frontdeskShadow.ok) return frontdeskShadow;
-      const leadRouting = parseLeadRouting(raw.leadRouting);
-      if (!leadRouting.ok) return leadRouting;
       return {
         ok: true,
         values: {
           ...(github.values ?? {}),
           ...(owner !== undefined ? { workRepoOwner: parseWorkRepoOwner(owner) } : {}),
           frontdeskShadow: frontdeskShadow.value,
-          leadRouting: leadRouting.value,
         },
       };
     },
@@ -283,27 +264,6 @@ function parseFrontdeskShadow(value: unknown): { ok: true; value: FrontdeskShado
     value: {
       enabled: raw.enabled ?? DEFAULT_FRONTDESK_SHADOW.enabled,
       model: typeof raw.model === "string" ? raw.model : DEFAULT_FRONTDESK_SHADOW.model,
-    },
-  };
-}
-
-function parseLeadRouting(value: unknown): { ok: true; value: LeadRoutingConfig } | { ok: false; error: string } {
-  if (value === undefined) return { ok: true, value: DEFAULT_LEAD_ROUTING };
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return { ok: false, error: "leadRouting must be an object" };
-  }
-  const raw = value as Record<string, unknown>;
-  if (raw.enabled !== undefined && typeof raw.enabled !== "boolean") {
-    return { ok: false, error: "leadRouting.enabled must be a boolean" };
-  }
-  if (raw.model !== undefined && (typeof raw.model !== "string" || !/^[A-Za-z0-9._-]+$/.test(raw.model))) {
-    return { ok: false, error: "leadRouting.model must be a model id using letters, numbers, dots, underscores, or hyphens" };
-  }
-  return {
-    ok: true,
-    value: {
-      enabled: raw.enabled ?? DEFAULT_LEAD_ROUTING.enabled,
-      model: typeof raw.model === "string" ? raw.model : DEFAULT_LEAD_ROUTING.model,
     },
   };
 }

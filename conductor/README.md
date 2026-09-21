@@ -193,30 +193,6 @@ ledger alone. Shadow rows include the user's input and compact open-task state,
 so enabling the experiment sends that state to TypeSafe and keeps a local copy
 for evaluation.
 
-### Hybrid Engineer Lead routing
-
-Before the Engineer Lead's first decision, Conductor asks Jev five atomic,
-typed questions about product readiness, acceptance clarity, technical
-uncertainty, scope shape, and the likely first handler. Deterministic policy
-combines those answers with conservative confidence gates and injects the
-result into the lead's wake prompt. Jev never writes a Job: the lead LLM still
-owns the decision and generates the PM, coding, or investigation handoff. Later
-wakes stay entirely with the lead because they require planning and evidence
-reconciliation rather than classification.
-
-The router is enabled by default when the TypeSafe app key or environment
-variable is present and fails open to the lead LLM. Configure it independently
-from the front-desk shadow:
-
-```json
-{
-  "leadRouting": { "enabled": false, "model": "jev-latest" }
-}
-```
-
-See [docs/engineer-lead-routing.md](docs/engineer-lead-routing.md) for the
-decision policy and the Jev/LLM boundary.
-
 ### PM worker
 
 `conductor:pm` is a specialist worker whose complete role, judgment boundary,

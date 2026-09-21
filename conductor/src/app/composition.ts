@@ -10,8 +10,6 @@ import { createWorkRepoConfigRoute, setupWorkRepoConfigRoute } from "../domain/c
 import { githubRepositoriesConfigRoute } from "../domain/config/github-repositories.js";
 import { PRODUCT_SPEC_PROMPT_CONTRACT } from "../domain/product-spec-contract.js";
 import { WORK_REPO_PROMPT_CONTRACT } from "../domain/work-repo-contract.js";
-import { initialLeadRoutingAdvice } from "../domain/lead-routing/advice.js";
-import type { LeadRoutingConfig } from "../domain/lead-routing/types.js";
 
 export const APP_COMPOSITION: CoreComposition = {
   parseConfig: parseAppConfig,
@@ -21,7 +19,6 @@ export const APP_COMPOSITION: CoreComposition = {
   providerFor,
   setupSchema,
   projectPromptNote: (task, audience) => `${githubPromptNote(task, audience)}${workRepoPromptNote(task, audience)}`,
-  coordinatorAdvice: (task, config) => initialLeadRoutingAdvice(task, config.leadRouting as LeadRoutingConfig | undefined, "git-worktree"),
   sharedPromptContracts: [PRODUCT_SPEC_PROMPT_CONTRACT, WORK_REPO_PROMPT_CONTRACT],
   projectPresentation: githubPresentation,
   mergeConfig: mergeAppConfig,

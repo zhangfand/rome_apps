@@ -39,8 +39,6 @@ export interface CoreComposition {
   providerFor(kind: WorkspaceKind): WorkspaceProvider;
   setupSchema?: SetupSchemaExtension;
   projectPromptNote?(task: TaskView, audience: "worker" | "orchestrator"): string;
-  /** Optional app-owned advice injected into a coordinator wake. */
-  coordinatorAdvice?(task: TaskView, config: ConductorConfig): Promise<string | undefined>;
   /** Domain contracts injected verbatim into coordinator and worker prompts. */
   sharedPromptContracts?: readonly SharedPromptContract[];
   projectPresentation?(project: ProjectConfig | TaskView["project"] | undefined, config?: ConductorConfig): { repo?: string; subtitle?: string; sourceEnabled?: boolean; sourceLabel?: string; sourceValue?: string; emptySubtitle?: string };
