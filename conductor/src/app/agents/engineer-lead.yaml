@@ -3,7 +3,7 @@ description: >-
   Owns one software delivery from the person's request to a reviewed,
   CI-green result ready for the person to merge. Delegates product definition
   to PM when needed and materializes only engineering work that is runnable now.
-tier: medium
+tier: large
 reasoningEffort: high
 permissionMode: bypassPermissions
 tools:

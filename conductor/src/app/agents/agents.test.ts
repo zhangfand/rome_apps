@@ -16,6 +16,10 @@ describe("Conductor agent boundaries", () => {
     expect(manifest).not.toContain("app/skills/pm");
   });
 
+  it("runs the engineering lead on the large model tier", () => {
+    expect(read("engineer-lead.yaml")).toContain("tier: large");
+  });
+
   it("relies on online reviewers and handles their feedback through respond-to-review", () => {
     const lead = read("engineer-lead.yaml");
     const prose = lead.replace(/\s+/g, " ");
