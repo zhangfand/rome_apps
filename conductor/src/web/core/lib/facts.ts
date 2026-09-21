@@ -141,6 +141,20 @@ export function authorLabel(by: string, kind?: string): string {
   return webDomain().authorLabel(by, kind) ?? "you";
 }
 
+/** Resolve a stored role/id to the concrete identity shown in Activity. */
+export function activityAuthorLabel(
+  fact: Pick<FactJson, "by" | "kind">,
+  coordinatorAgent: string | undefined,
+  workerAgents: ReadonlyMap<string, string>,
+): string {
+  const role = authorLabel(fact.by, fact.kind);
+  if (role === "conductor") return coordinatorAgent || role;
+  if (role === "worker") return workerAgents.get(fact.by) || role;
+  // Person facts are stored with the guardian/channel user id. Showing that id
+  // is more useful here than collapsing every person to the generic "you".
+  return role === "you" ? fact.by : role;
+}
+
 export function authorLane(fact: FactJson): 1 | 2 | 3 | 4 {
   if (fact.kind === "Event" || fact.by === "runtime") return 4;
   const author = authorLabel(fact.by, fact.kind);

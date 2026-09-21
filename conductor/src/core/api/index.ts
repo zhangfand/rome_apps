@@ -311,13 +311,16 @@ function runtimeControlJson(control: RuntimeControl) {
 
 function taskSummary(task: TaskView, now: Date, composition: CoreComposition, config?: ConductorConfig, storedSessions: TaskSessionRef[] = []) {
   const attention = needsAttention(task, now);
+  const presentation = composition.projectPresentation?.(task.project, config);
   return {
     id: task.id,
     brief: task.brief,
     projectId: task.projectId,
-    repo: composition.projectPresentation?.(task.project, config)?.repo,
-    projectSubtitle: composition.projectPresentation?.(task.project, config)?.repo,
+    repo: presentation?.repo,
+    projectSubtitle: presentation?.repo,
+    workRepo: presentation?.workRepo,
     createdBy: task.createdBy,
+    coordinatorAgent: config?.orchestratorAgent,
     createdAt: task.facts[0].createdAt.toISOString(),
     updatedAt: task.latest.createdAt.toISOString(),
     state: task.state,

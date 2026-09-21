@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@rstest/core";
 import type { FactJson } from "./types.js";
-import { workerSessions } from "./workers.js";
+import { workerAgentNames, workerSessions } from "./workers.js";
 
 const fact = (seq: number, kind: string, payload: Record<string, unknown>): FactJson => ({
   seq,
@@ -29,5 +29,20 @@ describe("workerSessions", () => {
     expect(workerSessions([
       fact(1, "Opened", { workerId: "w-1", romeSessionId: "s" }),
     ]).size).toBe(0);
+  });
+});
+
+describe("workerAgentNames", () => {
+  it("maps worker ids to the concrete agent used for each dispatch", () => {
+    const agents = workerAgentNames([
+      fact(1, "Dispatched", { workerId: "w-1", agent: "coding:coding" }),
+      fact(2, "Dispatched", { workerId: "w-2", agent: "conductor:pm" }),
+      fact(3, "Returned", { workerId: "w-1" }),
+    ]);
+
+    expect([...agents]).toEqual([
+      ["w-1", "coding:coding"],
+      ["w-2", "conductor:pm"],
+    ]);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@rstest/core";
-import { authorLabel, bucketTask, factLabel, taskStateLabel } from "./facts.js";
+import { activityAuthorLabel, authorLabel, bucketTask, factLabel, taskStateLabel } from "./facts.js";
 import type { FactJson, TaskSummary } from "./types.js";
 
 const item = (kind: string, payload: Record<string, unknown> = {}): FactJson => ({
@@ -78,5 +78,13 @@ describe("user-facing label maps", () => {
     expect(authorLabel("source:octo")).toBe("source");
     expect(authorLabel("runtime", "Event")).toBe("runtime");
     expect(authorLabel("guardian-id")).toBe("you");
+  });
+
+  it("resolves Activity authors to concrete agent and person identities", () => {
+    const workers = new Map([["w-12ab34cd", "coding:coding"]]);
+    expect(activityAuthorLabel({ by: "orchestrator", kind: "Reported" }, "conductor:engineer-lead", workers)).toBe("conductor:engineer-lead");
+    expect(activityAuthorLabel({ by: "w-12ab34cd", kind: "Returned" }, undefined, workers)).toBe("coding:coding");
+    expect(activityAuthorLabel({ by: "guardian-id", kind: "Reply" }, undefined, workers)).toBe("guardian-id");
+    expect(activityAuthorLabel({ by: "source:octo", kind: "Created" }, undefined, workers)).toBe("source");
   });
 });

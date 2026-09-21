@@ -15,7 +15,10 @@ export interface TaskSummary {
   projectId?: string;
   repo?: string;
   projectSubtitle?: string;
+  workRepo?: { repo: string; url: string };
   createdBy: string;
+  /** Agent id configured to coordinate this task (for example conductor:engineer-lead). */
+  coordinatorAgent?: string;
   createdAt: string;
   updatedAt: string;
   state: "open" | "completed" | "cancelled";
@@ -80,7 +83,7 @@ export interface ConfigJson {
   maxDecisionsPerTurn: number;
 }
 
-export interface ProjectPresentation { repo?: string; subtitle?: string; sourceEnabled?: boolean; sourceLabel?: string; sourceValue?: string; emptySubtitle?: string }
+export interface ProjectPresentation { repo?: string; subtitle?: string; workRepo?: { repo: string; url: string }; sourceEnabled?: boolean; sourceLabel?: string; sourceValue?: string; emptySubtitle?: string }
 
 export interface RuntimeJson {
   heartbeatLeaseSeconds: number;

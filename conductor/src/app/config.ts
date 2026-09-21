@@ -128,14 +128,17 @@ export const setupSchema = {
   },
 };
 
-export function githubPresentation(project: Parameters<typeof githubProject>[0], config?: ConductorConfig): { repo?: string; subtitle?: string; sourceEnabled?: boolean; sourceLabel?: string; sourceValue?: string; emptySubtitle?: string } {
+export function githubPresentation(project: Parameters<typeof githubProject>[0], config?: ConductorConfig): { repo?: string; subtitle?: string; workRepo?: { repo: string; url: string }; sourceEnabled?: boolean; sourceLabel?: string; sourceValue?: string; emptySubtitle?: string } {
   const github = githubProject(project);
   const repo = githubRepo(project);
-  if (!repo) return { sourceLabel: "intake", emptySubtitle: "no repository · chat intake only" };
+  const workRepo = workRepoFor(project);
+  const workRepoLink = workRepo ? { repo: workRepo.repo, url: `https://github.com/${workRepo.repo}` } : undefined;
+  if (!repo) return { workRepo: workRepoLink, sourceLabel: "intake", emptySubtitle: "no repository · chat intake only" };
   const labels = [github?.intakeLabel ?? (config ? githubRoot(config).intakeLabel : DEFAULT_INTAKE_LABEL), github?.projectLabel].filter(Boolean);
   return {
     repo,
     subtitle: `${repo} · ${labels.length === 1 ? "label" : "labels"} ${labels.map((label) => `“${label}”`).join(" + ")}`,
+    workRepo: workRepoLink,
     sourceEnabled: github?.enabled !== false,
     sourceLabel: "intake",
     sourceValue: labels.join(" + "),

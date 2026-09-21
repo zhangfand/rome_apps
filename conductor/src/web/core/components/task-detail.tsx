@@ -12,9 +12,11 @@ import { Switch } from "@rome-os/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rome-os/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@rome-os/ui/tabs";
 import { Textarea } from "@rome-os/ui/textarea";
+import { ExternalLink } from "lucide-react";
 import { LightMarkdown } from "./light-markdown";
 import {
   attentionText,
+  activityAuthorLabel,
   authorLabel,
   authorLane,
   expandedTextLabel,
@@ -31,7 +33,7 @@ import {
 } from "../lib/facts";
 import { formatRelative, formatStamp, formatTime } from "../lib/format";
 import type { FactJson, TaskDetailJson, TaskSummary } from "../lib/types";
-import { workerSessions, type WorkerSession } from "../lib/workers";
+import { workerAgentNames, workerSessions, type WorkerSession } from "../lib/workers";
 import { webDomain } from "../domain";
 import { StateChip, taskTitle } from "./board";
 import { WorkerLink } from "./worker-link";
@@ -149,6 +151,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
   const visible = task.facts.filter((item) => !(hideRoutine && isRoutine(item)));
   const rounds = groupRounds(visible);
   const sessions = workerSessions(task.facts);
+  const workerAgents = workerAgentNames(task.facts);
   const recent = task.facts.filter((item) => !isRoutine(item)).slice(-3).reverse();
   const now = Date.now();
   const created = task.facts.find((item) => item.kind === "Created");
@@ -260,11 +263,11 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
             </div>
           </div>
           {historyView === "Stream" ? (
-            <StreamView rounds={rounds} sessions={sessions} openEntries={openEntries} toggle={(seq) => setOpenEntries((current) => toggleSet(current, seq))} />
+            <StreamView rounds={rounds} sessions={sessions} workerAgents={workerAgents} coordinatorAgent={task.coordinatorAgent} openEntries={openEntries} toggle={(seq) => setOpenEntries((current) => toggleSet(current, seq))} />
           ) : historyView === "Lanes" ? (
-            <LanesView entries={visible} sessions={sessions} />
+            <LanesView entries={visible} sessions={sessions} workerAgents={workerAgents} coordinatorAgent={task.coordinatorAgent} />
           ) : (
-            <TableView entries={visible} sessions={sessions} openEntries={openEntries} toggle={(seq) => setOpenEntries((current) => toggleSet(current, seq))} />
+            <TableView entries={visible} sessions={sessions} workerAgents={workerAgents} coordinatorAgent={task.coordinatorAgent} openEntries={openEntries} toggle={(seq) => setOpenEntries((current) => toggleSet(current, seq))} />
           )}
         </TabsContent>
 
@@ -274,9 +277,18 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
         </TabsContent>
 
         <TabsContent value="Work" className="flex flex-col gap-3.5 pt-2">
-          <div>
-            <h2 className="text-title">Linked work</h2>
-            <p className="mt-1 text-ui text-muted-foreground">Pull requests and other deliverables connected to this task appear here.</p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-title">Linked work</h2>
+              <p className="mt-1 text-ui text-muted-foreground">Pull requests and other deliverables connected to this task appear here.</p>
+            </div>
+            {task.workRepo && (
+              <Button asChild variant="outline" size="sm">
+                <a href={task.workRepo.url} target="_blank" rel="noopener noreferrer" title={task.workRepo.repo}>
+                  Open work repo <ExternalLink className="size-3.5" aria-hidden />
+                </a>
+              </Button>
+            )}
           </div>
           {webDomain().taskDetailPanels.map((Panel, index) => (
             <Panel key={Panel.displayName ?? Panel.name ?? index} taskId={taskId} task={task} />
@@ -370,7 +382,7 @@ function ReplyComposer({ composerRef, reply, setReply, sending, error, onSend, o
   );
 }
 
-function StreamView({ rounds, sessions, openEntries, toggle }: { rounds: Array<{ stamp: string; entries: FactJson[] }>; sessions: ReadonlyMap<string, WorkerSession>; openEntries: Set<number>; toggle: (seq: number) => void }) {
+function StreamView({ rounds, sessions, workerAgents, coordinatorAgent, openEntries, toggle }: { rounds: Array<{ stamp: string; entries: FactJson[] }>; sessions: ReadonlyMap<string, WorkerSession>; workerAgents: ReadonlyMap<string, string>; coordinatorAgent?: string; openEntries: Set<number>; toggle: (seq: number) => void }) {
   return (
     <div className="flex flex-col gap-4">
       {rounds.map((round, index) => (
@@ -387,7 +399,7 @@ function StreamView({ rounds, sessions, openEntries, toggle }: { rounds: Array<{
                 <div className="flex flex-col gap-[3px]">
                   <span className="font-mono text-[11px] text-subtle-foreground">#{item.seq} · {formatTime(item.createdAt)}</span>
                   {item.kind !== "Event" && (
-                    <FactAuthor item={item} sessions={sessions} className={cn("font-mono text-[10.5px] font-semibold", who === "you" ? "text-info-fg" : who === "conductor" ? "text-foreground" : "text-muted-foreground")} />
+                    <FactAuthor item={item} sessions={sessions} workerAgents={workerAgents} coordinatorAgent={coordinatorAgent} className={cn("font-mono text-[10.5px] font-semibold", who === "you" ? "text-info-fg" : who === "conductor" ? "text-foreground" : "text-muted-foreground")} />
                   )}
                 </div>
                 <div className="flex min-w-0 flex-col gap-[5px]">
@@ -420,13 +432,13 @@ function StreamView({ rounds, sessions, openEntries, toggle }: { rounds: Array<{
   );
 }
 
-function LanesView({ entries, sessions }: { entries: FactJson[]; sessions: ReadonlyMap<string, WorkerSession> }) {
+function LanesView({ entries, sessions, workerAgents, coordinatorAgent }: { entries: FactJson[]; sessions: ReadonlyMap<string, WorkerSession>; workerAgents: ReadonlyMap<string, string>; coordinatorAgent?: string }) {
   const laneClass = { 1: "col-start-1", 2: "col-start-2", 3: "col-start-3", 4: "col-start-4" } as const;
   return (
     <Card className="overflow-x-auto px-3.5">
       <div className="min-w-[760px]">
         <div className="mb-2.5 grid grid-cols-4 gap-2.5 border-b border-border pb-2 font-mono text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
-          <span>you &amp; sources</span><span>conductor</span><span>workers</span><span>world</span>
+          <span>people &amp; sources</span><span>{coordinatorAgent || "coordinator"}</span><span>worker agents</span><span>world</span>
         </div>
         <div className="grid grid-cols-4 items-start gap-x-2.5 gap-y-2">
           {entries.map((item) => {
@@ -436,8 +448,8 @@ function LanesView({ entries, sessions }: { entries: FactJson[]; sessions: Reado
                 <div className="flex items-center gap-1.5">
                   <span className="font-mono text-[10.5px] text-subtle-foreground">#{item.seq}</span>
                   <HistoryChip item={item} />
-                  {authorLabel(item.by, item.kind) === "worker" && (
-                    <FactAuthor item={item} sessions={sessions} className="font-mono text-[10px] text-muted-foreground" />
+                  {item.kind !== "Event" && (
+                    <FactAuthor item={item} sessions={sessions} workerAgents={workerAgents} coordinatorAgent={coordinatorAgent} className="font-mono text-[10px] text-muted-foreground" />
                   )}
                   <span className="ml-auto font-mono text-[10px] text-subtle-foreground">{formatTime(item.createdAt)}</span>
                 </div>
@@ -451,7 +463,7 @@ function LanesView({ entries, sessions }: { entries: FactJson[]; sessions: Reado
   );
 }
 
-function TableView({ entries, sessions, openEntries, toggle }: { entries: FactJson[]; sessions: ReadonlyMap<string, WorkerSession>; openEntries: Set<number>; toggle: (seq: number) => void }) {
+function TableView({ entries, sessions, workerAgents, coordinatorAgent, openEntries, toggle }: { entries: FactJson[]; sessions: ReadonlyMap<string, WorkerSession>; workerAgents: ReadonlyMap<string, string>; coordinatorAgent?: string; openEntries: Set<number>; toggle: (seq: number) => void }) {
   return (
     <Card className="overflow-hidden py-0">
       <Table>
@@ -474,7 +486,7 @@ function TableView({ entries, sessions, openEntries, toggle }: { entries: FactJs
                 <TableRow className="cursor-pointer" aria-expanded={open} onClick={() => toggle(item.seq)}>
                   <TableCell className="text-aux text-muted-foreground">#{item.seq}</TableCell>
                   <TableCell><HistoryChip item={item} /></TableCell>
-                  <TableCell className="text-aux text-muted-foreground"><FactAuthor item={item} sessions={sessions} /></TableCell>
+                  <TableCell className="text-aux text-muted-foreground"><FactAuthor item={item} sessions={sessions} workerAgents={workerAgents} coordinatorAgent={coordinatorAgent} /></TableCell>
                   <TableCell className="max-w-0 truncate">{oneLine}</TableCell>
                   <TableCell className="text-right text-aux text-muted-foreground">{formatTime(item.createdAt)}</TableCell>
                 </TableRow>
@@ -498,9 +510,10 @@ function HistoryChip({ item }: { item: FactJson }) {
   return <Badge variant={TONE_BADGE[factTone(item)]} className="w-fit">{factLabel(item.kind)}</Badge>;
 }
 
-function FactAuthor({ item, sessions, className }: { item: FactJson; sessions: ReadonlyMap<string, WorkerSession>; className?: string }) {
-  const label = authorLabel(item.by, item.kind);
-  if (label !== "worker") return <span className={className}>{label}</span>;
+function FactAuthor({ item, sessions, workerAgents, coordinatorAgent, className }: { item: FactJson; sessions: ReadonlyMap<string, WorkerSession>; workerAgents: ReadonlyMap<string, string>; coordinatorAgent?: string; className?: string }) {
+  const role = authorLabel(item.by, item.kind);
+  const label = activityAuthorLabel(item, coordinatorAgent, workerAgents);
+  if (role !== "worker") return <span className={className}>{label}</span>;
   return <WorkerLink workerId={item.by} session={sessions.get(item.by)} label={label} className={className} />;
 }
 

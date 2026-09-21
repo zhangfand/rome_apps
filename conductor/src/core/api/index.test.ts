@@ -107,7 +107,9 @@ describe("task usage session reads", () => {
 
     const response = await handler.handle(apiRequest("GET", ["tasks", "t-usage"]));
     expect(response.status).toBe(200);
-    expect((await response.json() as { usageSessions: unknown[] }).usageSessions).toEqual(expect.arrayContaining([
+    const body = await response.json() as { coordinatorAgent?: string; usageSessions: unknown[] };
+    expect(body.coordinatorAgent).toBe("conductor:engineer-lead");
+    expect(body.usageSessions).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "worker-session", role: "worker", workerId: "w-1", jobId: "j-1", agent: "coding:coding", triggerSeq: 2 }),
       expect.objectContaining({ id: "coordinator-session", role: "coordinator", agent: "conductor:engineer-lead" }),
     ]));

@@ -1,12 +1,22 @@
 import { describe, expect, it } from "@rstest/core";
 import { DEFAULT_SOP } from "../domain/sop.js";
 import { DEFAULT_INTAKE_LABEL } from "../domain/adapters/github/config.js";
-import { DEFAULT_WORKER_AGENTS, mergeAppConfig, parseAppConfig } from "./config.js";
+import { DEFAULT_WORKER_AGENTS, githubPresentation, mergeAppConfig, parseAppConfig } from "./config.js";
 import { DEFAULT_ORCHESTRATOR_AGENT } from "../core/lib/config.js";
 
 const base = { projects: { app: { workingDir: "/repo" } } };
 
 describe("app config composition", () => {
+  it("presents the agent work repository as a GitHub link", () => {
+    expect(githubPresentation({
+      github: { repo: "owner/code" },
+      workRepo: { repo: "owner/app-work", workingDir: "/work/app" },
+    })).toMatchObject({
+      repo: "owner/code",
+      workRepo: { repo: "owner/app-work", url: "https://github.com/owner/app-work" },
+    });
+  });
+
   it("takes software-development defaults from the app, not core", () => {
     const parsed = parseAppConfig(base);
     expect(parsed.ok).toBe(true);
