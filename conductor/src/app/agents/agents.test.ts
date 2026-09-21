@@ -24,6 +24,21 @@ describe("Conductor agent boundaries", () => {
     expect(lead).not.toContain("conductor:stop_worker");
   });
 
+  it("prototypes medium and large work before production implementation", () => {
+    const lead = read("engineer-lead.yaml");
+    const prose = lead.replace(/\s+/g, " ");
+    expect(prose).toContain("Size: medium or Size: large");
+    expect(prose).toContain("begin with a bounded prototype before production implementation");
+    expect(prose).toContain("prove that the proposed approach is feasible");
+    expect(prose).toContain("better estimate of implementation");
+    expect(prose).toContain("result they can easily run or inspect");
+    expect(prose).toContain("wait for their approval before starting production implementation");
+    expect(prose).toContain("where the prototype code or result is");
+    expect(prose).toContain("known problems or limitations");
+    expect(prose).toContain("what architecture");
+    expect(lead).not.toContain("## Prototype Contract");
+  });
+
   it("keeps tool mechanics in action descriptions rather than the lead charter", () => {
     const lead = read("engineer-lead.yaml");
     const dispatch = readFileSync(path.resolve(here, "../actions/dispatch/action.yaml"), "utf8");
