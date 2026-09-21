@@ -48,7 +48,6 @@ actions:
   - app/actions/create-tasks
   - app/actions/ask
   - app/actions/report
-  - app/actions/wait
   - app/actions/close
   - app/actions/note
   - app/actions/stop

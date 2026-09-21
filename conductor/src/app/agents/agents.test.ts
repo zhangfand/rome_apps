@@ -27,7 +27,7 @@ describe("Conductor agent boundaries", () => {
     expect(prose).toContain("never create an independent code-review Job");
     expect(prose).toContain("`code-review` skill or action");
     expect(prose).toContain("`respond-to-review` skill");
-    expect(prose).toContain("wait for the bots to review that exact head");
+    expect(prose).toContain("bot review of that exact head arrives as a new fact");
     expect(lead).not.toContain("Independently verify claims");
     expect(lead).not.toContain("`.claude/skills/babysit-pr`");
     expect(lead).not.toContain("Someone other than the author checks");
@@ -43,7 +43,8 @@ describe("Conductor agent boundaries", () => {
     expect(prose).toContain("prove that the proposed approach is feasible");
     expect(prose).toContain("better estimate of implementation");
     expect(prose).toContain("result they can easily run or inspect");
-    expect(prose).toContain("wait for their approval before starting production implementation");
+    expect(prose).toContain("until their reply before starting production implementation");
+    expect(prose).toContain("do not create polling or periodic check-in Jobs");
     expect(prose).toContain("where the prototype code or result is");
     expect(prose).toContain("known problems or limitations");
     expect(prose).toContain("what architecture");
@@ -58,7 +59,7 @@ describe("Conductor agent boundaries", () => {
     const lead = read("engineer-lead.yaml").replace(/\s+/g, " ");
     expect(lead).toContain("A production implementation must match the person's request");
     expect(lead).toContain("repository CI to be green on the exact final bot-reviewed head");
-    expect(lead).toContain("Stop creating Jobs and wait for the person to merge or respond");
+    expect(lead).toContain("Stop creating Jobs and let the Task rest until the person merges or responds");
     expect(lead).toContain("The Task is complete only when the delivered result is accepted");
   });
 
@@ -113,9 +114,11 @@ describe("Conductor agent boundaries", () => {
       "report_to_person",
       "run_job",
       "stop_worker",
-      "wait_for_task_update",
       "wake_task_coordinator",
     ]);
+    const manifest = readFileSync(path.resolve(here, "../../../app.yaml"), "utf8");
+    expect(manifest).not.toContain("app/actions/wait");
+    expect(read("engineer-lead.yaml")).not.toContain("conductor:wait_for_task_update");
   });
 
   it("does not give the PM the global action catalog", () => {

@@ -62,7 +62,7 @@ than one Run/attempt over its lifetime.
 | by | kinds |
 |---|---|
 | person (`<channel user>` or `github:<login>`) | `Created`, `Reply`, `Completed`, `Cancelled` |
-| `orchestrator` | `JobCreated`, `Asked`, `Reported`, `Waited`, `Completed`, `Cancelled`, `Noted` |
+| `orchestrator` | `JobCreated`, `Asked`, `Reported`, `Completed`, `Cancelled`, `Noted` |
 | `runtime` | `Dispatched`, `JobFailed`, `Lost`, `Event` |
 | worker id | `Opened`, `Returned`, `Failed` |
 
@@ -70,11 +70,17 @@ than one Run/attempt over its lifetime.
 waiting | unparsed`, a one-paragraph `summary`, free `detail`. Nothing is
 rejected; an unparseable reply is recorded as `unparsed` with the raw text.
 
+Historical ledgers may also contain `Waited` decisions from the retired timed-wait
+action. They remain readable so existing Tasks and history do not need a data
+migration, but no registered action creates new ones. Open Tasks normally rest
+after a decision until a person, worker, child Task, or source adapter writes a
+new fact.
+
 ## What code still enforces (and why it is not workflow)
 
 - **Freshness** (`fold.ts` → `needsAttention`): wake the orchestrator when
-  there are facts after its last decision, when a `Waited` is due, or after a
-  `stop` with no follow-up. That is all the fold knows.
+  there are facts after its last decision, when a legacy `Waited` is due, or
+  after a `stop` with no follow-up. That is all the fold knows.
 - **Two ledger writes**: observations append; state-dependent commands compare
   and append. A conditional write identifies a Task plus the global `seq` of
   the newest fact the caller saw on that Task. Unrelated Tasks never conflict.
@@ -314,7 +320,7 @@ when the orchestrator narrates a decision instead of recording it, and the
 #6  JobCreated  orchestrator       j-… for assistant:assistant (read-only verify)
 #7  Dispatched  runtime            j-… as worker w-…
 #9  Returned    w-…                waiting: CI pending / no checks recorded
-#10 Waited      orchestrator       15 min
+#10 Asked       orchestrator       does this repository have CI?
 #11 Reply       zhangfan           "no CI here, proceed"
 #12 Reported    orchestrator       PR #2 delivered, please review and merge
 #13 Event       runtime            github/issue_closed (completed)
