@@ -7,11 +7,9 @@ import { Card } from "@rome-os/ui/card";
 import { DialogBody, DialogFooter } from "@rome-os/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@rome-os/ui/field";
 import { Input } from "@rome-os/ui/input";
-import { FormRow, FormRowControl, FormRowDescription, FormRowHeading, FormRowLabel, FormRows } from "@rome-os/ui/layout-form";
 import { Section, SectionActions, SectionDescription, SectionHeader, SectionHeading, SectionTitle } from "@rome-os/ui/page";
 import { Spinner } from "@rome-os/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rome-os/ui/table";
-import { Textarea } from "@rome-os/ui/textarea";
 import { ChevronRight } from "lucide-react";
 import { presentConfig, responseError, type ConfigResponse } from "../lib/config-api";
 import { safeText } from "../lib/facts";
@@ -48,15 +46,14 @@ function useConfig() {
   return { config, runtime, projectPresentation, error, accept, setError };
 }
 
-export function ProjectsOverview({ onOpenProject, onAddProject, onEditSop }: {
+export function ProjectsOverview({ onOpenProject, onAddProject }: {
   onOpenProject: (id: string) => void;
   onAddProject: () => void;
-  onEditSop: () => void;
 }) {
-  const { config, runtime, projectPresentation, error } = useConfig();
+  const { config, projectPresentation, error } = useConfig();
 
   if (error && !config) return <ErrorCard message={error} />;
-  if (!config || !runtime) return <Loading />;
+  if (!config) return <Loading />;
 
   const projects = Object.entries(config.projects);
 
@@ -101,25 +98,6 @@ export function ProjectsOverview({ onOpenProject, onAddProject, onEditSop }: {
         )}
       </Section>
 
-      <Section>
-        <SectionHeader>
-          <SectionHeading>
-            <SectionTitle>Operating procedure</SectionTitle>
-            <SectionDescription>The workflow, as a prompt. Takes effect on every open task.</SectionDescription>
-          </SectionHeading>
-        </SectionHeader>
-        <FormRows>
-          <FormRow>
-            <FormRowHeading>
-              <FormRowLabel>Global SOP</FormRowLabel>
-              <FormRowDescription>{runtime.sopBuiltIn ? "Built-in" : "Custom"} · {config.sop.length.toLocaleString()} chars</FormRowDescription>
-            </FormRowHeading>
-            <FormRowControl>
-              <Button variant="outline" size="sm" onClick={onEditSop}>Edit</Button>
-            </FormRowControl>
-          </FormRow>
-        </FormRows>
-      </Section>
     </div>
   );
 }
@@ -213,73 +191,6 @@ export function AddProjectBody({ onBack, onCreated }: {
       <DialogFooter>
         <Button variant="outline" onClick={onBack} disabled={saving}>Cancel</Button>
         <Button onClick={() => void submit()} disabled={!ready || saving || !id}>{saving && <Spinner />}Create</Button>
-      </DialogFooter>
-    </>
-  );
-}
-
-export function SopEditorBody({ onBack, onSaved, onDirtyChange }: {
-  onBack: () => void;
-  onSaved: () => void;
-  onDirtyChange?: (dirty: boolean) => void;
-}) {
-  const { config, runtime, error: loadError, accept, setError } = useConfig();
-  const [draft, setDraft] = useState("");
-  const [seeded, setSeeded] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (config && !seeded) { setDraft(config.sop); setSeeded(true); }
-  }, [config, seeded]);
-
-  const dirty = seeded && config !== null && draft !== config.sop;
-  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
-
-  const submit = async (revert = false) => {
-    setSaving(true);
-    setError(null);
-    try {
-      const response = await fetchAppApi("config", {
-        method: "PATCH",
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ sop: revert ? "" : draft }),
-      });
-      if (!response.ok) { setError(await responseError(response)); return; }
-      accept(await response.json() as ConfigResponse);
-      onSaved();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const ready = Boolean(config && runtime);
-  const builtIn = runtime?.sopBuiltIn ?? true;
-
-  return (
-    <>
-      <DialogBody className="flex min-h-[60vh] flex-col gap-2">
-        {loadError && !ready ? (
-          <ErrorCard message={loadError} />
-        ) : !ready ? (
-          <Loading />
-        ) : (
-          <>
-            <Textarea
-              className="block min-h-[50vh] flex-1 resize-none font-mono text-xs leading-[1.65]"
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              aria-label="Global SOP"
-              spellCheck={false}
-            />
-            <span className="text-aux text-muted-foreground">markdown · {draft.length.toLocaleString()} chars{builtIn && !dirty ? " · built-in" : ""}</span>
-          </>
-        )}
-      </DialogBody>
-      <DialogFooter className="flex-wrap">
-        {ready && !builtIn && <Button variant="outline" disabled={saving} onClick={() => void submit(true)}>Revert to built-in</Button>}
-        <span className="flex-1" />
-        <Button variant="ghost" disabled={saving} onClick={onBack}>Cancel</Button>
-        <Button disabled={!ready || saving || !dirty} onClick={() => void submit()}>{saving && <Spinner />}{saving ? "Saving…" : "Save"}</Button>
       </DialogFooter>
     </>
   );

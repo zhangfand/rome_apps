@@ -1,17 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Button } from "@rome-os/ui/button";
 import { Badge } from "@rome-os/ui/badge";
-import { Dialog, DialogBody, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@rome-os/ui/dialog";
+import { Dialog, DialogBody, DialogTitle } from "@rome-os/ui/dialog";
 import { IconButton } from "@rome-os/ui/icon-button";
 import { ChevronLeft, X } from "lucide-react";
 import { safeText } from "../lib/facts";
-import { AddProjectBody, ProjectsOverview, SopEditorBody } from "./configuration";
+import { AddProjectBody, ProjectsOverview } from "./configuration";
 import { ProjectSettingsBody } from "./project-detail";
 
 export type SettingsView =
   | { view: "overview" }
   | { view: "project"; id: string }
-  | { view: "sop" }
   | { view: "add" };
 
 export function SettingsDialog({ open, initialView, onClose }: {
@@ -22,16 +20,12 @@ export function SettingsDialog({ open, initialView, onClose }: {
   const [stack, setStack] = useState<SettingsView[]>([initialView]);
   const [projectStatus, setProjectStatus] = useState("");
   const [projectHeading, setProjectHeading] = useState<{ isDefault: boolean } | null>(null);
-  const [sopDirty, setSopDirty] = useState(false);
-  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const wasOpen = useRef(open);
 
   useEffect(() => {
     if (open && !wasOpen.current) {
       setStack([initialView]);
       setProjectStatus("");
-      setSopDirty(false);
-      setConfirmDiscard(false);
     }
     wasOpen.current = open;
   }, [open, initialView]);
@@ -42,8 +36,6 @@ export function SettingsDialog({ open, initialView, onClose }: {
   const replaceTop = (view: SettingsView) => setStack((s) => [...s.slice(0, -1), view]);
   const openProject = (id: string) => { setProjectStatus(""); setProjectHeading(null); push({ view: "project", id }); };
 
-  const sopBack = () => { if (sopDirty) setConfirmDiscard(true); else pop(); };
-  const discard = () => { setConfirmDiscard(false); setSopDirty(false); pop(); };
 
   return (
     <Dialog open={open} onClose={onClose} size="lg">
@@ -56,7 +48,6 @@ export function SettingsDialog({ open, initialView, onClose }: {
             <ProjectsOverview
               onOpenProject={openProject}
               onAddProject={() => push({ view: "add" })}
-              onEditSop={() => push({ view: "sop" })}
             />
           </DialogBody>
         </>
@@ -76,15 +67,6 @@ export function SettingsDialog({ open, initialView, onClose }: {
         </>
       )}
 
-      {active.view === "sop" && (
-        <>
-          <SettingsDialogHeader onBack={sopBack} onClose={onClose}>
-            <DialogTitle>Global SOP</DialogTitle>
-          </SettingsDialogHeader>
-          <SopEditorBody onBack={sopBack} onSaved={pop} onDirtyChange={setSopDirty} />
-        </>
-      )}
-
       {active.view === "add" && (
         <>
           <SettingsDialogHeader onBack={pop} onClose={onClose}>
@@ -94,16 +76,6 @@ export function SettingsDialog({ open, initialView, onClose }: {
         </>
       )}
 
-      <Dialog open={confirmDiscard} onClose={() => setConfirmDiscard(false)} size="sm">
-        <DialogHeader onClose={() => setConfirmDiscard(false)}><DialogTitle>Discard changes?</DialogTitle></DialogHeader>
-        <DialogBody>
-          <DialogDescription>Your edits to the global SOP have not been saved. Leaving loses them.</DialogDescription>
-        </DialogBody>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setConfirmDiscard(false)}>Keep editing</Button>
-          <Button variant="destructive" onClick={discard}>Discard</Button>
-        </DialogFooter>
-      </Dialog>
     </Dialog>
   );
 }

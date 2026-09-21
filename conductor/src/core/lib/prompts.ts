@@ -1,6 +1,5 @@
 import type { ConductorConfig } from "./config.js";
 import type { SharedPromptContract } from "./composition.js";
-import { sopFor } from "./config.js";
 import { describeFact } from "./facts.js";
 import type { TaskView } from "./fold.js";
 import { replyInstructions } from "./worker-reply.js";
@@ -60,9 +59,10 @@ function workspaceNote(task: TaskView, providerFor: (kind: string) => WorkspaceP
 }
 
 /**
- * The orchestrator's prompt for one wake. Everything it can know: the SOP,
- * the task's whole ledger, what agents it may create Jobs for, and the seq it
- * must cite so a stale decision is refused. Worker scheduling is not exposed.
+ * The orchestrator's prompt for one wake. Everything task-specific it can
+ * know: the whole ledger, what agents it may create Jobs for, and the seq it
+ * must cite so a stale decision is refused. Its operating policy lives in the
+ * configured Agent's system prompt. Worker scheduling is not exposed.
  */
 export function buildOrchestratorPrompt(input: {
   task: TaskView;
@@ -92,9 +92,6 @@ export function buildOrchestratorPrompt(input: {
     "",
     "## Agents you may create a Job for",
     ...Object.entries(config.workerAgents).map(([agent, description]) => `- \`${agent}\`: ${description}`),
-    "",
-    "## SOP",
-    sopFor(config, task.projectId),
     "",
     ...(input.sharedContracts?.length ? [
       "## Shared artifact contracts",

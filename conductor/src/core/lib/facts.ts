@@ -4,7 +4,7 @@ import type { ProjectBinding } from "./projects.js";
 /**
  * The ledger's vocabulary. Deliberately small and domain-neutral: nothing here
  * knows the app domain. The workflow — which step
- * follows which — lives in the SOP prompt the orchestrator reads, not in code.
+ * follows which — lives in the orchestrator Agent's system prompt, not in code.
  *
  * Three authors write facts:
  *   - a person (a chat user id or a source-namespaced external identity),

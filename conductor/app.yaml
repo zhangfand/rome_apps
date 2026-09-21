@@ -6,7 +6,7 @@ version: 0.1.0
 description: >-
   A long-running task runner whose workflow is a prompt, not a state machine.
   A person or a labeled GitHub issue opens a task; an engineering lead reads
-  the append-only ledger and SOP, brings in PM when product definition is
+  the append-only ledger, brings in PM when product definition is
   needed, materializes runnable work, and owns delivery through ready-to-merge.
   Workers, people and external events all write to the same ledger.
 appRoot: dist

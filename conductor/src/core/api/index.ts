@@ -294,8 +294,6 @@ function configPresentation(config: ConductorConfig, composition: CoreCompositio
 function runtimeJson(composition: CoreComposition, config?: ConductorConfig, control: RuntimeControl = { paused: false }) {
   return {
     heartbeatLeaseSeconds: HEARTBEAT_LEASE_MS / 1000,
-    /** Whether the global SOP is still the app's built-in one. */
-    sopBuiltIn: (config ?? composition.initialConfig).sop === composition.initialConfig.sop,
     workspaceKinds: composition.workspaceKinds,
     defaultWorkspaceKind: composition.defaultWorkspaceKind,
     ...runtimeControlJson(control),

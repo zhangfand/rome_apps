@@ -1,4 +1,3 @@
-import { safeText } from "./facts";
 import type { ConfigJson, ProjectPresentation, RuntimeJson } from "./types";
 
 /** The shape both settings pages read from GET/PATCH `config`. */
@@ -9,9 +8,8 @@ export interface ConfigResponse {
   projectPresentation?: Record<string, ProjectPresentation>;
 }
 
-/** Hide ledger mechanics from the global SOP before it reaches the UI. */
 export function presentConfig(config: ConfigJson): ConfigJson {
-  return { ...config, sop: safeText(config.sop) };
+  return config;
 }
 
 export async function responseError(response: Response): Promise<string> {

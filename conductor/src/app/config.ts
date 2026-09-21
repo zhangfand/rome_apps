@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
   createConfigParser,
   DEFAULT_INTERVAL_MINUTES,
@@ -8,14 +7,12 @@ import {
   DEFAULT_REUSE_SESSIONS,
   type ConductorConfig,
 } from "../core/lib/config.js";
-import { DEFAULT_SOP } from "../domain/sop.js";
 import { DEFAULT_INTAKE_LABEL, githubConfigExtensions, githubProject, githubRepo, githubRoot } from "../domain/adapters/github/config.js";
 import { defaultWorkRepo, workRepoFor } from "../domain/work-repo.js";
 import type { ConfigExtensions } from "../core/lib/config.js";
 
 const PM_AGENT_DESCRIPTION = "Product manager for broad or ambiguous feature requests. Researches the codebase and product precedents, decides defaults, and writes a bounded, implementation-ready spec in the project's agent work repo. Use before coding when scope or user-visible behavior is not clear; if it returns questions, ask the person and resume the same worker.";
 const LEGACY_ORCHESTRATOR_AGENT = "conductor:orchestrator";
-const LEGACY_DEFAULT_SOP_SHA256 = "e4890d96b2624dc1640871f496b42c43f59ebcb7db462f582320f93643291d8d";
 
 export interface FrontdeskShadowConfig {
   enabled: boolean;
@@ -35,10 +32,11 @@ const LEGACY_DEFAULT_WORKER_AGENTS: Record<string, string> = {
 export const DEFAULT_WORKER_AGENTS: Record<string, string> = {
   "conductor:pm": PM_AGENT_DESCRIPTION,
   ...LEGACY_DEFAULT_WORKER_AGENTS,
+  "assistant:assistant": "General assistant with web and shell access. Good for research, reading external state (e.g. a PR's review/CI status), handling production review feedback through the repository's respond-to-review skill, and writing summaries. It does not independently review code or process prototype review feedback.",
 };
 
 const parseConfig = createConfigParser(
-  { sop: DEFAULT_SOP, workerAgents: DEFAULT_WORKER_AGENTS, workspaceKinds: ["git-worktree", "none"], defaultWorkspaceKind: "git-worktree" },
+  { workerAgents: DEFAULT_WORKER_AGENTS, workspaceKinds: ["git-worktree", "none"], defaultWorkspaceKind: "git-worktree" },
   appConfigExtensions(),
 );
 
@@ -54,20 +52,12 @@ export function parseAppConfig(raw: unknown) {
   if (migrated.orchestratorAgent === LEGACY_ORCHESTRATOR_AGENT) {
     migrated.orchestratorAgent = DEFAULT_ORCHESTRATOR_AGENT;
   }
-  if (typeof migrated.sop === "string" && sha256(migrated.sop) === LEGACY_DEFAULT_SOP_SHA256) {
-    migrated.sop = DEFAULT_SOP;
-  }
   return parseConfig(migrated);
-}
-
-function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
 }
 
 /** UI-only defaults for an install that has not persisted settings yet. */
 export const initialAppConfig: ConductorConfig = {
   projects: {},
-  sop: DEFAULT_SOP,
   workerAgents: DEFAULT_WORKER_AGENTS,
   orchestratorAgent: DEFAULT_ORCHESTRATOR_AGENT,
   maxWorkers: DEFAULT_MAX_WORKERS,
@@ -79,7 +69,7 @@ export const initialAppConfig: ConductorConfig = {
 };
 
 export const setupSchema = {
-  projectDescription: "Named projects. Each has workingDir, optional workspace, optional github settings, and a project SOP override. Legacy GitHub fields at project level remain accepted for one release.",
+  projectDescription: "Named projects. Each has workingDir, optional workspace, and optional GitHub settings. Legacy GitHub fields at project level remain accepted for one release.",
   projectProperties: {
     github: {
       type: "object",

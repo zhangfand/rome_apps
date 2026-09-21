@@ -110,7 +110,7 @@ export function intakeRequests(input: {
 
 /**
  * The brief for a task opened from an issue: title, body and the issue URL.
- * Nothing about how to deliver — that is the SOP's business.
+ * Nothing about how to deliver — that is the coordinator Agent's business.
  */
 export function briefFromIssue(issue: IntakeIssue): string {
   const title = issue.title.trim() || `${issue.repo}#${issue.number}`;

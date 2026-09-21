@@ -23,7 +23,7 @@ function taskState(task: TaskView): FrontdeskTaskState {
   };
 }
 
-/** The compact, stateless view Jev judges. It intentionally excludes SOPs,
+/** The compact, stateless view Jev judges. It intentionally excludes Agent policy,
  * workspace paths, provider settings and the rest of the chat transcript. */
 export function buildFrontdeskState(
   message: string,

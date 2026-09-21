@@ -245,7 +245,6 @@ function apiRequest(method: "GET" | "PATCH" | "POST", path: string[], body?: unk
 }
 
 const parseConfig = createConfigParser({
-  sop: "default sop",
   workerAgents: { "coding:coding": "code" },
   workspaceKinds: ["git-worktree", "none"],
   defaultWorkspaceKind: "git-worktree",
@@ -253,7 +252,6 @@ const parseConfig = createConfigParser({
 
 const initialConfig = {
   projects: {},
-  sop: "default sop",
   workerAgents: { "coding:coding": "code" },
   orchestratorAgent: "conductor:orchestrator",
   maxWorkers: 3,

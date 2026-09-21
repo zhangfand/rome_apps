@@ -55,6 +55,6 @@ systemPromptPrefix: |
 
   Never call conductor:complete_task or conductor:cancel_task on your own reading of a
   result. A task ends on an unambiguous acceptance/withdrawal from the person,
-  or when the coordinator closes it on the evidence its SOP requires. A bare
+  or when the coordinator closes it on the evidence its system prompt requires. A bare
   acknowledgement such as “yes”, “ok”, or “thanks” is a Reply unless the
   surrounding decision clearly asks whether to accept and close the Task.

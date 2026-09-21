@@ -1,7 +1,7 @@
 name: wake_task_coordinator
 type: custom
 description: >-
-  Wake a Task's configured orchestrator from its current SOP and ledger, and
+  Wake a Task's configured orchestrator from its Agent policy and ledger, and
   record a note when it returns without a decision.
 entry: ./index.ts
 complexity: complex

@@ -77,7 +77,7 @@ agents and the live workers from the same state feed the board polls.
 **Settings** is one `lg` `Dialog` opened from a gear `IconButton` beside the
 Conductor title. It is a modal task, not a place, so it has no inner routes: an
 in-dialog view stack moves between an **overview** view and pushed **project**,
-**sop**, and **add** views, with a back affordance in the header. Only the
+and **add** views, with a back affordance in the header. Only the
 active view renders, so returning to the overview re-mounts and re-fetches.
 `/config` and `/config/projects/<id>` are deep links that open the dialog over
 the board — on the overview and on that project's view — and Escape, a backdrop
@@ -87,11 +87,7 @@ The overview lists projects as a kit `List` of rows — id (with a `default`
 badge), repository, intake label, and a workspace-status dot with a title
 tooltip — each row pushing that project's view. **Add project** pushes a small
 view asking only for an id and a working directory; on create it replaces
-itself with the new project's view. The global SOP is one row under **Operating
-procedure** ("Built-in" or "Custom" · length) whose **Edit** pushes the SOP
-editor view (explicit Save / Cancel, and Revert to built-in for a custom SOP);
-`runtime.sopBuiltIn` in the config response says which it is, and backing out of
-the editor with unsaved edits raises a nested `sm` discard-confirm dialog.
+itself with the new project's view.
 
 The project view has no Save or Cancel buttons: every change autosaves. Toggles
 and selects save immediately; text fields save on blur or ~600ms after typing
@@ -107,8 +103,7 @@ working-directory muted-mono line and the `default` badge render at the top of
 the project body, since `reportStatus` carries only the status string.
 
 Sections run, top to bottom: **General** (working directory, workspace kind,
-default project), **GitHub issue intake**, **Operating procedure** (the SOP
-override, empty to inherit the global SOP), and a **Danger zone** that removes the
+default project), **GitHub issue intake**, and a **Danger zone** that removes the
 project behind a confirmation and returns to the overview. The GitHub section is
 not core: it is a web-domain slot (`webDomain().projectSettingsFields`), so
 `src/web/core/` mentions no git or GitHub. The slot renders a whole `Section` —

@@ -6,7 +6,6 @@ import type { WorkspaceKind } from "./workspaces.js";
 export interface ProjectConfig {
   workingDir?: string;
   workspace?: WorkspaceKind;
-  sop?: string;
   [extension: string]: unknown;
 }
 
@@ -20,8 +19,7 @@ export function bindProject(config: ConductorConfig, projectId: string): Project
   if (!Object.hasOwn(config.projects, projectId)) {
     throw new Error(`Unknown project ${JSON.stringify(projectId)}. Choose: ${Object.keys(config.projects).join(", ")}`);
   }
-  const { sop: _sop, ...project } = config.projects[projectId];
-  return { projectId, project };
+  return { projectId, project: config.projects[projectId] };
 }
 
 export function resolveHumanProject(config: ConductorConfig, input: {

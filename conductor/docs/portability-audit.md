@@ -15,7 +15,7 @@ are currently baked in rather than pluggable, plus some prompt wording.
 | ~~Task intake~~ | ~~old intake helper, `src/core/actions/tick`~~ | **done 2026-09-14** | Any source opens a task through `src/core/lib/ingest.ts`, over HTTP or as an adapter. GitHub moved to `src/domain/adapters/github/`. |
 | ~~External events~~ | ~~old observation helpers~~ | **done 2026-09-14** | Same seam; `POST tasks/:id/events` and adapter polls are one path. |
 | Facts | `src/core/lib/facts.ts` | core | `Created.origin` is generic; the old issue payload remains a compatibility reader only. Workspaces are provider-owned opaque data. |
-| Config | `src/core/lib/config.ts`, `src/app/config.ts` | split 2026-09-16 | Core parses runtime fields through generic extension hooks; app owns the worker/SOP/workspace defaults and GitHub normalization. |
+| Config | `src/core/lib/config.ts`, `src/app/config.ts` | split 2026-09-16 | Core parses runtime fields through generic extension hooks; app owns the worker/workspace defaults and GitHub normalization. |
 | Orchestrator system prompt | `src/app/agents/orchestrator.yaml` | partly done | The checkout sentence moved to the wake prompt, emitted by the project's workspace provider. Still dev-worded: "GitHub issue closing; on a PR … reviews, comments, checks, merge", "may have pushed a branch or opened a PR" — those belong to proposal 3, where adapters emit their own notes. |
 | Front-desk agent, UI | `agents/conductor.yaml`, `web/` | dev wording | Mentions GitHub issue intake; repo badge on task rows. |
 | `create` action | `src/core/actions/create` | core | The source-specific URL check was dropped; source intake remains exactly deduped by `(source,key)`. |
@@ -122,7 +122,11 @@ Conductor is the software-development app. Portability of this app is no longer
 a goal, so proposals 3 (adapter-generated runtime notes) and 4 (a second SOP as
 proof) are dropped. Their replacement is a physical `core` / `domain` / `app`
 split plus a source-boundary test: core is reusable runtime, domain is GitHub,
-Git worktrees and the development SOP, and app is the composition root.
+Git worktrees and shared artifact contracts, and app is the composition root.
+
+**Update 2026-09-21:** runtime global/project SOP configuration was removed.
+Each Agent now owns its operating policy in its registered system prompt; wake
+prompts carry facts and available capabilities only.
 
 The first new domain feature after this restructure will be read-only pull
 request cards in phase 2. They are intentionally not part of this change.

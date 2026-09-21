@@ -17,7 +17,6 @@ function f(fact: NewFact): Fact {
 const config = {
   projects: { playground: { workingDir: "/work", workspace: "directory" } },
   defaultProject: "playground",
-  sop: "sop",
   workerAgents: { "coding:coding": "" },
   orchestratorAgent: "conductor:orchestrator",
   maxWorkers: 3,

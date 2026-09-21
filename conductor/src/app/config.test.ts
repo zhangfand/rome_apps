@@ -1,5 +1,4 @@
 import { describe, expect, it } from "@rstest/core";
-import { DEFAULT_SOP } from "../domain/sop.js";
 import { DEFAULT_INTAKE_LABEL } from "../domain/adapters/github/config.js";
 import { DEFAULT_WORKER_AGENTS, githubPresentation, mergeAppConfig, parseAppConfig } from "./config.js";
 import { DEFAULT_ORCHESTRATOR_AGENT } from "../core/lib/config.js";
@@ -21,11 +20,25 @@ describe("app config composition", () => {
     const parsed = parseAppConfig(base);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(parsed.config.sop).toBe(DEFAULT_SOP);
     expect(parsed.config.workerAgents).toEqual(DEFAULT_WORKER_AGENTS);
+    expect(parsed.config.workerAgents["assistant:assistant"]).toContain("respond-to-review skill");
+    expect(parsed.config.workerAgents["assistant:assistant"]).toContain("does not independently review code");
+    expect(parsed.config.workerAgents["assistant:assistant"]).toContain("or process prototype review feedback");
     expect(parsed.config.orchestratorAgent).toBe(DEFAULT_ORCHESTRATOR_AGENT);
     expect(parsed.config.github).toEqual({ intakeLabel: DEFAULT_INTAKE_LABEL });
     expect(parsed.config.frontdeskShadow).toEqual({ enabled: true, model: "jev-latest" });
+  });
+
+  it("drops legacy global and project SOP fields instead of injecting runtime policy", () => {
+    const parsed = parseAppConfig({
+      ...base,
+      sop: "legacy global instructions",
+      projects: { app: { workingDir: "/repo", sop: "legacy project instructions" } },
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.config).not.toHaveProperty("sop");
+    expect(parsed.config.projects.app).not.toHaveProperty("sop");
   });
 
   it("validates front-desk shadow settings without accepting an endpoint or key", () => {

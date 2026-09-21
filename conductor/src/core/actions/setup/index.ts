@@ -37,19 +37,17 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
       properties: {
         projects: {
           type: "object",
-          description: composition.setupSchema?.projectDescription ?? "Named projects with a workspace and optional project SOP.",
+          description: composition.setupSchema?.projectDescription ?? "Named projects with a workspace.",
           additionalProperties: {
             type: "object", additionalProperties: false,
             properties: {
               workingDir: { type: "string" },
               workspace: { type: "string", enum: [...composition.workspaceKinds], description: `What a worker on this project works in. Defaults to ${composition.defaultWorkspaceKind}.` },
-              sop: { type: "string" },
               ...(composition.setupSchema?.projectProperties ?? {}),
             },
           },
         },
         defaultProject: { type: "string", description: "Project used when a chat request does not name one and the selection is ambiguous." },
-        sop: { type: "string", description: "The global standard operating procedure the orchestrator follows, as prose. Omit to use the app default." },
         workerAgents: {
           type: "object", additionalProperties: { type: "string" },
           description: "Logical agents the coordinator may create Jobs for (agent id → one-line description). Uses the app defaults when omitted.",

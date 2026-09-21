@@ -38,7 +38,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         const attention = needsAttention(task, now);
         if (!attention.wake) return { status: "ok", data: { taskId, skipped: "nothing new" } };
 
-        // Safety valve. Not workflow: a budget, so a loop the SOP did not
+        // Safety valve. Not workflow: a budget, so a loop the Agent policy did not
         // foresee ends with a person being asked rather than with a bill.
         if (task.decisionsSinceLastPersonFact >= settings.maxDecisionsPerTurn) {
           const already = task.facts.some((f) => f.seq > task.lastPersonFactSeq && f.kind === "Event" && f.payload.type === "circuit_breaker");

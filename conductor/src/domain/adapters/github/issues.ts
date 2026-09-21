@@ -6,7 +6,7 @@ import { type IssueRef, issueRefsIn } from "./refs.js";
 /**
  * External events from issues. The adapter watches the GitHub issues an open
  * task names and, when one closes, says so — once per close. It does not end
- * the task; the orchestrator reads the Event and decides, per the SOP, whether
+ * the task; the orchestrator reads the Event and decides, per its system prompt, whether
  * that means done, dropped, or nothing yet.
  */
 

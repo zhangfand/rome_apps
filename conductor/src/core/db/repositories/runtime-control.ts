@@ -11,7 +11,7 @@ export interface RuntimeControl {
 
 /**
  * Mutable operational control kept outside Conductor's durable configuration.
- * Pausing is deliberately cheap and does not rewrite the routine or the SOP.
+ * Pausing is deliberately cheap and does not rewrite the routine or Agent policy.
  */
 export class RuntimeControlRepository {
   private readonly tables;

@@ -8,7 +8,6 @@ import { FormRow, FormRowControl, FormRowHeading, FormRowLabel, FormRows } from 
 import { Section, SectionHeader, SectionHeading, SectionTitle } from "@rome-os/ui/page";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@rome-os/ui/select";
 import { Switch } from "@rome-os/ui/switch";
-import { Textarea } from "@rome-os/ui/textarea";
 import { webDomain } from "../domain";
 import { presentConfig, responseError, type ConfigResponse } from "../lib/config-api";
 import { createSaveQueue, saveStatusText, type SaveQueue } from "../lib/configuration";
@@ -149,7 +148,6 @@ function ProjectDetailBody({ projectId, initialConfig, runtime, onServerConfig, 
   const workspace = typeof draft.workspace === "string" ? draft.workspace : runtime.defaultWorkspaceKind;
   const workingDir = typeof draft.workingDir === "string" ? draft.workingDir : "";
   useEffect(() => { reportHeading({ isDefault }); }, [isDefault, reportHeading]);
-  const sopOverride = typeof draft.sop === "string" ? draft.sop : "";
   const { inspection, refresh: refreshInspection } = useInspection(workspace, workingDir);
   const slots = webDomain().projectSettingsFields;
 
@@ -201,20 +199,6 @@ function ProjectDetailBody({ projectId, initialConfig, runtime, onServerConfig, 
           disabled={false}
         />
       ))}
-
-      <Section>
-        <SectionHeader><SectionHeading><SectionTitle>Operating procedure</SectionTitle></SectionHeading></SectionHeader>
-        <div className="flex flex-col gap-1.5">
-          <Textarea
-            aria-label="Project operating procedure override"
-            className="min-h-32 w-full resize-y font-mono text-xs leading-[1.65]"
-            value={sopOverride}
-            onChange={(event) => applyPatch({ sop: event.target.value })}
-            onBlur={flush}
-          />
-          <p className="text-aux text-muted-foreground">Leave empty to use the global SOP.</p>
-        </div>
-      </Section>
 
       <DangerZone projectId={projectId} onRemoved={onBack} />
     </div>

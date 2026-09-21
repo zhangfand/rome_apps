@@ -5,7 +5,6 @@ import type { WorkspaceKind } from "./workspaces.js";
 export interface ConductorConfig {
   projects: Record<string, ProjectConfig>;
   defaultProject?: string;
-  sop: string;
   workerAgents: Record<string, string>;
   orchestratorAgent: string;
   maxWorkers: number;
@@ -16,7 +15,6 @@ export interface ConductorConfig {
 }
 
 export interface ConfigDefaults {
-  sop: string;
   workerAgents: Record<string, string>;
   workspaceKinds: readonly WorkspaceKind[];
   defaultWorkspaceKind: WorkspaceKind;
@@ -82,7 +80,6 @@ export function parseConfig(raw: unknown, defaults: ConfigDefaults, extensions: 
     projects[id] = {
       ...(hasDir ? { workingDir: (p.workingDir as string).trim() } : {}),
       workspace,
-      ...(typeof p.sop === "string" && p.sop.trim() ? { sop: p.sop } : {}),
       ...(extension.values ?? {}),
     };
   }
@@ -106,7 +103,6 @@ export function parseConfig(raw: unknown, defaults: ConfigDefaults, extensions: 
   const config: ConductorConfig = {
     projects,
     ...(defaultProject ? { defaultProject } : {}),
-    sop: typeof args.sop === "string" && args.sop.trim() ? args.sop : defaults.sop,
     workerAgents,
     orchestratorAgent: typeof args.orchestratorAgent === "string" && args.orchestratorAgent.trim() ? args.orchestratorAgent.trim() : DEFAULT_ORCHESTRATOR_AGENT,
     maxWorkers: positiveInt(args.maxWorkers, DEFAULT_MAX_WORKERS, 50),
@@ -121,9 +117,4 @@ export function parseConfig(raw: unknown, defaults: ConfigDefaults, extensions: 
 
 export function tickTrigger(intervalMinutes: number): Record<string, unknown> {
   return { type: "schedule", tzid: "UTC", tzMode: "floating", localTime: "00:00", rrule: `FREQ=MINUTELY;INTERVAL=${intervalMinutes}` };
-}
-
-export function sopFor(config: ConductorConfig, projectId: string | undefined): string {
-  const project = projectId ? config.projects[projectId] : undefined;
-  return project?.sop?.trim() ? project.sop : config.sop;
 }

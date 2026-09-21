@@ -72,9 +72,8 @@ export interface StateJson {
 }
 
 export interface ConfigJson {
-  projects: Record<string, { workingDir?: string; workspace?: string; sop?: string; [extension: string]: unknown }>;
+  projects: Record<string, { workingDir?: string; workspace?: string; [extension: string]: unknown }>;
   defaultProject?: string;
-  sop: string;
   workerAgents: Record<string, string>;
   orchestratorAgent: string;
   maxWorkers: number;
@@ -87,7 +86,6 @@ export interface ProjectPresentation { repo?: string; subtitle?: string; workRep
 
 export interface RuntimeJson {
   heartbeatLeaseSeconds: number;
-  sopBuiltIn: boolean;
   workspaceKinds: string[];
   defaultWorkspaceKind: string;
   paused: boolean;

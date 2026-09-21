@@ -127,6 +127,23 @@ describe("prompts follow the workspace kind", () => {
     expect(buildOrchestratorPrompt({ ...args, task, providerFor, defaultWorkspaceKind: "git-worktree" })).not.toContain("Workers get their own checkout");
   });
 
+  it("keeps operating policy in the coordinator Agent instead of the wake prompt", () => {
+    const legacy = parseAppConfig({ projects: { p: { workingDir: "/repo", sop: "legacy project policy" } }, sop: "legacy global policy" });
+    expect(legacy.ok).toBe(true);
+    if (!legacy.ok) return;
+    const prompt = buildOrchestratorPrompt({
+      task: gitTask,
+      config: legacy.config,
+      now: new Date(t0),
+      why: "new facts",
+      providerFor,
+      defaultWorkspaceKind: "git-worktree",
+    });
+    expect(prompt).not.toContain("## SOP");
+    expect(prompt).not.toContain("legacy project policy");
+    expect(prompt).not.toContain("legacy global policy");
+  });
+
   it("injects the identical shared product contract for the lead and workers", () => {
     const worker = buildWorkerPrompt({
       task,

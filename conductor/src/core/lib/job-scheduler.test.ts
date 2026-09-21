@@ -77,7 +77,7 @@ describe("Job scheduler runtime pause", () => {
       }),
     } as unknown as CoreComposition;
     const config = {
-      projects: { app: { workspace: "none" } }, sop: "sop",
+      projects: { app: { workspace: "none" } },
       workerAgents: { "coding:coding": "code" }, orchestratorAgent: "conductor:engineer-lead",
       maxWorkers: 3, intervalMinutes: 5, reuseSessions: true, maxDecisionsPerTurn: 25,
     } as ConductorConfig;

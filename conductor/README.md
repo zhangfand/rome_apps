@@ -7,15 +7,15 @@ fact kind, with phases, retry caps and hook wiring in code. Conductor keeps the
 same bones — an append-only ledger, isolated worktrees, heartbeat-supervised
 workers, GitHub issue intake — and replaces the decision code with an
 **engineering-lead agent** that reads a task's whole ledger plus a standard
-operating procedure (SOP) and records one decision per wake. Change the SOP and
-the same app runs a different kind of work.
+operating policy in its system prompt and records one decision per wake. Agent
+system prompts own the workflow; the runtime only supplies current facts.
 
 ## Layout and dependency rule
 
 - `src/core/` is the domain-neutral runtime: ledger, configuration parser,
   repositories, action implementations, API implementation and generic seams.
 - `src/domain/` is Conductor's software-development domain: GitHub, Git
-  worktrees and the default software-development SOP.
+  worktrees and shared artifact contracts.
 - `src/app/` is the composition root: runtime entries, registries, agents and
   defaults. `src/web/App.tsx` plays the same role for the web app; reusable UI
   is under `src/web/core/`.
@@ -94,15 +94,15 @@ rejected; an unparseable reply is recorded as `unparsed` with the raw text.
 
 | layer | says | lives in |
 |---|---|---|
-| engineering-lead system prompt | who owns delivery, the PM/coding/review boundaries, what workers see and what each decision tool means | `src/app/agents/engineer-lead.yaml` — app-owned |
-| SOP | the goal and quality bar (not "a PR" but "a PR independently verified against the request"), what *done* means, the domain's hard lines, the shape the work usually takes | `src/domain/sop.ts` default; config / per project |
+| Agent system prompts | each Agent's responsibility, quality bar, hard lines and handoff boundaries | `src/app/agents/*.yaml` — app-owned |
 | wake prompt | facts only: ledger, Job execution status, available logical agents, `seenSeq` | built by `src/core/lib/prompts.ts` |
 
-The SOP is deliberately not a recipe. It does not enumerate what to do when
-a worker fails / blocks / waits; the ledger can hold combinations no list
-foresees, and a model with the goal in front of it handles them better than
-one matching cases. Behaviour is bounded by tools instead: the engineering
-lead has no hidden channel to a worker. `dispatch` records a `JobCreated`
+Agent policy is deliberately responsibility-oriented, not a recipe. It does
+not enumerate what to do when a worker fails / blocks / waits; the ledger can
+hold combinations no list foresees, and a model with the goal in front of it
+handles them better than one matching cases. Behaviour is bounded by tools
+instead: the engineering lead has no hidden channel to a worker. `dispatch`
+records a `JobCreated`
 decision; runtime separately records `Dispatched` when it chooses the concrete
 Run. `create-tasks` is reserved for genuinely separate outcomes and records
 the bounded child Tasks named by that decision—not PM/coding/review stages of
@@ -123,8 +123,8 @@ next. Obsolete created work is cancelled or superseded rather than deleted.
 Open **Settings** → **Projects** in the app to add, edit, inspect, or
 remove projects. The form accepts a permanent lowercase slug, an absolute
 working directory, a workspace kind, GitHub repository and intake settings,
-an optional project SOP, and the default-project choice. A GitHub repository
-may be entered as `owner/name` or a `github.com` URL. If its target directory
+and the default-project choice. A GitHub repository may be entered as
+`owner/name` or a `github.com` URL. If its target directory
 is missing or empty, **Clone here** runs `gh repo clone`; existing non-empty
 directories are never replaced. Project deletion is blocked when open tasks
 are pinned to it until the UI's explicit force confirmation. Existing tasks
@@ -150,18 +150,14 @@ conductor:configure_conductor {
       github: { repo: "owner/name", intakeLabel: "conductor" },
       workRepo: { repo: "owner/playground-work", workingDir: "/abs/playground-work" }, // optional; derived by default
     },
-    research:   { workspace: "none", sop: "..." },
+    research:   { workspace: "none" },
   },
   workRepoOwner?: "owner", // default owner for derived <project>-work repositories
   github?: { intakeLabel: "conductor" },
-  sop?: "...",            // omit for the built-in software-development SOP (src/domain/sop.ts)
   workerAgents?: { "conductor:pm": "...", "coding:coding": "...", "assistant:assistant": "..." },
   maxWorkers?: 3, intervalMinutes?: 5, reuseSessions?: true, maxDecisionsPerTurn?: 25
 }
 ```
-
-The SOP is editable on the Configuration page; a project may carry its own
-`sop` to override the global one.
 
 ### Jev front-desk shadow
 

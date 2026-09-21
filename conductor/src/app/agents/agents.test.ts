@@ -16,11 +16,18 @@ describe("Conductor agent boundaries", () => {
     expect(manifest).not.toContain("app/skills/pm");
   });
 
-  it("keeps review convergence with the lead instead of bots, threads, or long-running Jobs", () => {
+  it("relies on online reviewers and handles their feedback through respond-to-review", () => {
     const lead = read("engineer-lead.yaml");
-    expect(lead).toContain("Automated review is evidence, not");
-    expect(lead).toContain("An open thread or bot");
-    expect(lead).toContain("Review is converged when");
+    const prose = lead.replace(/\s+/g, " ");
+    expect(prose).toContain("Rely on the repository's online review bots");
+    expect(prose).toContain("never create an independent code-review Job");
+    expect(prose).toContain("`code-review` skill or action");
+    expect(prose).toContain("`respond-to-review` skill");
+    expect(prose).toContain("wait for the bots to review that exact head");
+    expect(lead).not.toContain("Independently verify claims");
+    expect(lead).not.toContain("`.claude/skills/babysit-pr`");
+    expect(lead).not.toContain("Someone other than the author checks");
+    expect(lead).not.toContain("independent review has converged");
     expect(lead).not.toContain("conductor:stop_worker");
   });
 
@@ -36,7 +43,19 @@ describe("Conductor agent boundaries", () => {
     expect(prose).toContain("where the prototype code or result is");
     expect(prose).toContain("known problems or limitations");
     expect(prose).toContain("what architecture");
+    expect(prose).toContain("A prototype is not a production delivery");
+    expect(prose).toContain("Do not gate its handoff on CI or online review");
+    expect(prose).toContain("do not process review-bot findings on it");
+    expect(prose).toContain("Only act on the prototype again when the person asks");
     expect(lead).not.toContain("## Prototype Contract");
+  });
+
+  it("keeps delivery policy in Agent system prompts rather than a runtime SOP", () => {
+    const lead = read("engineer-lead.yaml").replace(/\s+/g, " ");
+    expect(lead).toContain("A production implementation must match the person's request");
+    expect(lead).toContain("repository CI to be green on the exact final bot-reviewed head");
+    expect(lead).toContain("Stop creating Jobs and wait for the person to merge or respond");
+    expect(lead).toContain("The Task is complete only when the delivered result is accepted");
   });
 
   it("keeps tool mechanics in action descriptions rather than the lead charter", () => {
