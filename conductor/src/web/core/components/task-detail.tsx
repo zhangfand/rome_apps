@@ -1,15 +1,16 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { fetchAppApi, navigateToApp } from "@rome-os/app-web-sdk";
 import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
 import { Badge } from "@rome-os/ui/badge";
 import { Button } from "@rome-os/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@rome-os/ui/card";
+import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "@rome-os/ui/card";
 import { cn } from "@rome-os/ui/cn";
 import { EmptyState, EmptyStateDescription, EmptyStateTitle } from "@rome-os/ui/empty-state";
 import { SegmentedControl } from "@rome-os/ui/segmented-control";
 import { Spinner } from "@rome-os/ui/spinner";
 import { Switch } from "@rome-os/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rome-os/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@rome-os/ui/tabs";
 import { Textarea } from "@rome-os/ui/textarea";
 import { LightMarkdown } from "./light-markdown";
 import {
@@ -39,6 +40,7 @@ import { TaskUsageSummary } from "./task-usage";
 import { TaskUsageExplorer } from "./task-usage-explorer";
 
 type HistoryView = "Stream" | "Lanes" | "Table";
+type DetailTab = "Overview" | "Activity" | "Usage" | "Work";
 const VIEW_KEY = "conductor-history-view";
 const VIEW_OPTIONS = (["Stream", "Lanes", "Table"] as HistoryView[]).map((value) => ({ value, label: value }));
 const DETAIL_REPLIES = ["accepted, thanks", "please revise", "hold for now"];
@@ -48,11 +50,14 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
   const [error, setError] = useState<string | null>(null);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
+  const [detailTab, setDetailTab] = useState<DetailTab>("Overview");
+  const [composerOpen, setComposerOpen] = useState(false);
   const [openEntries, setOpenEntries] = useState<Set<number>>(() => new Set());
   const [historyView, setHistoryView] = useState<HistoryView>(readView);
   const [hideRoutine, setHideRoutine] = useState(true);
   const composerRef = useRef<HTMLTextAreaElement>(null);
-  const usage = useTaskUsageAnalysis(task);
+  const composerInitialized = useRef(false);
+  const usage = useTaskUsageAnalysis(task, detailTab === "Usage");
 
   const load = useCallback(async () => {
     try {
@@ -76,6 +81,12 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
     try { window.localStorage.setItem(VIEW_KEY, historyView); } catch { /* preference persistence is optional */ }
   }, [historyView]);
 
+  useEffect(() => {
+    if (!task || composerInitialized.current) return;
+    composerInitialized.current = true;
+    setComposerOpen(task.state === "open" && hasOutstandingPersonDecision(task));
+  }, [task]);
+
   const send = async () => {
     if (!reply.trim() || !task) return;
     setSending(true);
@@ -96,6 +107,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
         return;
       }
       setReply("");
+      setComposerOpen(false);
       await load();
     } finally {
       setSending(false);
@@ -137,6 +149,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
   const visible = task.facts.filter((item) => !(hideRoutine && isRoutine(item)));
   const rounds = groupRounds(visible);
   const sessions = workerSessions(task.facts);
+  const recent = task.facts.filter((item) => !isRoutine(item)).slice(-3).reverse();
   const now = Date.now();
   const created = task.facts.find((item) => item.kind === "Created");
   // Where the task came from, whichever source opened it. Facts written before
@@ -151,29 +164,33 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
       : undefined;
   const originLabel = originSource ? ` · ${safeText(originSource)}${originNumber !== undefined ? ` #${originNumber}` : ""}` : "";
   const from = origin ? task.createdBy : "you";
-  const focusComposer = () => {
-    composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    composerRef.current?.focus({ preventScroll: true });
+  const openComposer = () => {
+    setDetailTab("Overview");
+    setComposerOpen(true);
+    window.setTimeout(() => {
+      composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      composerRef.current?.focus({ preventScroll: true });
+    }, 0);
   };
 
   return (
     <div className="flex flex-col gap-3.5">
       <Button variant="ghost" size="xs" className="w-fit text-muted-foreground" onClick={() => navigateToApp("/")}>← back to board</Button>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex flex-wrap items-center gap-2.5">
+      <section className="flex flex-col gap-4 border-b border-border pb-5">
+        <div className="flex flex-col gap-2">
+          <h1 className="flex flex-wrap items-center gap-2.5 text-title">
             <StateChip label={task.state} tone={task.state === "open" ? "info" : taskTone(task)} />
             {taskTitle(task)}
             <Badge variant="outline">{task.id}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-3.5 text-aux text-muted-foreground">
+          </h1>
+          <div className="flex flex-wrap gap-3.5 text-aux text-muted-foreground">
           <span>{safeText(task.projectId ?? "no project")}{task.projectSubtitle ? ` · ${safeText(task.projectSubtitle)}` : ""}</span>
           <span>from {safeText(from)}{originLabel}</span>
           <span>opened {formatRelative(task.createdAt, now)}</span>
-        </CardContent>
-        <CardContent>
+          </div>
+        </div>
+        <div>
           <Alert variant="info">
             <AlertTitle>Where it stands</AlertTitle>
             <AlertDescription>
@@ -191,65 +208,165 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
               </div>
             </AlertDescription>
           </Alert>
-        </CardContent>
+        </div>
         {task.state === "open" && (
-          <CardFooter className="flex-wrap">
-            <Button onClick={focusComposer}>Reply</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={openComposer}>Reply</Button>
             <Button variant="outline" disabled={sending} onClick={() => void closeTask("complete")}>Mark complete</Button>
             <Button variant="ghost" disabled={sending} onClick={() => void closeTask("cancel")}>Cancel task</Button>
-          </CardFooter>
+          </div>
         )}
-        {error && <CardContent><DetailError message={error} /></CardContent>}
-      </Card>
+        {error && !composerOpen && <DetailError message={error} />}
+      </section>
 
-      <TaskUsageSummary usage={usage.analysis?.usage} loading={usage.loading} unavailable={usage.unavailable} />
-      <TaskUsageExplorer task={task} analysis={usage.analysis} loading={usage.loading} unavailable={usage.unavailable} />
-
-      {webDomain().taskDetailPanels.map((Panel, index) => (
-        <Panel key={Panel.displayName ?? Panel.name ?? index} taskId={taskId} task={task} />
-      ))}
-
-      <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex items-baseline gap-2.5">
-          <h3 className="text-title">What happened</h3>
-          <span className="font-mono text-[11px] text-subtle-foreground">{task.facts.length} events</span>
+      <Tabs value={detailTab} onValueChange={(value) => setDetailTab(value as DetailTab)}>
+        <div className="overflow-x-auto border-b border-border pb-1">
+          <TabsList aria-label="Task detail sections">
+            <TabsTrigger value="Overview">Overview</TabsTrigger>
+            <TabsTrigger value="Activity">Activity <span className="text-current/55">{task.factCount}</span></TabsTrigger>
+            <TabsTrigger value="Usage">Usage <span className="text-current/55">{task.usageSessions.length}</span></TabsTrigger>
+            <TabsTrigger value="Work">Work</TabsTrigger>
+          </TabsList>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <label className="inline-flex cursor-pointer items-center gap-2 text-aux text-muted-foreground">
-            <Switch checked={hideRoutine} onCheckedChange={setHideRoutine} />
-            hide routine steps
-          </label>
-          <SegmentedControl options={VIEW_OPTIONS} value={historyView} onValueChange={setHistoryView} size="sm" aria-label="History view" />
-        </div>
-      </div>
 
-      {historyView === "Stream" ? (
-        <StreamView rounds={rounds} sessions={sessions} openEntries={openEntries} toggle={(seq) => setOpenEntries((current) => toggleSet(current, seq))} />
-      ) : historyView === "Lanes" ? (
-        <LanesView entries={visible} sessions={sessions} />
-      ) : (
-        <TableView entries={visible} sessions={sessions} openEntries={openEntries} toggle={(seq) => setOpenEntries((current) => toggleSet(current, seq))} />
-      )}
+        <TabsContent value="Overview" className="flex flex-col gap-4 pt-2">
+          <OverviewMetrics task={task} workerCount={sessions.size} now={now} />
+          <RecentActivity entries={recent} onViewAll={() => setDetailTab("Activity")} />
+          {task.state === "open" && composerOpen && (
+            <ReplyComposer
+              composerRef={composerRef}
+              reply={reply}
+              setReply={setReply}
+              sending={sending}
+              error={error}
+              onSend={send}
+              onClose={() => setComposerOpen(false)}
+            />
+          )}
+        </TabsContent>
 
-      {task.state === "open" && (
-        <Card>
-          <CardHeader><CardTitle>Reply</CardTitle></CardHeader>
-          <CardContent className="flex flex-wrap gap-1.5">
-            {DETAIL_REPLIES.map((text) => <Button key={text} variant="outline" size="sm" onClick={() => setReply(text)}>{text}</Button>)}
-          </CardContent>
-          <CardContent>
-            <Textarea ref={composerRef} className="min-h-[104px]" value={reply} onChange={(event) => setReply(event.target.value)} aria-label="Reply to this task" />
-          </CardContent>
-          <CardFooter className="flex-col items-stretch gap-2.5">
-            <Button className="w-fit" onClick={() => void send()} disabled={sending || !reply.trim()}>
-              {sending && <Spinner />}
-              {sending ? "Sending…" : "Send reply"}
-            </Button>
-            {error && <DetailError message={error} />}
-          </CardFooter>
-        </Card>
-      )}
+        <TabsContent value="Activity" className="flex flex-col gap-3.5 pt-2">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex items-baseline gap-2.5">
+              <h2 className="text-title">What happened</h2>
+              <span className="font-mono text-[11px] text-subtle-foreground">{task.facts.length} events</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <label className="inline-flex cursor-pointer items-center gap-2 text-aux text-muted-foreground">
+                <Switch checked={hideRoutine} onCheckedChange={setHideRoutine} />
+                hide routine steps
+              </label>
+              <SegmentedControl options={VIEW_OPTIONS} value={historyView} onValueChange={setHistoryView} size="sm" aria-label="History view" />
+            </div>
+          </div>
+          {historyView === "Stream" ? (
+            <StreamView rounds={rounds} sessions={sessions} openEntries={openEntries} toggle={(seq) => setOpenEntries((current) => toggleSet(current, seq))} />
+          ) : historyView === "Lanes" ? (
+            <LanesView entries={visible} sessions={sessions} />
+          ) : (
+            <TableView entries={visible} sessions={sessions} openEntries={openEntries} toggle={(seq) => setOpenEntries((current) => toggleSet(current, seq))} />
+          )}
+        </TabsContent>
+
+        <TabsContent value="Usage" className="flex flex-col gap-3.5 pt-2">
+          <TaskUsageSummary usage={usage.analysis?.usage} loading={usage.loading} unavailable={usage.unavailable} />
+          <TaskUsageExplorer task={task} analysis={usage.analysis} loading={usage.loading} unavailable={usage.unavailable} />
+        </TabsContent>
+
+        <TabsContent value="Work" className="flex flex-col gap-3.5 pt-2">
+          <div>
+            <h2 className="text-title">Linked work</h2>
+            <p className="mt-1 text-ui text-muted-foreground">Pull requests and other deliverables connected to this task appear here.</p>
+          </div>
+          {webDomain().taskDetailPanels.map((Panel, index) => (
+            <Panel key={Panel.displayName ?? Panel.name ?? index} taskId={taskId} task={task} />
+          ))}
+        </TabsContent>
+      </Tabs>
     </div>
+  );
+}
+
+function OverviewMetrics({ task, workerCount, now }: { task: TaskDetailJson; workerCount: number; now: number }) {
+  const items = [
+    { label: "Events", value: task.factCount.toLocaleString() },
+    { label: "Agent sessions", value: task.usageSessions.length.toLocaleString() },
+    { label: "Workers", value: workerCount.toLocaleString() },
+    { label: "Last update", value: formatRelative(task.updatedAt, now) },
+  ];
+  return (
+    <dl className="grid grid-cols-2 overflow-hidden rounded-8 border border-border sm:grid-cols-4">
+      {items.map((item, index) => (
+        <div key={item.label} className={cn("min-w-0 px-3.5 py-3", index > 0 && "sm:border-l sm:border-border", index % 2 === 1 && "border-l border-border", index >= 2 && "border-t border-border sm:border-t-0")}>
+          <dt className="text-aux text-muted-foreground">{item.label}</dt>
+          <dd className="mt-0.5 truncate font-mono text-[14px] font-semibold text-foreground">{item.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function RecentActivity({ entries, onViewAll }: { entries: FactJson[]; onViewAll: () => void }) {
+  return (
+    <section className="flex flex-col gap-2.5" aria-labelledby="recent-activity-title">
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="recent-activity-title" className="text-title">Recent activity</h2>
+        <Button variant="link" size="xs" className="px-0" onClick={onViewAll}>View all activity</Button>
+      </div>
+      <Card className="gap-0 overflow-hidden py-0">
+        {entries.map((item, index) => {
+          const content = factBody(item);
+          return (
+            <div key={item.seq} className={cn("grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 px-4 py-3", index > 0 && "border-t border-border")}>
+              <HistoryChip item={item} />
+              <div className="min-w-0">
+                {content.title && <div className="truncate text-ui font-semibold">{content.title}</div>}
+                {content.body && <LightMarkdown markdown={content.body} compact className="line-clamp-2 text-ui text-muted-foreground" />}
+              </div>
+              <span className="whitespace-nowrap font-mono text-[10.5px] text-subtle-foreground">{formatTime(item.createdAt)}</span>
+            </div>
+          );
+        })}
+        {!entries.length && (
+          <EmptyState>
+            <EmptyStateTitle>No activity yet</EmptyStateTitle>
+            <EmptyStateDescription>New task updates will appear here.</EmptyStateDescription>
+          </EmptyState>
+        )}
+      </Card>
+    </section>
+  );
+}
+
+function ReplyComposer({ composerRef, reply, setReply, sending, error, onSend, onClose }: {
+  composerRef: RefObject<HTMLTextAreaElement | null>;
+  reply: string;
+  setReply: (value: string) => void;
+  sending: boolean;
+  error: string | null;
+  onSend: () => Promise<void>;
+  onClose: () => void;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Reply</CardTitle>
+        <CardAction><Button variant="ghost" size="xs" onClick={onClose}>Close</Button></CardAction>
+      </CardHeader>
+      <CardContent className="flex flex-wrap gap-1.5">
+        {DETAIL_REPLIES.map((text) => <Button key={text} variant="outline" size="sm" onClick={() => setReply(text)}>{text}</Button>)}
+      </CardContent>
+      <CardContent>
+        <Textarea ref={composerRef} className="min-h-[104px]" value={reply} onChange={(event) => setReply(event.target.value)} aria-label="Reply to this task" />
+      </CardContent>
+      <CardFooter className="flex-col items-stretch gap-2.5">
+        <Button className="w-fit" onClick={() => void onSend()} disabled={sending || !reply.trim()}>
+          {sending && <Spinner />}
+          {sending ? "Sending…" : "Send reply"}
+        </Button>
+        {error && <DetailError message={error} />}
+      </CardFooter>
+    </Card>
   );
 }
 
