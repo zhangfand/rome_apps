@@ -26,6 +26,7 @@ import { frontdeskShadowLimit, frontdeskShadowReport } from "../frontdesk/report
  *   POST tasks/:id/reply   a person's reply, through conductor:record_person_reply
  *   POST tasks/:id/complete close as done, through conductor:complete_task
  *   POST tasks/:id/cancel  close as not wanted, through conductor:cancel_task
+ *   POST tasks/:id/fork    replay a historical checkpoint with a pinned coordinator prompt
  *   GET|PATCH config       settings; projects.<id>: null deletes (force=1 overrides the open-task guard)
  *   GET config/inspect     inspect one working directory through its workspace provider
  *   GET config/directories browse directories on the Rome host
@@ -124,6 +125,24 @@ class ConductorApiHandler implements RomeAppApiHandler {
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `cancel returned ${result.status}` }, 502);
         if (isConflictData(result.data)) return json(result.data, 409);
         return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get(), safe(() => createTaskSessionRepository(this.ctx.db).forTask(taskId)) ?? [], safe(() => createAgentInstanceRepository(this.ctx.db).forTaskCoordinator(taskId)));
+      }
+      if (request.path[0] === "tasks" && request.path[2] === "fork" && request.path.length === 3) {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+        const body = readJsonBody<{ throughSeq?: unknown; seed?: unknown; coordinatorAgent?: unknown; brief?: unknown }>(request);
+        if (!body || !Number.isInteger(body.throughSeq)) return json({ error: "throughSeq is required." }, 400);
+        if (typeof body.seed !== "string" || !body.seed.trim()) return json({ error: "A sanitized checkpoint seed is required." }, 400);
+        if (typeof body.coordinatorAgent !== "string" || !body.coordinatorAgent.trim()) return json({ error: "coordinatorAgent is required." }, 400);
+        const result = await this.ctx.runAction("conductor:fork_task", {
+          taskId: request.path[1],
+          throughSeq: body.throughSeq,
+          seed: body.seed.trim(),
+          coordinatorAgent: body.coordinatorAgent.trim(),
+          ...(typeof body.brief === "string" && body.brief.trim() ? { brief: body.brief.trim() } : {}),
+          source: `Replay ${request.path[1]} from checkpoint #${body.throughSeq}`,
+        });
+        if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `fork returned ${result.status}` }, 502);
+        return json(result.data ?? {});
       }
       // The ingest seam over HTTP. Any system that can reach Rome can open a
       // task or report an event; it cannot do anything else to the ledger,
@@ -322,7 +341,8 @@ function taskSummary(task: TaskView, now: Date, composition: CoreComposition, co
     projectSubtitle: presentation?.repo,
     workRepo: presentation?.workRepo,
     createdBy: task.createdBy,
-    coordinatorAgent: config?.orchestratorAgent,
+    coordinatorAgent: task.replay?.coordinatorAgent ?? task.parent?.coordinatorAgent ?? config?.orchestratorAgent,
+    replay: task.replay,
     coordinatorInstance: coordinatorInstance ? {
       id: coordinatorInstance.id,
       agent: coordinatorInstance.agentName,

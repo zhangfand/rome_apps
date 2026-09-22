@@ -27,6 +27,7 @@ db:
 agents:
   - app/agents/conductor.yaml
   - app/agents/engineer-lead.yaml
+  - app/agents/engineer-lead-replay-v1.yaml
   - app/agents/ledger-compactor.yaml
   - app/agents/pm.yaml
 
@@ -40,6 +41,7 @@ actions:
   - app/actions/compact-task-history
   - app/actions/run-worker
   - app/actions/create
+  - app/actions/fork-task
   - app/actions/reply
   - app/actions/complete
   - app/actions/cancel

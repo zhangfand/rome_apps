@@ -6,6 +6,7 @@ import { Button } from "@rome-os/ui/button";
 import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "@rome-os/ui/card";
 import { cn } from "@rome-os/ui/cn";
 import { EmptyState, EmptyStateDescription, EmptyStateTitle } from "@rome-os/ui/empty-state";
+import { Input } from "@rome-os/ui/input";
 import { SegmentedControl } from "@rome-os/ui/segmented-control";
 import { Spinner } from "@rome-os/ui/spinner";
 import { Switch } from "@rome-os/ui/switch";
@@ -60,6 +61,10 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
   const [sending, setSending] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>("Overview");
   const [composerOpen, setComposerOpen] = useState(false);
+  const [forkOpen, setForkOpen] = useState(false);
+  const [forkSeq, setForkSeq] = useState("");
+  const [forkSeed, setForkSeed] = useState("");
+  const [forkAgent, setForkAgent] = useState("conductor:engineer-lead-replay-v1");
   const [openEntries, setOpenEntries] = useState<Set<number>>(() => new Set());
   const [historyView, setHistoryView] = useState<HistoryView>(readView);
   const [activityOrder, setActivityOrder] = useState<ActivityOrder>(readActivityOrder);
@@ -154,6 +159,30 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
     }
   };
 
+  const forkTask = async () => {
+    if (!task || !forkSeed.trim() || !Number.isInteger(Number(forkSeq))) return;
+    setSending(true);
+    setError(null);
+    try {
+      const response = await fetchAppApi(`tasks/${encodeURIComponent(taskId)}/fork`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ throughSeq: Number(forkSeq), seed: forkSeed.trim(), coordinatorAgent: forkAgent.trim() }),
+      });
+      if (!response.ok) {
+        setError(await responseError(response));
+        return;
+      }
+      const result = await response.json() as { taskId?: string };
+      if (!result.taskId) throw new Error("Replay was created without a Task id.");
+      navigateToApp(`/${result.taskId}`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The replay could not be created.");
+    } finally {
+      setSending(false);
+    }
+  };
+
   if (!task) {
     if (error) return <ErrorCard message={error} retry={load} />;
     return <p className="my-6 font-mono text-[13px] tracking-[0.06em] text-muted-foreground">reading this task<span className="loading-dot">.</span><span className="loading-dot loading-dot-2">.</span><span className="loading-dot loading-dot-3">.</span></p>;
@@ -231,8 +260,44 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
             <Button variant="ghost" disabled={sending} onClick={() => void closeTask("cancel")}>Cancel task</Button>
           </div>
         )}
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" disabled={sending} onClick={() => {
+            setForkSeq((current) => current || String(task.latest.seq));
+            setForkOpen((current) => !current);
+          }}>Replay from checkpoint</Button>
+        </div>
         {error && !composerOpen && <DetailError message={error} />}
       </section>
+
+      {forkOpen && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Replay this Task</CardTitle>
+            <CardAction><Button variant="ghost" size="xs" onClick={() => setForkOpen(false)}>Close</Button></CardAction>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-ui font-medium">
+              Source checkpoint sequence
+              <Input type="number" min={task.facts[0]?.seq ?? 1} max={task.latest.seq} value={forkSeq} onChange={(event) => setForkSeq(event.target.value)} />
+            </label>
+            <label className="grid gap-1.5 text-ui font-medium">
+              Coordinator prompt variant
+              <Input value={forkAgent} onChange={(event) => setForkAgent(event.target.value)} />
+            </label>
+          </CardContent>
+          <CardContent className="grid gap-1.5">
+            <label className="text-ui font-medium" htmlFor="fork-seed">Sanitized checkpoint seed</label>
+            <p className="text-aux text-muted-foreground">Include pinned spec/prototype references, the person’s decision, constraints, and desired next outcome. Do not copy secrets or facts after the checkpoint.</p>
+            <Textarea id="fork-seed" className="min-h-[180px]" value={forkSeed} onChange={(event) => setForkSeed(event.target.value)} />
+          </CardContent>
+          <CardFooter>
+            <Button onClick={() => void forkTask()} disabled={sending || !forkSeed.trim() || !forkAgent.trim() || !forkSeq}>
+              {sending && <Spinner />}
+              {sending ? "Creating replay…" : "Create fresh replay"}
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
 
       <Tabs value={detailTab} onValueChange={(value) => setDetailTab(value as DetailTab)}>
         <div className="overflow-x-auto border-b border-border pb-1">

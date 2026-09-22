@@ -16,6 +16,15 @@ export interface SharedPromptContract {
   content: string;
 }
 
+export interface TaskSnapshotMirrorRef {
+  repo: string;
+  path: string;
+  commit: string;
+  sha256: string;
+  bytes: number;
+  url: string;
+}
+
 /** An app-owned, guardian-only read attached beneath one task. */
 export interface TaskDomainRoute {
   method: "GET";
@@ -41,6 +50,12 @@ export interface CoreComposition {
   projectPromptNote?(task: TaskView, audience: "worker" | "orchestrator"): string;
   /** Domain contracts injected verbatim into coordinator and worker prompts. */
   sharedPromptContracts?: readonly SharedPromptContract[];
+  /** Optional domain-owned mirror for a newly generated ledger Snapshot. */
+  archiveTaskSnapshot?(task: TaskView, input: {
+    coversThroughSeq: number;
+    generatedAt: Date;
+    summary: string;
+  }): Promise<TaskSnapshotMirrorRef | undefined>;
   projectPresentation?(project: ProjectConfig | TaskView["project"] | undefined, config?: ConductorConfig): { repo?: string; subtitle?: string; workRepo?: { repo: string; url: string }; sourceEnabled?: boolean; sourceLabel?: string; sourceValue?: string; emptySubtitle?: string };
   mergeConfig?(current: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown>;
   /** Defaults shown before setup. They are not persisted until a valid PATCH. */

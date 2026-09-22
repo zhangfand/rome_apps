@@ -14,19 +14,32 @@ export interface JsonArtifactDraft {
   value: unknown;
 }
 
+export interface TextArtifactDraft {
+  /** POSIX path inside the work repository. */
+  path: string;
+  content: string;
+  mediaType: "text/markdown";
+}
+
 export interface WorkRepoArtifactRef {
   repo: string;
   path: string;
   commit: string;
   sha256: string;
   bytes: number;
-  mediaType: "application/json";
+  mediaType: "application/json" | "text/markdown";
   url: string;
 }
 
 export type PersistJsonArtifacts = (
   workRepo: WorkRepoConfig,
   drafts: readonly JsonArtifactDraft[],
+  message: string,
+) => Promise<Map<string, WorkRepoArtifactRef>>;
+
+export type PersistTextArtifacts = (
+  workRepo: WorkRepoConfig,
+  drafts: readonly TextArtifactDraft[],
   message: string,
 ) => Promise<Map<string, WorkRepoArtifactRef>>;
 
@@ -38,6 +51,28 @@ export type PersistJsonArtifacts = (
 export const persistJsonArtifacts: PersistJsonArtifacts = async (workRepo, drafts, message) => {
   if (!drafts.length) return new Map();
   const prepared = prepare(drafts);
+  return persistPreparedArtifacts(workRepo, prepared, message);
+};
+
+/** Commit human-readable runtime artifacts with the same isolated-clone guarantees. */
+export const persistTextArtifacts: PersistTextArtifacts = async (workRepo, drafts, message) => {
+  if (!drafts.length) return new Map();
+  const paths = new Set<string>();
+  const prepared = drafts.map((draft) => {
+    const artifactPath = safeArtifactPath(draft.path);
+    if (paths.has(artifactPath)) throw new Error(`Duplicate work-repository artifact path: ${artifactPath}`);
+    paths.add(artifactPath);
+    const content = draft.content.endsWith("\n") ? draft.content : `${draft.content}\n`;
+    return { path: artifactPath, content, sha256: createHash("sha256").update(content).digest("hex"), mediaType: draft.mediaType };
+  });
+  return persistPreparedArtifacts(workRepo, prepared, message);
+};
+
+async function persistPreparedArtifacts(
+  workRepo: WorkRepoConfig,
+  prepared: readonly PreparedArtifact[],
+  message: string,
+): Promise<Map<string, WorkRepoArtifactRef>> {
   const origin = (await git(workRepo.workingDir, "remote", "get-url", "origin")).trim();
   if (!origin) throw new Error(`Work repository ${workRepo.repo} has no origin remote`);
   const branch = await remoteDefaultBranch(workRepo.workingDir);
@@ -73,7 +108,7 @@ export const persistJsonArtifacts: PersistJsonArtifacts = async (workRepo, draft
         commit,
         sha256: item.sha256,
         bytes: Buffer.byteLength(item.content),
-        mediaType: "application/json" as const,
+        mediaType: item.mediaType,
         url: `https://github.com/${workRepo.repo}/blob/${commit}/${item.path.split("/").map(encodeURIComponent).join("/")}`,
       }]));
     } catch (error) {
@@ -84,7 +119,14 @@ export const persistJsonArtifacts: PersistJsonArtifacts = async (workRepo, draft
     }
   }
   throw lastError;
-};
+}
+
+interface PreparedArtifact {
+  path: string;
+  content: string;
+  sha256: string;
+  mediaType: WorkRepoArtifactRef["mediaType"];
+}
 
 function prepare(drafts: readonly JsonArtifactDraft[]) {
   const paths = new Set<string>();
@@ -93,7 +135,7 @@ function prepare(drafts: readonly JsonArtifactDraft[]) {
     if (paths.has(artifactPath)) throw new Error(`Duplicate work-repository artifact path: ${artifactPath}`);
     paths.add(artifactPath);
     const content = `${JSON.stringify(draft.value, null, 2)}\n`;
-    return { path: artifactPath, content, sha256: createHash("sha256").update(content).digest("hex") };
+    return { path: artifactPath, content, sha256: createHash("sha256").update(content).digest("hex"), mediaType: "application/json" as const };
   });
 }
 

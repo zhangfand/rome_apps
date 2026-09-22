@@ -212,11 +212,17 @@ export function factBody(fact: FactJson): FactContent {
     case "Failed": return { title: "Work failed", body: s("error") };
     case "Lost": return { title: "Work stopped", body: s("why") };
     case "Event": return { title: eventTitle(fact), body: s("summary") };
-    case "Snapshot": return {
-      title: value(p, "coversThroughSeq") ? `History through #${value(p, "coversThroughSeq")}` : "Task history snapshot",
-      body: "Earlier ledger entries were compressed for future coordinator context.",
-      extra: s("summary") || undefined,
-    };
+    case "Snapshot": {
+      const mirror = p.workRepo && typeof p.workRepo === "object" && !Array.isArray(p.workRepo)
+        ? p.workRepo as Record<string, unknown>
+        : undefined;
+      const url = mirror ? value(mirror, "url") : "";
+      return {
+        title: value(p, "coversThroughSeq") ? `History through #${value(p, "coversThroughSeq")}` : "Task history snapshot",
+        body: `Earlier ledger entries were compressed for future coordinator context.${url ? ` [Open work-repo mirror](${url})` : ""}`,
+        extra: s("summary") || undefined,
+      };
+    }
     default: return { title: "", body: "An update was recorded." };
   }
 }

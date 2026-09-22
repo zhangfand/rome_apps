@@ -122,6 +122,20 @@ export function buildOrchestratorPrompt(input: {
       ...(input.task.parent.planRef ? [`Engineering plan: ${input.task.parent.planRef}`] : []),
       "",
     ] : []),
+    ...(!resumed && input.task.replay ? [
+      "## Replay fork",
+      `Source checkpoint: ${input.task.replay.sourceTaskId} through ledger #${input.task.replay.sourceThroughSeq}`,
+      `Pinned coordinator: ${input.task.replay.coordinatorAgent}`,
+      `Experimental engineering plan: ${input.task.replay.workRepoPath}`,
+      "This is a fresh execution branch, not a continuation of the source Task's Agent Session.",
+      "The source ledger was intentionally not copied because later facts, stale execution state, and secrets must not leak into this run.",
+      "Treat the seed below as the complete checkpoint state. Do not read or mutate the source Task, its later production branch, or its canonical design.md.",
+      "Write replay-specific engineering decisions only to the experimental plan path above. Canonical promotion is a separate human decision.",
+      "",
+      "### Sanitized checkpoint seed",
+      input.task.replay.seed,
+      "",
+    ] : []),
     ...((input.children?.length ?? 0) > 0 ? [
       "## Materialized tasks",
       ...input.children!.map((child) => {

@@ -19,6 +19,13 @@ export interface TaskSummary {
   createdBy: string;
   /** Agent id configured to coordinate this task (for example conductor:engineer-lead). */
   coordinatorAgent?: string;
+  replay?: {
+    sourceTaskId: string;
+    sourceThroughSeq: number;
+    coordinatorAgent: string;
+    seed: string;
+    workRepoPath: string;
+  };
   /** Conductor-owned logical identity whose one Agent Session coordinates this Task. */
   coordinatorInstance?: {
     id: string;

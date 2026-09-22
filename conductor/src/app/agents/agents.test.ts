@@ -108,6 +108,7 @@ describe("Conductor agent boundaries", () => {
       "create_child_tasks",
       "create_job",
       "create_task",
+      "fork_task",
       "frontdesk_shadow_report",
       "list_tasks",
       "read_task_history",
@@ -121,6 +122,14 @@ describe("Conductor agent boundaries", () => {
     const manifest = readFileSync(path.resolve(here, "../../../app.yaml"), "utf8");
     expect(manifest).not.toContain("app/actions/wait");
     expect(read("engineer-lead.yaml")).not.toContain("conductor:wait_for_task_update");
+  });
+
+  it("pins replay experiments to a decomposition-first lead prompt", () => {
+    const replay = read("engineer-lead-replay-v1.yaml").replace(/\s+/g, " ");
+    expect(replay).toContain("do not create a production coding Job on the parent delivery Task");
+    expect(replay).toContain("Materialize production work with conductor:create_child_tasks");
+    expect(replay).toContain("Do not pack a roadmap into one worker instruction");
+    expect(replay).toContain("Do not edit the workstream's canonical design.md");
   });
 
   it("does not give the PM the global action catalog", () => {
@@ -158,6 +167,7 @@ describe("Conductor agent boundaries", () => {
     expect(WORK_REPO_CONTRACT).toContain("# Agent Work Repository Contract");
     expect(WORK_REPO_CONTRACT).toContain("├── spec.md");
     expect(WORK_REPO_CONTRACT).toContain("├── design.md");
+    expect(WORK_REPO_CONTRACT).toContain("_conductor/tasks/<task-id>/snapshot.md");
     expect(pm).toContain("`work-repo-contract.md`");
     expect(lead).toContain("`work-repo-contract.md`");
     expect(lead).not.toContain("This repo is shared coordination state");

@@ -86,6 +86,9 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
           planItemId: item.planItemId,
           ...(item.specRef ? { specRef: item.specRef } : {}),
           ...(item.planRef ? { planRef: item.planRef } : {}),
+          ...(loaded.task.replay?.coordinatorAgent || loaded.task.parent?.coordinatorAgent
+            ? { coordinatorAgent: loaded.task.replay?.coordinatorAgent ?? loaded.task.parent?.coordinatorAgent }
+            : {}),
         };
         childFacts.push({
           taskId: childTaskId,

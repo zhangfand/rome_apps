@@ -45,6 +45,8 @@ export interface TaskView {
   project?: import("./projects.js").ProjectBinding["project"];
   /** Lead-owned delivery Task and plan item that materialized this outcome. */
   parent?: import("./facts.js").TaskParent;
+  /** Historical checkpoint and prompt variant that seeded this fresh Task. */
+  replay?: import("./facts.js").TaskReplay;
   brief: string;
   createdBy: string;
   state: TaskState;
@@ -151,6 +153,7 @@ export function foldTask(facts: readonly Fact[]): TaskView {
     projectId: created.payload.projectId,
     project: created.payload.project,
     parent: created.payload.parent,
+    replay: created.payload.replay,
     brief: created.payload.brief,
     createdBy: created.by,
     state,

@@ -32,7 +32,10 @@ describe("engineering lead task materialization", () => {
       kind: "Created",
       by: "person",
       source: "build it",
-      payload: { brief: "deliver feature", projectId: "app", project: { workingDir: "/repo" } },
+      payload: { brief: "deliver feature", projectId: "app", project: { workingDir: "/repo" }, replay: {
+        sourceTaskId: "source", sourceThroughSeq: 9, coordinatorAgent: "conductor:engineer-lead-replay-v1",
+        seed: "approved prototype", workRepoPath: "_experiments/replays/parent/design.md",
+      } },
     });
     const action = createAction({} as ActionConfig, { appContext } as unknown as AppActionRuntimeDeps);
 
@@ -51,6 +54,7 @@ describe("engineering lead task materialization", () => {
     const children = snapshot.tasks.filter((task) => task.parent?.taskId === "parent");
     expect(children.map((task) => task.parent?.planItemId).sort()).toEqual(["api", "ui"]);
     expect(children[0].project).toEqual({ workingDir: "/repo" });
+    expect(children[0].parent?.coordinatorAgent).toBe("conductor:engineer-lead-replay-v1");
     expect(parent.lastDecision?.kind).toBe("Noted");
     expect(runActionCalls).toEqual(["conductor:reconcile_tasks"]);
 

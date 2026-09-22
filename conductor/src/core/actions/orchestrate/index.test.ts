@@ -109,7 +109,10 @@ describe("coordinator wake observations", () => {
       kind: "Created",
       by: "guardian",
       source: "create",
-      payload: { brief: "ORIGINAL_BRIEF", projectId: "app", project: { workspace: "none" } },
+      payload: { brief: "ORIGINAL_BRIEF", projectId: "app", project: { workspace: "none" }, replay: {
+        sourceTaskId: "source", sourceThroughSeq: 12, coordinatorAgent: "conductor:engineer-lead-replay-v1",
+        seed: "approved prototype", workRepoPath: "_experiments/replays/t-1/design.md",
+      } },
     });
     const composition = {
       parseConfig: (raw: unknown) => ({ ok: true as const, config: raw as ConductorConfig }),
@@ -124,6 +127,7 @@ describe("coordinator wake observations", () => {
     const first = await action.execute({ taskId: "t-1" });
     expect(first.status).toBe("ok");
     expect(summons[0].sessionId).toBeUndefined();
+    expect(summons[0].agentName).toBe("conductor:engineer-lead-replay-v1");
     expect(String(summons[0].prompt)).toContain("ORIGINAL_BRIEF");
 
     ledger.append({ taskId: "t-1", kind: "Reply", by: "guardian", source: "NEXT_REPLY", payload: { text: "NEXT_REPLY" } });

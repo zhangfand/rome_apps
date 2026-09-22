@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "@rstest/core";
-import { persistJsonArtifacts } from "./work-repo-artifacts.js";
+import { persistJsonArtifacts, persistTextArtifacts } from "./work-repo-artifacts.js";
 
 const exec = promisify(execFile);
 
@@ -30,6 +30,30 @@ describe("work repository JSON artifacts", () => {
       expect(ref.commit).toMatch(/^[0-9a-f]{40}$/);
       expect(ref.sha256).toMatch(/^[0-9a-f]{64}$/);
       expect(ref.url).toContain(`/blob/${ref.commit}/`);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("commits a Markdown Snapshot mirror", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "conductor-snapshot-test-"));
+    const remote = path.join(root, "remote.git");
+    const checkout = path.join(root, "checkout");
+    const inspect = path.join(root, "inspect");
+    try {
+      await git(root, "init", "--bare", "--initial-branch=main", remote);
+      await git(root, "clone", remote, checkout);
+      const refs = await persistTextArtifacts(
+        { repo: "acme/widgets-work", workingDir: checkout },
+        [{ path: "_conductor/tasks/t-1/snapshot.md", mediaType: "text/markdown", content: "# Snapshot\n\nCurrent state." }],
+        "archive snapshot",
+      );
+      const ref = refs.values().next().value!;
+
+      await git(root, "clone", remote, inspect);
+      expect(await readFile(path.join(inspect, ref.path), "utf8")).toBe("# Snapshot\n\nCurrent state.\n");
+      expect(ref.mediaType).toBe("text/markdown");
+      expect(ref.url).toContain(`/blob/${ref.commit}/_conductor/tasks/t-1/snapshot.md`);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

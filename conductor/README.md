@@ -101,6 +101,9 @@ Raw facts remain untouched. A coordinator that has not already consumed the
 prefix receives the canonical `Created` fact, the newest Snapshot, and facts
 after the Snapshot's covered sequence. Snapshot facts are context, not
 coordinator decisions or runtime events, and never wake a Task by themselves.
+When the project has an agent work repository, the same summary is also
+committed to `_conductor/tasks/<task-id>/snapshot.md`; the Snapshot fact pins
+the exact repository commit and remains authoritative.
 
 ## What code still enforces (and why it is not workflow)
 
@@ -149,6 +152,18 @@ records its parent, stable plan-item id, and optional spec/plan references. When
 a child completes, the runtime observes that fact on the parent; the lead then
 reconciles the actual result and decides what, if anything, becomes runnable
 next. Obsolete created work is cancelled or superseded rather than deleted.
+
+## Checkpoint replay for prompt experiments
+
+`conductor:fork_task` starts a fresh Task from a historical checkpoint without
+copying the source ledger or resuming its Agent Sessions. The caller supplies a
+sanitized checkpoint seed and a registered coordinator Agent id, so prompt
+variants can be compared against the same product/prototype state without
+leaking later decisions, worker state, or credentials. Replay planning is
+isolated under `_experiments/replays/<new-task-id>/design.md` in the project work
+repository; promotion into the canonical workstream remains an explicit human
+decision. The Task detail page exposes the same flow as **Replay from
+checkpoint**.
 
 ## Setup
 

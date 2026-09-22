@@ -12,8 +12,10 @@ repository; it replaces neither.
   code, generated build output, and credentials only in their proper systems,
   never here.
 - The Task ledger remains the record of events, decisions, Jobs, and execution
-  state. Do not copy the ledger into documents. Link Task ids, PRs, commits, and
-  other evidence where they help another Agent recover the reasoning.
+  state. Do not manually copy the ledger into documents; the runtime-owned
+  `_conductor/` Snapshot mirror described below is the sole exception. Link
+  Task ids, PRs, commits, and other evidence where they help another Agent
+  recover the reasoning.
 - Commit and push meaningful changes before handing work to another Agent. Git
   history is the version history; update canonical files rather than creating
   `v2` or per-Agent copies.
@@ -29,6 +31,10 @@ Tasks or Jobs contribute to it:
 │   ├── spec.md       # product contract; PM-owned when PM is involved
 │   ├── design.md     # evolving engineering plan and decisions, when needed
 │   └── artifacts/    # optional supporting evidence that merits its own file
+├── _conductor/           # runtime-owned Task context mirrors
+│   └── tasks/<task-id>/snapshot.md
+├── _experiments/         # isolated, non-canonical replay/prompt experiments
+│   └── replays/<task-id>/design.md
 └── _evidence/        # runtime-owned snapshots of external payloads
 ```
 
@@ -49,6 +55,17 @@ Tasks or Jobs contribute to it:
   than Task, Agent, or Run id. Agents may read these files but must not edit
   them. Ledger events cite the repository path and the exact Git commit; the
   compact ledger envelope remains authoritative for ordering and deduplication.
+- `_conductor/tasks/<task-id>/snapshot.md` is runtime-owned and overwritten
+  whenever Conductor writes a newer ledger `Snapshot` fact. It is a
+  human-readable recovery mirror, not a second source of truth: the Snapshot
+  fact cites its exact repository commit, while the append-only ledger remains
+  authoritative. Agents may read this file but must not edit it.
+- `_experiments/replays/<task-id>/design.md` is used only by a Task replay that
+  explicitly names that path. It isolates prompt/decomposition experiments
+  from the canonical workstream `design.md`. A replay may update its own file,
+  but never promotes it automatically; a person chooses a winning experiment
+  before an engineering lead reconciles useful decisions into the canonical
+  workstream.
 
 ## Collaboration semantics
 

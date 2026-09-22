@@ -1,0 +1,10 @@
+name: fork_task
+type: custom
+description: >-
+  Start a fresh Task coordinator run from a historical Task checkpoint, using
+  a sanitized seed and a pinned prompt variant without copying the old ledger.
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

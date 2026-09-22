@@ -10,11 +10,12 @@ import {
   SNAPSHOT_AGENT,
 } from "../../lib/ledger-snapshot.js";
 import { readSummonOutput } from "../run-worker/index.js";
+import type { CoreComposition, TaskSnapshotMirrorRef } from "../../lib/composition.js";
 
 const log = createAppLogger("conductor:compact_task_history");
 const COMPACTION_LEASE_MS = 15 * 60_000;
 
-export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): Action {
+export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, composition: CoreComposition): Action {
   const { appContext } = deps;
   return {
     config,
@@ -66,6 +67,12 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         const summary = parseLedgerSnapshotReply(output.reply);
         if (!summary) return { status: "error", error: "ledger compactor returned no valid bounded snapshot" };
 
+        const workRepoRef: TaskSnapshotMirrorRef | undefined = await composition.archiveTaskSnapshot?.(task, {
+          coversThroughSeq: task.latest.seq,
+          generatedAt: new Date(),
+          summary,
+        });
+
         const append = ledger.compareAndAppend(taskId, task.latest.seq, [{
           taskId,
           kind: "Snapshot",
@@ -78,6 +85,14 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
             schemaVersion: 1,
             inputFactCount: input.factCount,
             estimatedInputTokens: input.estimatedTokens,
+            ...(workRepoRef ? { workRepo: {
+              repo: workRepoRef.repo,
+              path: workRepoRef.path,
+              commit: workRepoRef.commit,
+              sha256: workRepoRef.sha256,
+              bytes: workRepoRef.bytes,
+              url: workRepoRef.url,
+            } } : {}),
           },
         }]);
         if (append.status === "conflict") {
@@ -106,6 +121,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
             coversThroughSeq: task.latest.seq,
             inputFactCount: input.factCount,
             estimatedInputTokens: input.estimatedTokens,
+            workRepo: workRepoRef,
           },
         };
       } finally {

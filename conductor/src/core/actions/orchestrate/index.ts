@@ -54,7 +54,10 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         const agentInstances = createAgentInstanceRepository(appContext.db);
         let coordinatorInstance;
         try {
-          coordinatorInstance = agentInstances.ensureTaskCoordinator(taskId, settings.orchestratorAgent);
+          coordinatorInstance = agentInstances.ensureTaskCoordinator(
+            taskId,
+            task.replay?.coordinatorAgent ?? task.parent?.coordinatorAgent ?? settings.orchestratorAgent,
+          );
         } catch (err) {
           return { status: "error", error: err instanceof Error ? err.message : String(err) };
         }
@@ -99,7 +102,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
           });
         };
 
-        const summon = (p: string, sessionId?: string) => appContext.runAction("system:summon", { agentName: settings.orchestratorAgent, prompt: p, ...(sessionId ? { sessionId } : {}) })
+        const summon = (p: string, sessionId?: string) => appContext.runAction("system:summon", { agentName: coordinatorInstance.agentName, prompt: p, ...(sessionId ? { sessionId } : {}) })
           .catch((error: unknown) => ({ status: "error" as const, error: error instanceof Error ? error.message : String(error) }));
         let result = await summon(prompt, coordinatorInstance.sessionId);
         let reply = result.status === "ok" ? readSummonOutput(result.data).reply : "";

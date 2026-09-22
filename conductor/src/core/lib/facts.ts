@@ -117,6 +117,25 @@ export interface TaskParent {
   specRef?: string;
   /** Durable engineering plan the lead is reconciling, when one exists. */
   planRef?: string;
+  /** Prompt variant inherited from an experimental/replay lead, when pinned. */
+  coordinatorAgent?: string;
+}
+
+/**
+ * A fresh Task coordinator run seeded from a deliberate point in another
+ * Task's history.  The old ledger is never copied: it may contain stale
+ * execution state or secrets.  Instead, a person supplies the bounded,
+ * sanitized context that is safe for the new coordinator to consume.
+ */
+export interface TaskReplay {
+  sourceTaskId: string;
+  sourceThroughSeq: number;
+  /** Registered Agent id pinned for this replay (a prompt variant). */
+  coordinatorAgent: string;
+  /** Human-authored, sanitized state at the checkpoint. */
+  seed: string;
+  /** Isolated engineering-design path for the experiment. */
+  workRepoPath: string;
 }
 
 // ---- person facts -------------------------------------------------------
@@ -127,6 +146,8 @@ export type CreatedFact = FactOf<"Created", {
   project?: ProjectBinding["project"];
   /** Present when an engineering lead created this separate outcome Task. */
   parent?: TaskParent;
+  /** Present when this Task is a clean replay/fork of an earlier checkpoint. */
+  replay?: TaskReplay;
   /** Set when a source adapter opened the task rather than a person in chat. */
   origin?: TaskOrigin;
   /** Legacy shape of the above, kept for facts already in the ledger. */
@@ -179,6 +200,15 @@ export type SnapshotFact = FactOf<"Snapshot", {
   /** Observability for why this compaction happened. */
   inputFactCount: number;
   estimatedInputTokens: number;
+  /** Human-readable mirror in the configured project work repository. */
+  workRepo?: {
+    repo: string;
+    path: string;
+    commit: string;
+    sha256: string;
+    bytes: number;
+    url: string;
+  };
 }>;
 
 // ---- runtime / worker facts ---------------------------------------------
@@ -322,7 +352,7 @@ export function describeFact(fact: Fact, opts: { full?: boolean } = {}): string 
         return `${fact.payload.source}/${fact.payload.type}: ${fact.payload.summary}${artifact ? `\nArtifact: ${artifact}` : ""}`;
       }
       case "Snapshot":
-        return `covers through #${fact.payload.coversThroughSeq}${fact.payload.previousSnapshotSeq ? `, replacing snapshot #${fact.payload.previousSnapshotSeq}` : ""}\n${fact.payload.summary}`;
+        return `covers through #${fact.payload.coversThroughSeq}${fact.payload.previousSnapshotSeq ? `, replacing snapshot #${fact.payload.previousSnapshotSeq}` : ""}${fact.payload.workRepo ? `\nWork-repository mirror: ${fact.payload.workRepo.repo}:${fact.payload.workRepo.path} at ${fact.payload.workRepo.commit}` : ""}\n${fact.payload.summary}`;
     }
   })();
   const cited = fact.source && fact.by !== RUNTIME && fact.by !== ORCHESTRATOR ? ` [source: ${clip(fact.source, 300)}]` : "";
