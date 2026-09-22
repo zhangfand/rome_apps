@@ -49,13 +49,13 @@ export interface ModelUsage {
 export function aggregateTaskUsage(task: Pick<TaskSummary, "usageSessions">, sessions: ReadonlyMap<string, SessionRecord>): TaskTokenUsage {
   const unique = uniqueSessions(task.usageSessions);
   const all = empty(unique.length);
-  const coordinator = empty(unique.filter((ref) => ref.role === "coordinator").length);
+  const coordinator = empty(unique.filter((ref) => ref.role !== "worker").length);
   const workers = empty(unique.filter((ref) => ref.role === "worker").length);
   for (const ref of unique) {
     const record = sessions.get(ref.id);
     if (!record) continue;
     add(all, record);
-    add(ref.role === "coordinator" ? coordinator : workers, record);
+    add(ref.role === "worker" ? workers : coordinator, record);
   }
   return { ...all, coordinator, workers };
 }

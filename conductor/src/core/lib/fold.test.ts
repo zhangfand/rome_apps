@@ -109,6 +109,23 @@ describe("foldTask", () => {
     expect(task.liveWorker).toBeUndefined();
     expect(task.pendingJob).toBeUndefined();
   });
+  it("treats a Snapshot as context rather than a decision or operational event", () => {
+    const task = foldTask([
+      created(),
+      f({ kind: "JobCreated", by: "orchestrator", payload: { jobId: "j-1", agent: "coding:coding", instructions: "x" } }),
+      f({ kind: "Snapshot", by: "conductor:ledger-compactor", payload: {
+        coversThroughSeq: seq,
+        summary: "Job j-1 is queued",
+        schemaVersion: 1,
+        inputFactCount: 2,
+        estimatedInputTokens: 20,
+      } }),
+    ]);
+    expect(task.pendingJob?.jobId).toBe("j-1");
+    expect(task.lastDecision?.kind).toBe("JobCreated");
+    expect(task.unseen).toEqual([]);
+    expect(needsAttention(task, new Date()).wake).toBe(false);
+  });
 });
 
 describe("parseWorkerReply", () => {

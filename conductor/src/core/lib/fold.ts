@@ -132,8 +132,12 @@ export function foldTask(facts: readonly Fact[]): TaskView {
   // Dispatch and session-open are runtime progress for a Job the coordinator
   // already decided on. Only its outcome (Returned/Failed/Lost) is new input
   // for the next coordination decision.
-  const unseen = ordered.filter((f) => f.seq > lastDecisionSeq && f.kind !== "Dispatched" && f.kind !== "Opened");
-  const pendingJob = jobRef(ordered.at(-1));
+  const unseen = ordered.filter((f) =>
+    f.seq > lastDecisionSeq && f.kind !== "Dispatched" && f.kind !== "Opened" && f.kind !== "Snapshot",
+  );
+  // A Snapshot is transparent to operational state: appending one must not
+  // hide a Job that is still waiting for runtime dispatch.
+  const pendingJob = jobRef([...ordered].reverse().find((fact) => fact.kind !== "Snapshot"));
   // A person's reply supersedes a prior wait immediately, before the
   // orchestrator has had time to record its next decision. Keeping the old
   // wait here makes the UI claim that the task is still sleeping after the

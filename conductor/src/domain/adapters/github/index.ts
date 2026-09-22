@@ -7,6 +7,7 @@ import { githubProject, githubRepo, githubRoot, intakeRoutes } from "./config.js
 import { claimedIssues, intakeApiPath, type IntakeIssue, intakeRequests, MAX_INTAKE_PAGES, toIntakeIssue } from "./intake.js";
 import { issueEvents, type IssueStatus, issuesToWatch } from "./issues.js";
 import { pullApiPaths, pullEvents, type PullObservation, pullsToWatch, unknownTaskPulls } from "./pulls.js";
+import { externalizeReviewArtifacts } from "./review-artifacts.js";
 import { issueApiPath } from "./refs.js";
 
 /**
@@ -84,8 +85,6 @@ async function pollIssueCloses(ctx: AdapterPollContext): Promise<IngestRequest[]
 async function pollPulls(ctx: AdapterPollContext): Promise<IngestRequest[]> {
   const watches = pullsToWatch(ctx.snapshot);
   if (watches.length === 0) return [];
-  const str = (v: unknown) => (typeof v === "string" ? v : "");
-  const login = (v: unknown) => str((v as { login?: unknown } | null)?.login) || "unknown";
 
   const observed = new Map<string, PullObservation>();
   const byId = taskIndex(ctx.snapshot);
@@ -105,19 +104,22 @@ async function pollPulls(ctx: AdapterPollContext): Promise<IngestRequest[]> {
           mergedAt: str(pull.merged_at) || undefined,
           headSha: str((pull.head as { sha?: unknown } | undefined)?.sha) || undefined,
         };
-        const reviews = await githubGet(ctx, paths.reviews, { pull: ref.url });
-        if (Array.isArray(reviews)) seen.reviews = reviews.map((r) => ({ id: Number(r.id), user: login(r.user), state: str(r.state), body: str(r.body), submittedAt: str(r.submitted_at) || undefined }));
-        const rcs = await githubGet(ctx, paths.reviewComments, { pull: ref.url });
-        if (Array.isArray(rcs)) seen.reviewComments = rcs.map((c) => ({
-          id: Number(c.id),
-          reviewId: typeof c.pull_request_review_id === "number" ? c.pull_request_review_id : undefined,
-          user: login(c.user),
-          path: str(c.path) || undefined,
-          line: typeof c.line === "number" ? c.line : undefined,
-          body: str(c.body),
-        }));
+        const reviews = await githubList(ctx, paths.reviews, { pull: ref.url, aspect: "reviews" });
+        if (Array.isArray(reviews)) seen.reviews = reviews.flatMap((value) => {
+          const review = toPullReview(value);
+          return review ? [review] : [];
+        });
+        const rcs = await githubList(ctx, paths.reviewComments, { pull: ref.url, aspect: "review comments" });
+        if (Array.isArray(rcs)) seen.reviewComments = rcs.flatMap((value) => {
+          const comment = toPullReviewComment(value);
+          return comment ? [comment] : [];
+        });
         const ics = await githubGet(ctx, paths.comments, { pull: ref.url });
-        if (Array.isArray(ics)) seen.comments = ics.map((c) => ({ id: Number(c.id), user: login(c.user), body: str(c.body) }));
+        if (Array.isArray(ics)) seen.comments = ics.flatMap((value) => {
+          const c = record(value);
+          const id = positiveId(c?.id);
+          return c && id ? [{ id, user: login(c.user), body: str(c.body) }] : [];
+        });
         if (seen.headSha) {
           const checks = (await githubGet(ctx, paths.checks(seen.headSha), { pull: ref.url })) as { check_runs?: unknown } | undefined;
           if (checks && Array.isArray(checks.check_runs)) {
@@ -127,10 +129,72 @@ async function pollPulls(ctx: AdapterPollContext): Promise<IngestRequest[]> {
         }
         observed.set(ref.url, seen);
       }
-      out.push(...pullEvents(task, ref, seen));
+      out.push(...await externalizeReviewArtifacts(task, pullEvents(task, ref, seen), ctx.log));
     }
   }
   return out;
+}
+
+/** Read a complete GitHub list without treating a partial page sequence as a complete payload. */
+async function githubList(ctx: AdapterPollContext, firstPath: string, meta: Record<string, unknown>): Promise<unknown[] | undefined> {
+  const out: unknown[] = [];
+  for (let page = 1; page <= 100; page += 1) {
+    const rows = await githubGet(ctx, page === 1 ? firstPath : `${firstPath}${firstPath.includes("?") ? "&" : "?"}page=${page}`, { ...meta, page });
+    if (!Array.isArray(rows)) return undefined;
+    out.push(...rows);
+    if (rows.length < 100) return out;
+  }
+  ctx.log.warn("GitHub list exceeded the bounded pagination limit; ignoring the partial observation", meta);
+  return undefined;
+}
+
+/** Normalize only the stable routing fields while retaining the provider JSON verbatim. */
+export function toPullReview(value: unknown): NonNullable<PullObservation["reviews"]>[number] | undefined {
+  const raw = record(value);
+  const id = positiveId(raw?.id);
+  const state = str(raw?.state);
+  if (!raw || !id || !state) return undefined;
+  return {
+    id,
+    user: login(raw.user),
+    state,
+    body: str(raw.body),
+    submittedAt: str(raw.submitted_at) || undefined,
+    raw,
+  };
+}
+
+/** Normalize only the stable routing fields while retaining the provider JSON verbatim. */
+export function toPullReviewComment(value: unknown): NonNullable<PullObservation["reviewComments"]>[number] | undefined {
+  const raw = record(value);
+  const id = positiveId(raw?.id);
+  if (!raw || !id) return undefined;
+  return {
+    id,
+    reviewId: positiveId(raw.pull_request_review_id),
+    user: login(raw.user),
+    path: str(raw.path) || undefined,
+    line: positiveId(raw.line),
+    body: str(raw.body),
+    raw,
+  };
+}
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+}
+
+function positiveId(value: unknown): number | undefined {
+  const n = typeof value === "number" ? value : typeof value === "string" && /^\d+$/.test(value) ? Number(value) : NaN;
+  return Number.isSafeInteger(n) && n > 0 ? n : undefined;
+}
+
+function str(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function login(value: unknown): string {
+  return str(record(value)?.login) || "unknown";
 }
 
 /** One list per repository: open PRs whose head branch names one of our tasks. */

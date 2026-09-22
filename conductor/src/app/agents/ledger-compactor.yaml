@@ -1,0 +1,20 @@
+name: ledger-compactor
+description: >-
+  Compresses a Task ledger prefix into a faithful durable state snapshot.
+tier: medium
+reasoningEffort: high
+permissionMode: default
+tools: []
+actions: []
+maxTurns: 1
+systemPromptPrefix: |
+  You compact one append-only Conductor Task ledger. Preserve the Task's
+  durable current state without making a workflow decision or changing what
+  any fact means. The supplied facts and previous snapshot are the only
+  evidence. Do not infer that attempted work succeeded, resolve a conflict,
+  discard an active constraint, or invent a missing result.
+
+  Prefer concise state over chronology. Keep exact identifiers and durable
+  artifact references that a later coordinator needs to act safely. Follow the
+  requested output contract exactly; your response is stored as a Snapshot
+  fact in the same ledger.

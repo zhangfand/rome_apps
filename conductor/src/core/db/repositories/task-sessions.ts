@@ -2,7 +2,7 @@ import { asc, eq } from "drizzle-orm";
 import type { AppDbContext, DrizzleDb } from "@rome-os/app-runtime";
 import { createAppDbSchema } from "../schema.js";
 
-export type TaskSessionRole = "coordinator" | "worker";
+export type TaskSessionRole = "coordinator" | "worker" | "compactor";
 
 export interface TaskSessionRef {
   taskId: string;
@@ -87,7 +87,7 @@ function toRef(row: TaskSessionRow): TaskSessionRef {
     taskId: row.taskId,
     sessionId: row.sessionId,
     sessionType: row.sessionType,
-    role: row.role === "worker" ? "worker" : "coordinator",
+    role: row.role === "worker" || row.role === "compactor" ? row.role : "coordinator",
     workerId: row.workerId ?? undefined,
     jobId: row.jobId ?? undefined,
     triggerSeq: row.triggerSeq ?? undefined,

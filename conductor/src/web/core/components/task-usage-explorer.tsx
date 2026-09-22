@@ -195,8 +195,8 @@ function Waterfall({ task, analysis }: { task: TaskDetailJson; analysis: TaskUsa
 
 function Icicle({ analysis }: { analysis: TaskUsageAnalysis }) {
   const sessions = analysis.sessions.filter((session) => sessionTokens(session) > 0);
-  const roles = groupSegments(sessions, (session) => session.ref.role === "coordinator" ? "Coordinator" : "Workers");
-  const agents = groupSegments(sessions, (session) => `${session.ref.role === "coordinator" ? "Coordinator" : "Worker"} · ${session.ref.agent ?? "unknown agent"}`);
+  const roles = groupSegments(sessions, (session) => session.ref.role === "coordinator" ? "Coordinator" : session.ref.role === "compactor" ? "Compaction" : "Workers");
+  const agents = groupSegments(sessions, (session) => `${session.ref.role === "coordinator" ? "Coordinator" : session.ref.role === "compactor" ? "Compactor" : "Worker"} · ${session.ref.agent ?? "unknown agent"}`);
   const models = groupSegments(sessions, sessionModels);
   return (
     <CardContent className="border-t pt-4">
@@ -297,14 +297,14 @@ function groupSegments(sessions: SessionUsageAnalysis[], keyOf: (session: Sessio
 }
 
 function sessionTokens(session: SessionUsageAnalysis): number { return session.record?.stats.usage.totalTokens ?? 0; }
-function stageLabel(session: SessionUsageAnalysis): string { return session.ref.role === "coordinator" ? "Coordinator" : (session.ref.agent?.split(":").at(-1) ?? "Worker"); }
+function stageLabel(session: SessionUsageAnalysis): string { return session.ref.role === "coordinator" ? "Coordinator" : session.ref.role === "compactor" ? "Compactor" : (session.ref.agent?.split(":").at(-1) ?? "Worker"); }
 function shortStage(session: SessionUsageAnalysis): string { return session.ref.jobId ?? stageLabel(session); }
 function sessionModels(session: SessionUsageAnalysis): string { return session.models.join(" + ") || session.record?.largeModelSelection || "unknown model"; }
 function factRef(fact: FactJson): string { return `#${fact.seq} ${fact.kind}`; }
 interface CausalGroup {
   key: string;
   jobId?: string;
-  role: "coordinator" | "worker";
+  role: "coordinator" | "worker" | "compactor";
   label: string;
   created?: FactJson;
   sessions: SessionUsageAnalysis[];
@@ -384,6 +384,7 @@ function whyLarge(session: SessionUsageAnalysis, attempts: Map<string, number>, 
   const cache = (usage.cacheReadTokens + usage.cacheWriteTokens) / Math.max(1, usage.totalTokens);
   if (cache >= 0.8) reasons.push(`${Math.round(cache * 100)}% repeated/cache context`);
   if (session.ref.role === "coordinator") reasons.push("coordination handoff");
+  if (session.ref.role === "compactor") reasons.push("ledger compaction");
   if (session.ref.jobId && (attempts.get(session.ref.jobId) ?? 0) > 1) reasons.push("repeated Job attempt");
   const outcome = session.ref.resultSeq ? task.facts.find((fact) => fact.seq === session.ref.resultSeq) : undefined;
   if (outcome && ["Failed", "Lost"].includes(outcome.kind)) reasons.push(outcome.kind.toLowerCase());

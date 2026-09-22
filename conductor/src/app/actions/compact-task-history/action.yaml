@@ -1,0 +1,9 @@
+name: compact_task_history
+type: custom
+description: >-
+  Append a bounded state Snapshot that covers a Task ledger prefix.
+entry: ./index.ts
+complexity: complex
+speed: slow
+reliability: high
+sideEffects: write

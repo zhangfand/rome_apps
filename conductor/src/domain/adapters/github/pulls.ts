@@ -1,6 +1,7 @@
 import type { Fact } from "../../../core/lib/facts.js";
 import type { LedgerSnapshot, TaskView } from "../../../core/lib/fold.js";
 import type { PushEventRequest } from "../../../core/lib/ingest.js";
+import type { JsonArtifactDraft } from "../../work-repo-artifacts.js";
 
 /**
  * Pull requests as a source of external events. A task that has produced a
@@ -61,19 +62,28 @@ export interface PullObservation {
   merged?: boolean;
   mergedAt?: string;
   headSha?: string;
-  reviews?: Array<{ id: number; user: string; state: string; body: string; submittedAt?: string }>;
-  reviewComments?: Array<{ id: number; reviewId?: number; user: string; path?: string; line?: number; body: string }>;
+  reviews?: Array<{ id: number; user: string; state: string; body: string; submittedAt?: string; raw?: Record<string, unknown> }>;
+  reviewComments?: Array<{ id: number; reviewId?: number; user: string; path?: string; line?: number; body: string; raw?: Record<string, unknown> }>;
   comments?: Array<{ id: number; user: string; body: string }>;
   checks?: { total: number; completed: number; runs: Array<{ name: string; status: string; conclusion?: string; url?: string }> };
 }
 
-export function pullEvents(task: TaskView, ref: PullRef, seen: PullObservation): PushEventRequest[] {
-  const out: PushEventRequest[] = [];
-  const event = (type: string, key: string, summary: string, data: Record<string, unknown>) => {
+export interface PullEventPlan {
+  request: PushEventRequest;
+  /** Full review evidence to commit before this request may enter the ledger. */
+  artifact?: JsonArtifactDraft;
+}
+
+export function pullEvents(task: TaskView, ref: PullRef, seen: PullObservation): PullEventPlan[] {
+  const out: PullEventPlan[] = [];
+  const event = (type: string, key: string, summary: string, data: Record<string, unknown>, artifact?: JsonArtifactDraft) => {
     out.push({
-      op: "push_event", source: "github", taskId: task.id, type, key, summary,
-      cite: `conductor:reconcile_tasks, polling ${ref.url}`,
-      data: { url: ref.url, ...data },
+      request: {
+        op: "push_event", source: "github", taskId: task.id, type, key, summary,
+        cite: `conductor:reconcile_tasks, polling ${ref.url}`,
+        data: { url: ref.url, ...data },
+      },
+      ...(artifact ? { artifact } : {}),
     });
   };
 
@@ -94,12 +104,13 @@ export function pullEvents(task: TaskView, ref: PullRef, seen: PullObservation):
       // into N comment events (and N noisy history rows).
       if (r.state === "COMMENTED" && !r.body.trim() && comments.length === 0) continue;
       event("pr_review", reviewKey, reviewSummary(ref, r, comments), {
+        reviewId: r.id,
         reviewer: r.user,
         state: r.state,
-        body: clip(r.body, 4_000),
         submittedAt: r.submittedAt,
-        ...reviewCommentsData(comments),
-      });
+        headSha: seen.headSha,
+        ...reviewCommentIndex(comments),
+      }, reviewArtifact(ref, seen.headSha, r, comments));
       continue;
     }
 
@@ -137,8 +148,9 @@ export function pullEvents(task: TaskView, ref: PullRef, seen: PullObservation):
     event("pr_review_comments", `review-comments:${reviewId}`, reviewCommentsSummary(ref, comments), {
       reviewId,
       authors: [...new Set(comments.map((comment) => comment.user))],
-      ...reviewCommentsData(comments),
-    });
+      headSha: seen.headSha,
+      ...reviewCommentIndex(comments),
+    }, reviewCommentArtifact(ref, seen.headSha, reviewId, comments));
   }
 }
 
@@ -182,49 +194,85 @@ function recordedReviewCommentIds(task: TaskView): Set<number> {
 
 function reviewSummary(ref: PullRef, review: PullReview, comments: readonly PullReviewComment[]): string {
   const state = review.state.toLowerCase().replaceAll("_", " ");
-  const body = review.body.trim() ? `: ${clip(review.body, 240)}` : "";
-  const inline = comments.length ? `; ${inlineCommentSummary(comments)}` : "";
-  return clip(`${review.user} reviewed ${ref.url} (${state})${body}${inline}`, 950);
+  const inline = comments.length ? `; ${commentCountSummary(comments.length)}` : "";
+  return `${review.user} reviewed ${ref.url} (${state}${inline})`;
 }
 
 function reviewCommentsSummary(ref: PullRef, comments: readonly PullReviewComment[]): string {
   const authors = [...new Set(comments.map((comment) => comment.user))].join(", ");
-  return clip(`${authors} left ${inlineCommentSummary(comments)} on ${ref.url}`, 950);
+  return `${authors} left ${commentCountSummary(comments.length)} on ${ref.url}`;
 }
 
-function inlineCommentSummary(comments: readonly PullReviewComment[]): string {
-  const shown = comments.slice(0, 3).map((comment) => {
-    const location = comment.path ? `${clip(comment.path, 120)}${comment.line ? `:${comment.line}` : ""}: ` : "";
-    return `${location}${clip(comment.body, 180)}`;
-  });
-  const rest = comments.length - shown.length;
-  return `${comments.length} inline review comment${comments.length === 1 ? "" : "s"} — ${shown.join(" | ")}${rest ? ` | +${rest} more` : ""}`;
+function commentCountSummary(count: number): string {
+  return `${count} inline review comment${count === 1 ? "" : "s"}`;
 }
 
-/**
- * Keep common reviews fully self-contained while respecting the ingest seam's
- * 32 KiB data limit. All ids are retained for durable dedupe; unusually large
- * review bodies can be read from the PR URL already carried by the event.
- */
-function reviewCommentsData(comments: readonly PullReviewComment[]) {
-  const detailed: Array<{ id: number; author: string; path?: string; line?: number; body: string }> = [];
-  for (const comment of comments) {
-    const candidate = {
-      id: comment.id,
-      author: comment.user,
-      ...(comment.path ? { path: clip(comment.path, 300) } : {}),
-      ...(comment.line ? { line: comment.line } : {}),
-      body: clip(comment.body, 4_000),
-    };
-    if (JSON.stringify([...detailed, candidate]).length > 22_000) break;
-    detailed.push(candidate);
-  }
+function reviewCommentIndex(comments: readonly PullReviewComment[]) {
   return {
     commentCount: comments.length,
     commentIds: comments.map((comment) => comment.id),
-    comments: detailed,
-    ...(detailed.length < comments.length ? { commentsOmitted: comments.length - detailed.length } : {}),
   };
+}
+
+function reviewArtifact(ref: PullRef, headSha: string | undefined, review: PullReview, comments: readonly PullReviewComment[]): JsonArtifactDraft {
+  return {
+    path: reviewArtifactPath(ref, String(review.id)),
+    value: {
+      schema: "conductor.github.pull-review/v1",
+      source: "github",
+      pullRequest: pullIdentity(ref, headSha),
+      review: {
+        id: review.id,
+        reviewer: review.user,
+        state: review.state,
+        body: review.body,
+        ...(review.submittedAt ? { submittedAt: review.submittedAt } : {}),
+      },
+      comments: comments.map(reviewCommentValue),
+      providerPayload: {
+        review: review.raw ?? null,
+        comments: comments.map((comment) => comment.raw ?? null),
+      },
+    },
+  };
+}
+
+function reviewCommentArtifact(ref: PullRef, headSha: string | undefined, reviewId: number, comments: readonly PullReviewComment[]): JsonArtifactDraft {
+  return {
+    path: reviewArtifactPath(ref, reviewId > 0 ? `${reviewId}-comments` : "unbound-comments"),
+    value: {
+      schema: "conductor.github.pull-review-comments/v1",
+      source: "github",
+      pullRequest: pullIdentity(ref, headSha),
+      reviewId: reviewId > 0 ? reviewId : null,
+      comments: comments.map(reviewCommentValue),
+      providerPayload: { comments: comments.map((comment) => comment.raw ?? null) },
+    },
+  };
+}
+
+function pullIdentity(ref: PullRef, headSha: string | undefined) {
+  return {
+    repository: `${ref.owner}/${ref.repo}`,
+    number: ref.number,
+    url: ref.url,
+    ...(headSha ? { headSha } : {}),
+  };
+}
+
+function reviewCommentValue(comment: PullReviewComment) {
+  return {
+    id: comment.id,
+    ...(comment.reviewId ? { reviewId: comment.reviewId } : {}),
+    author: comment.user,
+    ...(comment.path ? { path: comment.path } : {}),
+    ...(comment.line ? { line: comment.line } : {}),
+    body: comment.body,
+  };
+}
+
+function reviewArtifactPath(ref: PullRef, name: string): string {
+  return `_evidence/github/${ref.owner}/${ref.repo}/pulls/${ref.number}/reviews/${name}.json`;
 }
 
 function clip(text: string, max = 400): string {

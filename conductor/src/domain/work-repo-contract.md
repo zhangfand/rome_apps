@@ -24,10 +24,12 @@ One stable directory represents one product workstream, even when several
 Tasks or Jobs contribute to it:
 
 ```text
-<workstream-slug>/
-├── spec.md       # product contract; PM-owned when PM is involved
-├── design.md     # evolving engineering plan and decisions, when needed
-└── artifacts/    # optional supporting evidence that merits its own file
+.
+├── <workstream-slug>/
+│   ├── spec.md       # product contract; PM-owned when PM is involved
+│   ├── design.md     # evolving engineering plan and decisions, when needed
+│   └── artifacts/    # optional supporting evidence that merits its own file
+└── _evidence/        # runtime-owned snapshots of external payloads
 ```
 
 - Use a short, stable, kebab-case slug derived from the outcome. Do not organize
@@ -42,6 +44,11 @@ Tasks or Jobs contribute to it:
 - `artifacts/` is optional. Add narrowly named files only when evidence or a
   decision is too substantial for the canonical spec or design. A Job's routine
   transcript and scratch notes do not belong here.
+- `_evidence/` is runtime-owned. It stores structured external payloads that
+  are too large for the Task ledger, keyed by stable source identity rather
+  than Task, Agent, or Run id. Agents may read these files but must not edit
+  them. Ledger events cite the repository path and the exact Git commit; the
+  compact ledger envelope remains authoritative for ordering and deduplication.
 
 ## Collaboration semantics
 

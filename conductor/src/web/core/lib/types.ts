@@ -55,7 +55,7 @@ export interface TaskSummary {
 export interface TaskUsageSession {
   id: string;
   type: string;
-  role: "coordinator" | "worker";
+  role: "coordinator" | "worker" | "compactor";
   agent?: string;
   workerId?: string;
   jobId?: string;

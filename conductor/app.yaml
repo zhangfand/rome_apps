@@ -27,6 +27,7 @@ db:
 agents:
   - app/agents/conductor.yaml
   - app/agents/engineer-lead.yaml
+  - app/agents/ledger-compactor.yaml
   - app/agents/pm.yaml
 
 hooks:
@@ -36,6 +37,7 @@ actions:
   - app/actions/setup
   - app/actions/tick
   - app/actions/orchestrate
+  - app/actions/compact-task-history
   - app/actions/run-worker
   - app/actions/create
   - app/actions/reply

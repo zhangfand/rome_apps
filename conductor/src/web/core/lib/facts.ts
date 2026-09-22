@@ -57,6 +57,7 @@ const LABELS: Record<string, string> = {
   // Notes are quiet implementation detail and are hidden by default. When
   // revealed, this neutral word describes the content rather than its storage.
   Noted: "update",
+  Snapshot: "snapshot",
 };
 
 export function factLabel(kind: string): string {
@@ -121,6 +122,7 @@ export function factTone(fact: FactJson): Tone {
     case "Dispatched":
     case "Opened":
     case "Noted":
+    case "Snapshot":
     case "Cancelled": return "quiet";
     case "Asked": return "question";
     case "Reported": return "report";
@@ -136,6 +138,7 @@ export function factTone(fact: FactJson): Tone {
 /** Raw identities become the four plain author labels used by the detail views. */
 export function authorLabel(by: string, kind?: string): string {
   if (by === "orchestrator") return "conductor";
+  if (by === "conductor:ledger-compactor") return "compactor";
   if (by === "runtime") return "runtime";
   if (/^w-[0-9a-z-]+$/i.test(by)) return "worker";
   return webDomain().authorLabel(by, kind) ?? "you";
@@ -156,7 +159,7 @@ export function activityAuthorLabel(
 }
 
 export function authorLane(fact: FactJson): 1 | 2 | 3 | 4 {
-  if (fact.kind === "Event" || fact.by === "runtime") return 4;
+  if (fact.kind === "Event" || fact.kind === "Snapshot" || fact.by === "runtime") return 4;
   const author = authorLabel(fact.by, fact.kind);
   if (author === "conductor") return 2;
   if (author === "worker") return 3;
@@ -164,7 +167,7 @@ export function authorLane(fact: FactJson): 1 | 2 | 3 | 4 {
 }
 
 export function isRoutine(fact: FactJson): boolean {
-  return fact.kind === "Opened" || fact.kind === "Noted" || (fact.kind === "Dispatched" && typeof fact.payload.jobId === "string");
+  return fact.kind === "Opened" || fact.kind === "Noted" || fact.kind === "Snapshot" || (fact.kind === "Dispatched" && typeof fact.payload.jobId === "string");
 }
 
 export function expandedTextLabel(fact: FactJson): "instructions" | "detail" {
@@ -209,6 +212,11 @@ export function factBody(fact: FactJson): FactContent {
     case "Failed": return { title: "Work failed", body: s("error") };
     case "Lost": return { title: "Work stopped", body: s("why") };
     case "Event": return { title: eventTitle(fact), body: s("summary") };
+    case "Snapshot": return {
+      title: value(p, "coversThroughSeq") ? `History through #${value(p, "coversThroughSeq")}` : "Task history snapshot",
+      body: "Earlier ledger entries were compressed for future coordinator context.",
+      extra: s("summary") || undefined,
+    };
     default: return { title: "", body: "An update was recorded." };
   }
 }

@@ -6,22 +6,34 @@ import { pullEvents, type PullObservation, type PullRef } from "./pulls.js";
 const ref: PullRef = { owner: "acme", repo: "widgets", number: 12, url: "https://github.com/acme/widgets/pull/12" };
 
 describe("GitHub pull review events", () => {
-  it("records a submitted review and all of its inline comments as one event", () => {
-    const events = pullEvents(task(), ref, observation());
+  it("keeps only a compact review envelope beside a structured artifact draft", () => {
+    const plans = pullEvents(task(), ref, observation());
 
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      type: "pr_review",
-      key: "review:42",
-      data: {
-        reviewer: "alice",
-        state: "CHANGES_REQUESTED",
-        commentCount: 3,
-        commentIds: [101, 102, 103],
+    expect(plans).toHaveLength(1);
+    expect(plans[0]).toMatchObject({
+      request: {
+        type: "pr_review",
+        key: "review:42",
+        data: {
+          reviewId: 42,
+          reviewer: "alice",
+          state: "CHANGES_REQUESTED",
+          commentCount: 3,
+          commentIds: [101, 102, 103],
+        },
+      },
+      artifact: {
+        path: "_evidence/github/acme/widgets/pulls/12/reviews/42.json",
+        value: {
+          schema: "conductor.github.pull-review/v1",
+          review: { id: 42, body: "please adjust" },
+          comments: [{ id: 101, body: "first" }, { id: 102, body: "second" }, { id: 103, body: "third" }],
+        },
       },
     });
-    expect(events[0].summary).toContain("3 inline review comments");
-    expect((events[0].data?.comments as unknown[])).toHaveLength(3);
+    expect(plans[0].request.summary).toContain("3 inline review comments");
+    expect(plans[0].request.data).not.toHaveProperty("body");
+    expect(plans[0].request.data).not.toHaveProperty("comments");
   });
 
   it("keeps separate review submissions as separate events", () => {
@@ -29,7 +41,7 @@ describe("GitHub pull review events", () => {
     seen.reviews!.push({ id: 43, user: "bob", state: "APPROVED", body: "looks good" });
     seen.reviewComments!.push({ id: 104, reviewId: 43, user: "bob", path: "src/d.ts", line: 4, body: "nice" });
 
-    expect(pullEvents(task(), ref, seen).map((event) => event.key)).toEqual(["review:42", "review:43"]);
+    expect(pullEvents(task(), ref, seen).map((plan) => plan.request.key)).toEqual(["review:42", "review:43"]);
   });
 
   it("waits for a pending review to be submitted", () => {
@@ -54,9 +66,14 @@ describe("GitHub pull review events", () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
-      type: "pr_review_comments",
-      key: "review-comments:42",
-      data: { reviewId: 42, commentCount: 3, commentIds: [101, 102, 103] },
+      request: {
+        type: "pr_review_comments",
+        key: "review-comments:42",
+        data: { reviewId: 42, commentCount: 3, commentIds: [101, 102, 103] },
+      },
+      artifact: {
+        path: "_evidence/github/acme/widgets/pulls/12/reviews/42-comments.json",
+      },
     });
   });
 });

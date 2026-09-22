@@ -2,6 +2,7 @@ import type { ConductorConfig } from "./config.js";
 import type { SharedPromptContract } from "./composition.js";
 import { describeFact } from "./facts.js";
 import type { TaskView } from "./fold.js";
+import { coordinatorFacts } from "./ledger-snapshot.js";
 import { replyInstructions } from "./worker-reply.js";
 import { projectWorkspaceKind, type Workspace, workspaceKind, type WorkspaceProvider } from "./workspaces.js";
 
@@ -60,7 +61,7 @@ function workspaceNote(task: TaskView, providerFor: (kind: string) => WorkspaceP
 
 /**
  * The orchestrator's prompt for one wake. Everything task-specific it can
- * know: the whole ledger, what agents it may create Jobs for, and the seq it
+ * know: bounded ledger context, what agents it may create Jobs for, and the seq it
  * must cite so a stale decision is refused. Its operating policy lives in the
  * configured Agent's system prompt. Worker scheduling is not exposed.
  */
@@ -85,9 +86,8 @@ export function buildOrchestratorPrompt(input: {
   const seenSeq = task.latest.seq;
   const resumed = input.deliveredThroughSeq !== undefined;
   const deliveredThroughSeq = input.deliveredThroughSeq ?? 0;
-  const deliveredFacts = resumed
-    ? task.facts.filter((fact) => fact.seq > deliveredThroughSeq)
-    : task.facts;
+  const context = coordinatorFacts(task, input.deliveredThroughSeq);
+  const deliveredFacts = context.facts;
   const lines: string[] = [];
   lines.push(
     `# Orchestrator wake for task ${task.id}`,
@@ -132,14 +132,18 @@ export function buildOrchestratorPrompt(input: {
       }),
       "",
     ] : []),
-    resumed
-      ? `## New ledger facts after #${deliveredThroughSeq} (oldest first)`
-      : "## Ledger (every fact on this task, oldest first)",
+    context.compacted
+      ? `## Ledger context (latest Snapshot #${context.snapshot!.seq} plus uncovered facts)`
+      : resumed
+        ? `## New ledger facts after #${deliveredThroughSeq} (oldest first)`
+        : "## Ledger (every fact on this task, oldest first)",
     ...deliveredFacts.map((fact) => describeFact(fact, { full: resumed || fact.seq > task.lastDecisionSeq || fact.kind === "Created" })),
     "",
     "## Now",
     resumed
-      ? `This is another turn of the same Agent Instance and Session. Earlier Task history remains in your conversation context; only the facts after #${deliveredThroughSeq} are repeated above.`
+      ? context.compacted
+        ? `This is another turn of the same Agent Instance and Session. Snapshot #${context.snapshot!.seq} replaces its covered raw facts; everything after its covered prefix is included above.`
+        : `This is another turn of the same Agent Instance and Session. Earlier Task history remains in your conversation context; only the facts after #${deliveredThroughSeq} are repeated above.`
       : task.lastDecision ? `Your last decision was #${task.lastDecisionSeq} (${task.lastDecision.kind}); everything after it is new to you.` : "This is the first time you see this task.",
     `Decide the next step and record it with one decision action, citing taskId="${task.id}" and seenSeq=${seenSeq}.`,
   );

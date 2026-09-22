@@ -6,9 +6,10 @@ import type { ProjectBinding } from "./projects.js";
  * knows the app domain. The workflow — which step
  * follows which — lives in the orchestrator Agent's system prompt, not in code.
  *
- * Three authors write facts:
+ * Four authors write facts:
  *   - a person (a chat user id or a source-namespaced external identity),
  *   - the orchestrator agent (via the decision actions), stamped {@link ORCHESTRATOR},
+ *   - a named supporting Agent such as the ledger compactor,
  *   - the runtime / a worker (run_worker, tick), stamped {@link RUNTIME} or a worker id.
  *
  * Facts are append-only. A task's state is a fold over its facts.
@@ -23,10 +24,14 @@ export const DECISION_KINDS = ["JobCreated", "Asked", "Reported", "Waited", "Com
 /** Written by the runtime or a worker: things that happened. */
 export const RUNTIME_KINDS = ["Dispatched", "JobFailed", "Opened", "Returned", "Failed", "Lost", "Event"] as const;
 
+/** Derived context retained in the ledger, but neither a decision nor an event. */
+export const CONTEXT_KINDS = ["Snapshot"] as const;
+
 export const FACT_KINDS = [
   "Created", "Reply", "Completed", "Cancelled",
   "JobCreated", "Dispatched", "Asked", "Reported", "Waited", "Noted",
   "JobFailed", "Opened", "Returned", "Failed", "Lost", "Event",
+  "Snapshot",
 ] as const;
 
 export type FactKind = (typeof FACT_KINDS)[number];
@@ -158,6 +163,24 @@ export type ReportedFact = FactOf<"Reported", { report: string }>;
 export type WaitedFact = FactOf<"Waited", { reason: string; resumeAfter: string }>;
 export type NotedFact = FactOf<"Noted", { note: string }>;
 
+/**
+ * A lossily compressed prefix of this same Task ledger. Raw facts remain
+ * append-only; prompt construction may start from the newest Snapshot and the
+ * facts after its covered prefix.
+ */
+export type SnapshotFact = FactOf<"Snapshot", {
+  /** Newest fact faithfully represented by summary. */
+  coversThroughSeq: number;
+  /** Previous Snapshot folded into this one, when present. */
+  previousSnapshotSeq?: number;
+  /** Prompt-ready Markdown containing the Task's durable current state. */
+  summary: string;
+  schemaVersion: 1;
+  /** Observability for why this compaction happened. */
+  inputFactCount: number;
+  estimatedInputTokens: number;
+}>;
+
 // ---- runtime / worker facts ---------------------------------------------
 
 /** The runtime materialization of a JobCreated fact into a concrete run. */
@@ -211,7 +234,8 @@ export type EventFact = FactOf<"Event", {
 export type Fact =
   | CreatedFact | ReplyFact | CompletedFact | CancelledFact
   | JobCreatedFact | AskedFact | ReportedFact | WaitedFact | NotedFact
-  | DispatchedFact | JobFailedFact | OpenedFact | ReturnedFact | FailedFact | LostFact | EventFact;
+  | DispatchedFact | JobFailedFact | OpenedFact | ReturnedFact | FailedFact | LostFact | EventFact
+  | SnapshotFact;
 
 export type NewFact = Omit<Fact, "seq" | "id" | "createdAt">;
 
@@ -293,8 +317,12 @@ export function describeFact(fact: Fact, opts: { full?: boolean } = {}): string 
         return `worker ${fact.payload.workerId}: ${fact.payload.error}`;
       case "Lost":
         return `worker ${fact.payload.workerId}: ${fact.payload.why}`;
-      case "Event":
-        return `${fact.payload.source}/${fact.payload.type}: ${fact.payload.summary}`;
+      case "Event": {
+        const artifact = describeArtifactRef(fact.payload.data?.artifact);
+        return `${fact.payload.source}/${fact.payload.type}: ${fact.payload.summary}${artifact ? `\nArtifact: ${artifact}` : ""}`;
+      }
+      case "Snapshot":
+        return `covers through #${fact.payload.coversThroughSeq}${fact.payload.previousSnapshotSeq ? `, replacing snapshot #${fact.payload.previousSnapshotSeq}` : ""}\n${fact.payload.summary}`;
     }
   })();
   const cited = fact.source && fact.by !== RUNTIME && fact.by !== ORCHESTRATOR ? ` [source: ${clip(fact.source, 300)}]` : "";
@@ -303,4 +331,17 @@ export function describeFact(fact: Fact, opts: { full?: boolean } = {}): string 
 
 function clip(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}… [${text.length - max} more chars]` : text;
+}
+
+/** Render only the immutable pointer, never an Event's potentially large opaque data. */
+function describeArtifactRef(value: unknown): string | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const artifact = value as Record<string, unknown>;
+  const repo = typeof artifact.repo === "string" ? artifact.repo : "";
+  const artifactPath = typeof artifact.path === "string" ? artifact.path : "";
+  const commit = typeof artifact.commit === "string" ? artifact.commit : "";
+  if (!repo || !artifactPath || !commit) return undefined;
+  const sha256 = typeof artifact.sha256 === "string" ? artifact.sha256 : undefined;
+  const url = typeof artifact.url === "string" ? artifact.url : undefined;
+  return `${repo}@${commit}:${artifactPath}${sha256 ? ` (sha256 ${sha256})` : ""}${url ? ` — ${url}` : ""}`;
 }

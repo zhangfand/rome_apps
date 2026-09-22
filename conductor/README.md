@@ -65,6 +65,7 @@ than one Run/attempt over its lifetime.
 | `orchestrator` | `JobCreated`, `Asked`, `Reported`, `Completed`, `Cancelled`, `Noted` |
 | `runtime` | `Dispatched`, `JobFailed`, `Lost`, `Event` |
 | worker id | `Opened`, `Returned`, `Failed` |
+| `conductor:ledger-compactor` | `Snapshot` |
 
 `Returned` is semi-structured: `status ∈ succeeded | failed | blocked |
 waiting | unparsed`, a one-paragraph `summary`, free `detail`. Nothing is
@@ -81,16 +82,25 @@ new fact.
 Each Task coordinator is a first-class, Conductor-owned **Agent Instance**.
 The Instance has an opaque durable id; its Task/coordinator identity and its
 single resumable Agent Session identity are stored as mappings rather than
-encoded into that id. The first wake sends the complete Task ledger and binds
-the Session returned by `system:summon`. Later wakes resume that exact Session
-and send only facts after the Task binding's delivered cursor.
+encoded into that id. The first wake sends bounded Task context and binds the
+Session returned by `system:summon`. Later wakes resume that exact Session and
+send only facts after the Task binding's delivered cursor.
 
 This first experiment is deliberately one-to-one: one Agent Instance owns one
-Agent Session. Conductor does not compress, rotate, or silently replace it. A
+Agent Session. Conductor does not rotate or silently replace that Session. A
 resume rejection marks the Instance broken so the failure is visible instead
 of creating a second Session under the same identity. Per-invocation Rome trace
 sessions remain separate accounting records and are grouped beneath the Task's
 stable coordinator Instance in the Usage UI.
+
+The append-only ledger has its own bounded-context mechanism. When the raw
+segment after the newest `Snapshot` reaches either 24,000 conservatively
+estimated tokens or 80 facts, `conductor:ledger-compactor` (the medium model
+tier) writes a new `Snapshot` fact through an optimistic sequence boundary.
+Raw facts remain untouched. A coordinator that has not already consumed the
+prefix receives the canonical `Created` fact, the newest Snapshot, and facts
+after the Snapshot's covered sequence. Snapshot facts are context, not
+coordinator decisions or runtime events, and never wake a Task by themselves.
 
 ## What code still enforces (and why it is not workflow)
 

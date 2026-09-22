@@ -9,9 +9,12 @@ import { fold, needsAttention } from "../../lib/fold.js";
 import { isTerminalKind, RUNTIME } from "../../lib/facts.js";
 import { describeOutcome, ingestAtomically, type IngestRequest } from "../../lib/ingest.js";
 import { dispatchPendingJobs } from "../../lib/job-scheduler.js";
+import { shouldSnapshotTask } from "../../lib/ledger-snapshot.js";
 
 const log = createAppLogger("conductor:reconcile_tasks");
 const LOCK_LEASE_MS = 5 * 60_000;
+/** Avoid a deploy-time burst when several old Tasks first cross the threshold. */
+const MAX_COMPACTIONS_PER_TICK = 1;
 
 /**
  * The runtime pass, in three steps that never blur into each other:
@@ -90,7 +93,15 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         const now = new Date();
         const current = fold(now, ledger.all());
         const woken: string[] = [];
+        const compacting: string[] = [];
         for (const task of current.tasks) {
+          if (task.state === "open" && shouldSnapshotTask(task)) {
+            if (compacting.length < MAX_COMPACTIONS_PER_TICK) {
+              await appContext.runAction("conductor:compact_task_history", { taskId: task.id }, { detached: true });
+              compacting.push(task.id);
+            }
+            continue;
+          }
           const attention = needsAttention(task, now);
           if (!attention.wake) continue;
           if (task.decisionsSinceLastPersonFact >= conductorConfig.maxDecisionsPerTurn &&
@@ -100,8 +111,8 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
           await appContext.runAction("conductor:wake_task_coordinator", { taskId: task.id }, { detached: true });
           woken.push(task.id);
         }
-        log.info("tick finished", { tasks: current.tasks.length, applied: applied.length, woken });
-        return { status: "ok", data: { tasks: current.tasks.length, applied, woken } };
+        log.info("tick finished", { tasks: current.tasks.length, applied: applied.length, compacting, woken });
+        return { status: "ok", data: { tasks: current.tasks.length, applied, compacting, woken } };
       } finally {
         locks.release(TICK_LOCK);
       }

@@ -370,7 +370,7 @@ function taskUsageSessions(task: TaskView, stored: TaskSessionRef[], config?: Co
   const refs = new Map<string, {
     id: string;
     type: string;
-    role: "coordinator" | "worker";
+    role: "coordinator" | "worker" | "compactor";
     workerId?: string;
     jobId?: string;
     triggerSeq?: number;
@@ -411,7 +411,9 @@ function taskUsageSessions(task: TaskView, stored: TaskSessionRef[], config?: Co
       resultSeq: ref.resultSeq ?? outcome?.seq,
       agent: ref.role === "coordinator"
         ? config?.orchestratorAgent
-        : dispatch?.kind === "Dispatched" ? dispatch.payload.agent : undefined,
+        : ref.role === "compactor"
+          ? "conductor:ledger-compactor"
+          : dispatch?.kind === "Dispatched" ? dispatch.payload.agent : undefined,
     };
   });
 }

@@ -12,6 +12,7 @@ describe("Conductor agent boundaries", () => {
   it("registers one task coordinator rather than the obsolete generic orchestrator", () => {
     const manifest = readFileSync(path.resolve(here, "../../../app.yaml"), "utf8");
     expect(manifest).toContain("app/agents/engineer-lead.yaml");
+    expect(manifest).toContain("app/agents/ledger-compactor.yaml");
     expect(manifest).not.toContain("app/agents/orchestrator.yaml");
     expect(manifest).not.toContain("app/skills/pm");
   });
@@ -101,6 +102,7 @@ describe("Conductor agent boundaries", () => {
       "ask_person",
       "cancel_task",
       "close_task",
+      "compact_task_history",
       "complete_task",
       "configure_conductor",
       "create_child_tasks",
