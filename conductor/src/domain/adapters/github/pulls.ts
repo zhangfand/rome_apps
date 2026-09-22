@@ -74,7 +74,7 @@ export interface PullEventPlan {
   artifact?: JsonArtifactDraft;
 }
 
-export function pullEvents(task: TaskView, ref: PullRef, seen: PullObservation): PullEventPlan[] {
+export function pullEvents(task: TaskView, ref: PullRef, seen: PullObservation, reviewAuthors: readonly string[]): PullEventPlan[] {
   const out: PullEventPlan[] = [];
   const event = (type: string, key: string, summary: string, data: Record<string, unknown>, artifact?: JsonArtifactDraft) => {
     out.push({
@@ -87,10 +87,12 @@ export function pullEvents(task: TaskView, ref: PullRef, seen: PullObservation):
     });
   };
 
-  const commentsByReview = groupReviewComments(seen.reviewComments ?? []);
+  const allowedReviewAuthors = new Set(reviewAuthors.map(normalizeLogin));
+  const commentsByReview = groupReviewComments((seen.reviewComments ?? []).filter((comment) => allowedReviewAuthors.has(normalizeLogin(comment.user))));
   const capturedCommentIds = recordedReviewCommentIds(task);
   const recordedKeys = recordedGithubEventKeys(task);
   for (const r of seen.reviews ?? []) {
+    if (!allowedReviewAuthors.has(normalizeLogin(r.user))) continue;
     const comments = commentsByReview.get(r.id) ?? [];
     commentsByReview.delete(r.id);
     // GitHub may reveal the authenticated reviewer's own draft. Its comments
@@ -152,6 +154,10 @@ export function pullEvents(task: TaskView, ref: PullRef, seen: PullObservation):
       ...reviewCommentIndex(comments),
     }, reviewCommentArtifact(ref, seen.headSha, reviewId, comments));
   }
+}
+
+function normalizeLogin(login: string): string {
+  return login.trim().toLowerCase();
 }
 
 type PullReview = NonNullable<PullObservation["reviews"]>[number];

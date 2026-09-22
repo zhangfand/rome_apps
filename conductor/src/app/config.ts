@@ -7,7 +7,7 @@ import {
   DEFAULT_REUSE_SESSIONS,
   type ConductorConfig,
 } from "../core/lib/config.js";
-import { DEFAULT_INTAKE_LABEL, githubConfigExtensions, githubProject, githubRepo, githubRoot } from "../domain/adapters/github/config.js";
+import { DEFAULT_INTAKE_LABEL, DEFAULT_REVIEW_AUTHORS, githubConfigExtensions, githubProject, githubRepo, githubRoot } from "../domain/adapters/github/config.js";
 import { defaultWorkRepo, workRepoFor } from "../domain/work-repo.js";
 import type { ConfigExtensions } from "../core/lib/config.js";
 
@@ -65,7 +65,7 @@ export const initialAppConfig: ConductorConfig = {
   reuseSessions: DEFAULT_REUSE_SESSIONS,
   maxDecisionsPerTurn: DEFAULT_MAX_DECISIONS_PER_TURN,
   frontdeskShadow: DEFAULT_FRONTDESK_SHADOW,
-  github: { intakeLabel: DEFAULT_INTAKE_LABEL },
+  github: { intakeLabel: DEFAULT_INTAKE_LABEL, reviewAuthors: [...DEFAULT_REVIEW_AUTHORS] },
 };
 
 export const setupSchema = {
@@ -103,7 +103,15 @@ export const setupSchema = {
     github: {
       type: "object",
       additionalProperties: false,
-      properties: { intakeLabel: { type: "string", description: `Default intake label. Defaults to "${DEFAULT_INTAKE_LABEL}".` } },
+      properties: {
+        intakeLabel: { type: "string", description: `Default intake label. Defaults to "${DEFAULT_INTAKE_LABEL}".` },
+        reviewAuthors: {
+          type: "array",
+          minItems: 1,
+          items: { type: "string" },
+          description: "Only code-review events authored by these GitHub logins enter the task ledger.",
+        },
+      },
     },
     intakeLabel: { type: "string", description: "Legacy default intake label; accepted for one release." },
     frontdeskShadow: {

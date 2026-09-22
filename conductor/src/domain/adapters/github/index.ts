@@ -87,6 +87,7 @@ async function pollPulls(ctx: AdapterPollContext): Promise<IngestRequest[]> {
   if (watches.length === 0) return [];
 
   const observed = new Map<string, PullObservation>();
+  const reviewAuthors = githubRoot(ctx.config).reviewAuthors;
   const byId = taskIndex(ctx.snapshot);
   const out: IngestRequest[] = [];
   for (const watch of watches) {
@@ -129,7 +130,7 @@ async function pollPulls(ctx: AdapterPollContext): Promise<IngestRequest[]> {
         }
         observed.set(ref.url, seen);
       }
-      out.push(...await externalizeReviewArtifacts(task, pullEvents(task, ref, seen), ctx.log));
+      out.push(...await externalizeReviewArtifacts(task, pullEvents(task, ref, seen, reviewAuthors), ctx.log));
     }
   }
   return out;

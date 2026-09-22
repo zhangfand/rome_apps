@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@rstest/core";
-import { DEFAULT_INTAKE_LABEL } from "../domain/adapters/github/config.js";
+import { DEFAULT_INTAKE_LABEL, DEFAULT_REVIEW_AUTHORS } from "../domain/adapters/github/config.js";
 import { DEFAULT_WORKER_AGENTS, githubPresentation, mergeAppConfig, parseAppConfig } from "./config.js";
 import { DEFAULT_ORCHESTRATOR_AGENT } from "../core/lib/config.js";
 
@@ -25,7 +25,7 @@ describe("app config composition", () => {
     expect(parsed.config.workerAgents["assistant:assistant"]).toContain("does not independently review code");
     expect(parsed.config.workerAgents["assistant:assistant"]).toContain("or process prototype review feedback");
     expect(parsed.config.orchestratorAgent).toBe(DEFAULT_ORCHESTRATOR_AGENT);
-    expect(parsed.config.github).toEqual({ intakeLabel: DEFAULT_INTAKE_LABEL });
+    expect(parsed.config.github).toEqual({ intakeLabel: DEFAULT_INTAKE_LABEL, reviewAuthors: [...DEFAULT_REVIEW_AUTHORS] });
     expect(parsed.config.frontdeskShadow).toEqual({ enabled: true, model: "jev-latest" });
   });
 
@@ -84,7 +84,7 @@ describe("app config composition", () => {
     });
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(parsed.config.github).toEqual({ intakeLabel: "take-me" });
+    expect(parsed.config.github).toEqual({ intakeLabel: "take-me", reviewAuthors: [...DEFAULT_REVIEW_AUTHORS] });
     expect(parsed.config.projects.app).toEqual({
       workingDir: "/repo",
       workspace: "git-worktree",
@@ -110,8 +110,23 @@ describe("app config composition", () => {
     });
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(parsed.config.github).toEqual({ intakeLabel: "new-global" });
+    expect(parsed.config.github).toEqual({ intakeLabel: "new-global", reviewAuthors: [...DEFAULT_REVIEW_AUTHORS] });
     expect(parsed.config.projects.app.github).toEqual({ repo: "new/repo", enabled: true, projectLabel: "app" });
+  });
+
+  it("normalizes and validates the GitHub code-review author allowlist", () => {
+    const parsed = parseAppConfig({ ...base, github: { reviewAuthors: ["ZhangFanD", "zhangfand"] } });
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(parsed.config.github).toEqual({ intakeLabel: DEFAULT_INTAKE_LABEL, reviewAuthors: ["zhangfand"] });
+
+    expect(parseAppConfig({ ...base, github: { reviewAuthors: [] } })).toEqual({
+      ok: false,
+      error: "github.reviewAuthors must be a nonempty array of GitHub logins",
+    });
+    expect(parseAppConfig({ ...base, github: { reviewAuthors: ["not a login"] } })).toEqual({
+      ok: false,
+      error: "github.reviewAuthors must be a nonempty array of GitHub logins",
+    });
   });
 
   it("normalizes github.com repository URLs", () => {
@@ -129,7 +144,7 @@ describe("app config composition", () => {
     const parsed = parseAppConfig(merged);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(parsed.config.github).toEqual({ intakeLabel: "legacy-patch" });
+    expect(parsed.config.github).toEqual({ intakeLabel: "legacy-patch", reviewAuthors: [...DEFAULT_REVIEW_AUTHORS] });
     expect(parsed.config.projects.app.github).toEqual({ repo: "new/repo", enabled: false });
   });
 

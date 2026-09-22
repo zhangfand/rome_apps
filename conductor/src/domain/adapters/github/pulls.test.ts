@@ -7,7 +7,7 @@ const ref: PullRef = { owner: "acme", repo: "widgets", number: 12, url: "https:/
 
 describe("GitHub pull review events", () => {
   it("keeps only a compact review envelope beside a structured artifact draft", () => {
-    const plans = pullEvents(task(), ref, observation());
+    const plans = pullEvents(task(), ref, observation(), ["alice"]);
 
     expect(plans).toHaveLength(1);
     expect(plans[0]).toMatchObject({
@@ -41,14 +41,28 @@ describe("GitHub pull review events", () => {
     seen.reviews!.push({ id: 43, user: "bob", state: "APPROVED", body: "looks good" });
     seen.reviewComments!.push({ id: 104, reviewId: 43, user: "bob", path: "src/d.ts", line: 4, body: "nice" });
 
-    expect(pullEvents(task(), ref, seen).map((plan) => plan.request.key)).toEqual(["review:42", "review:43"]);
+    expect(pullEvents(task(), ref, seen, ["alice", "bob"]).map((plan) => plan.request.key)).toEqual(["review:42", "review:43"]);
+  });
+
+  it("ignores code-review events from anyone outside the configured author allowlist", () => {
+    const seen = observation();
+    seen.reviews!.push({ id: 43, user: "ZhangFanD", state: "APPROVED", body: "ship it" });
+    seen.reviewComments!.push({ id: 104, reviewId: 43, user: "zhangfand", path: "src/d.ts", line: 4, body: "one fix" });
+
+    const plans = pullEvents(task(), ref, seen, ["zhangfand"]);
+
+    expect(plans.map((plan) => plan.request.key)).toEqual(["review:43"]);
+    expect(plans[0]).toMatchObject({
+      request: { data: { reviewer: "ZhangFanD", commentIds: [104] } },
+      artifact: { value: { comments: [{ id: 104, author: "zhangfand" }] } },
+    });
   });
 
   it("waits for a pending review to be submitted", () => {
     const seen = observation();
     seen.reviews![0].state = "PENDING";
 
-    expect(pullEvents(task(), ref, seen)).toEqual([]);
+    expect(pullEvents(task(), ref, seen, ["alice"])).toEqual([]);
   });
 
   it("does not replay comments already captured by the legacy per-comment events", () => {
@@ -58,11 +72,11 @@ describe("GitHub pull review events", () => {
       githubEvent(4, "pr_review_comment", "rc:102", {}),
       githubEvent(5, "pr_review_comment", "rc:103", {}),
     ];
-    expect(pullEvents(task(events), ref, observation())).toEqual([]);
+    expect(pullEvents(task(events), ref, observation(), ["alice"])).toEqual([]);
   });
 
   it("batches comments missed after an already-recorded review shell", () => {
-    const events = pullEvents(task([githubEvent(2, "pr_review", "review:42", {})]), ref, observation());
+    const events = pullEvents(task([githubEvent(2, "pr_review", "review:42", {})]), ref, observation(), ["alice"]);
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({

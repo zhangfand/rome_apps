@@ -3,6 +3,7 @@ import { bindProject, type ProjectBinding, type ProjectConfig } from "../../../c
 import type { TaskView } from "../../../core/lib/fold.js";
 
 export const DEFAULT_INTAKE_LABEL = "conductor";
+export const DEFAULT_REVIEW_AUTHORS = ["zhangfand"] as const;
 
 export interface GitHubProjectConfig {
   repo: string;
@@ -13,6 +14,7 @@ export interface GitHubProjectConfig {
 
 export interface GitHubRootConfig {
   intakeLabel: string;
+  reviewAuthors: string[];
 }
 
 const REPO_RE = /^(?!\.{1,2}\/)(?!.*\/\.{1,2}$)[\w.-]+\/[\w.-]+$/;
@@ -50,7 +52,7 @@ export function githubRoot(config: ConductorConfig): GitHubRootConfig {
   const value = config.github;
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as unknown as GitHubRootConfig
-    : { intakeLabel: DEFAULT_INTAKE_LABEL };
+    : { intakeLabel: DEFAULT_INTAKE_LABEL, reviewAuthors: [...DEFAULT_REVIEW_AUTHORS] };
 }
 
 /** New shape wins field-by-field; legacy fields remain accepted for one release. */
@@ -89,12 +91,31 @@ export const githubConfigExtensions: ConfigExtensions = {
       return { ok: false, error: "github must be an object" };
     }
     const g = (nested ?? {}) as Record<string, unknown>;
-    return { ok: true, values: { github: { intakeLabel: stringValue(g.intakeLabel ?? raw.intakeLabel) ?? DEFAULT_INTAKE_LABEL } satisfies GitHubRootConfig } };
+    const reviewAuthors = githubLogins(g.reviewAuthors);
+    if (g.reviewAuthors !== undefined && !reviewAuthors) {
+      return { ok: false, error: "github.reviewAuthors must be a nonempty array of GitHub logins" };
+    }
+    return {
+      ok: true,
+      values: {
+        github: {
+          intakeLabel: stringValue(g.intakeLabel ?? raw.intakeLabel) ?? DEFAULT_INTAKE_LABEL,
+          reviewAuthors: reviewAuthors ?? [...DEFAULT_REVIEW_AUTHORS],
+        } satisfies GitHubRootConfig,
+      },
+    };
   },
 };
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function githubLogins(value: unknown): string[] | undefined {
+  if (!Array.isArray(value) || value.length === 0) return undefined;
+  const logins = value.map((login) => typeof login === "string" ? login.trim().toLowerCase() : "");
+  if (logins.some((login) => !/^[a-z0-9](?:[a-z0-9-]{0,38})$/.test(login))) return undefined;
+  return [...new Set(logins)];
 }
 
 export interface IntakeRoute extends ProjectBinding { repo: string; labels: string[] }
