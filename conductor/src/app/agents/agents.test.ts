@@ -86,6 +86,10 @@ describe("Conductor agent boundaries", () => {
     expect(skill).toContain("needs nothing unmerged");
     expect(skill).toContain("touches no file another PR in this round touches");
     expect(skill).toContain("behavior PR would exceed 400 lines of non-test diff");
+    expect(skill).toContain("Every PR, behavior or preparatory, carries at most 400 lines");
+    expect(skill).toContain("Generated files and lockfiles do not count");
+    expect(skill).toContain("smallest coherent part that unlocks the next decision");
+    expect(skill).toContain("abstractions needed only by later, unplanned behavior out of this round");
     expect(skill).toContain("For each PR give the Conventional Commit title, the kind");
     expect(skill).toContain("every scenario in the spec is already proven on main");
   });
