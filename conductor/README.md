@@ -6,9 +6,9 @@ Manager decides what happens next in `reconcile.ts`: a `switch` on the latest
 fact kind, with phases, retry caps and hook wiring in code. Conductor keeps the
 same bones — an append-only ledger, isolated worktrees, heartbeat-supervised
 workers, GitHub issue intake — and replaces the decision code with an
-**engineering-lead agent** that reads a task's whole ledger plus a standard
-operating policy in its system prompt and records one decision per wake. Agent
-system prompts own the workflow; the runtime only supplies current facts.
+**engineering-lead agent** that receives the task ledger plus current facts and
+records one decision per wake. Agent system prompts own the workflow; the
+runtime only supplies current facts.
 
 ## Layout and dependency rule
 
@@ -76,6 +76,22 @@ migration, but no registered action creates new ones. Open Tasks normally rest
 after a decision until a person, worker, child Task, or source adapter writes a
 new fact.
 
+## Agent Instance
+
+Each Task coordinator is a first-class, Conductor-owned **Agent Instance**.
+The Instance has an opaque durable id; its Task/coordinator identity and its
+single resumable Agent Session identity are stored as mappings rather than
+encoded into that id. The first wake sends the complete Task ledger and binds
+the Session returned by `system:summon`. Later wakes resume that exact Session
+and send only facts after the Task binding's delivered cursor.
+
+This first experiment is deliberately one-to-one: one Agent Instance owns one
+Agent Session. Conductor does not compress, rotate, or silently replace it. A
+resume rejection marks the Instance broken so the failure is visible instead
+of creating a second Session under the same identity. Per-invocation Rome trace
+sessions remain separate accounting records and are grouped beneath the Task's
+stable coordinator Instance in the Usage UI.
+
 ## What code still enforces (and why it is not workflow)
 
 - **Freshness** (`fold.ts` → `needsAttention`): wake the orchestrator when
@@ -101,7 +117,7 @@ new fact.
 | layer | says | lives in |
 |---|---|---|
 | Agent system prompts | each Agent's responsibility, quality bar, hard lines and handoff boundaries | `src/app/agents/*.yaml` — app-owned |
-| wake prompt | facts only: ledger, Job execution status, available logical agents, `seenSeq` | built by `src/core/lib/prompts.ts` |
+| wake prompt | first turn: complete ledger and contracts; resumed Instance: new facts and current execution state; always includes `seenSeq` | built by `src/core/lib/prompts.ts` |
 
 Agent policy is deliberately responsibility-oriented, not a recipe. It does
 not enumerate what to do when a worker fails / blocks / waits; the ledger can

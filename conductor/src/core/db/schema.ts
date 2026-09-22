@@ -53,6 +53,40 @@ export function createAppDbSchema(tablePrefix: string = "conductor") {
   });
 
   /**
+   * A durable logical Agent identity owned by Conductor. The first experiment
+   * intentionally keeps its runtime model simple: one Agent Instance binds to
+   * exactly one resumable Agent Session. Task and Session identities live in
+   * the mapping table rather than being encoded into this primary identity.
+   */
+  const agentInstances = sqliteTable(`${tablePrefix}__agent_instances`, {
+    id: text("id").primaryKey(),
+    agentName: text("agent_name").notNull(),
+    status: text("status").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  });
+
+  const agentInstanceMappings = sqliteTable(
+    `${tablePrefix}__agent_instance_mappings`,
+    {
+      id: text("id").primaryKey(),
+      instanceId: text("instance_id").notNull(),
+      identityType: text("identity_type").notNull(),
+      identityValue: text("identity_value").notNull(),
+      relation: text("relation").notNull(),
+      /** Task-ledger cursor used only by the coordinator Task binding. */
+      cursorSeq: integer("cursor_seq"),
+      createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+      updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+    },
+    (t) => [
+      uniqueIndex(`${tablePrefix}__agent_instance_mappings_identity_idx`).on(t.identityType, t.identityValue, t.relation),
+      uniqueIndex(`${tablePrefix}__agent_instance_mappings_instance_relation_idx`).on(t.instanceId, t.identityType, t.relation),
+      index(`${tablePrefix}__agent_instance_mappings_instance_idx`).on(t.instanceId),
+    ],
+  );
+
+  /**
    * Durable Rome sessions that belong to a Task. Token accounting remains
    * owned by Rome's session store; Conductor only keeps this small join so the
    * guardian can aggregate the coordinator and worker sessions per Task.
@@ -117,7 +151,7 @@ export function createAppDbSchema(tablePrefix: string = "conductor") {
     ],
   );
 
-  return { facts, config, locks, workerHealth, taskSessions, frontdeskShadowRuns };
+  return { facts, config, locks, workerHealth, agentInstances, agentInstanceMappings, taskSessions, frontdeskShadowRuns };
 }
 
 const defaultSchema = createAppDbSchema();
@@ -127,5 +161,7 @@ export const config = defaultSchema.config;
 export const locks = defaultSchema.locks;
 
 export const workerHealth = defaultSchema.workerHealth;
+export const agentInstances = defaultSchema.agentInstances;
+export const agentInstanceMappings = defaultSchema.agentInstanceMappings;
 export const taskSessions = defaultSchema.taskSessions;
 export const frontdeskShadowRuns = defaultSchema.frontdeskShadowRuns;

@@ -4,6 +4,7 @@ import { createLockRepository, TICK_LOCK } from "../db/repositories/lock.js";
 import { createSettingsRepository } from "../db/repositories/settings.js";
 import { createWorkerHealthRepository } from "../db/repositories/worker-health.js";
 import { createTaskSessionRepository, type TaskSessionRef } from "../db/repositories/task-sessions.js";
+import { createAgentInstanceRepository, type AgentInstanceRef } from "../db/repositories/agent-instances.js";
 import { createRuntimeControlRepository, type RuntimeControl } from "../db/repositories/runtime-control.js";
 import { persistConfiguration } from "../actions/setup/index.js";
 import type { CoreComposition } from "../lib/composition.js";
@@ -51,6 +52,8 @@ class ConductorApiHandler implements RomeAppApiHandler {
         const lock = createLockRepository(this.ctx.db).peek(TICK_LOCK);
         const storedSessions = safe(() => createTaskSessionRepository(this.ctx.db).all()) ?? [];
         const sessionsByTask = groupTaskSessions(storedSessions);
+        const coordinatorInstances = safe(() => createAgentInstanceRepository(this.ctx.db).allTaskCoordinators()) ?? [];
+        const instancesByTask = new Map(coordinatorInstances.map((instance) => [instance.taskId, instance]));
         return json({
           now: now.toISOString(),
           configured: Boolean(config),
@@ -58,7 +61,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
           maxWorkers: config?.maxWorkers ?? 0,
           tickRunning: Boolean(lock && lock.heldUntil > now.getTime()),
           runtimePaused: runtimeControl.get().paused,
-          tasks: snapshot.tasks.map((task) => taskSummary(task, now, this.composition, config, sessionsByTask.get(task.id))),
+          tasks: snapshot.tasks.map((task) => taskSummary(task, now, this.composition, config, sessionsByTask.get(task.id), instancesByTask.get(task.id))),
           workers: health ?? [],
         });
       }
@@ -75,7 +78,8 @@ class ConductorApiHandler implements RomeAppApiHandler {
         const now = new Date();
         const task = foldTask(facts);
         const storedSessions = safe(() => createTaskSessionRepository(this.ctx.db).forTask(task.id)) ?? [];
-        return json({ ...taskSummary(task, now, this.composition, settings.get(), storedSessions), facts: task.facts.map(factJson) });
+        const coordinatorInstance = safe(() => createAgentInstanceRepository(this.ctx.db).forTaskCoordinator(task.id));
+        return json({ ...taskSummary(task, now, this.composition, settings.get(), storedSessions, coordinatorInstance), facts: task.facts.map(factJson) });
       }
       const taskRoute = request.path[0] === "tasks"
         ? this.composition.taskRoutes?.find((candidate) => (
@@ -108,7 +112,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         const result = await this.ctx.runAction("conductor:complete_task", { taskId, seenSeq: body.seenSeq, source: "Mark complete" });
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `complete returned ${result.status}` }, 502);
         if (isConflictData(result.data)) return json(result.data, 409);
-        return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get(), safe(() => createTaskSessionRepository(this.ctx.db).forTask(taskId)) ?? []);
+        return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get(), safe(() => createTaskSessionRepository(this.ctx.db).forTask(taskId)) ?? [], safe(() => createAgentInstanceRepository(this.ctx.db).forTaskCoordinator(taskId)));
       }
       if (request.path[0] === "tasks" && request.path[2] === "cancel" && request.path.length === 3) {
         if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
@@ -119,7 +123,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         const result = await this.ctx.runAction("conductor:cancel_task", { taskId, seenSeq: body.seenSeq, source: "Cancel task" });
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `cancel returned ${result.status}` }, 502);
         if (isConflictData(result.data)) return json(result.data, 409);
-        return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get(), safe(() => createTaskSessionRepository(this.ctx.db).forTask(taskId)) ?? []);
+        return refreshedTask(ledger.factsFor(taskId), this.composition, settings.get(), safe(() => createTaskSessionRepository(this.ctx.db).forTask(taskId)) ?? [], safe(() => createAgentInstanceRepository(this.ctx.db).forTaskCoordinator(taskId)));
       }
       // The ingest seam over HTTP. Any system that can reach Rome can open a
       // task or report an event; it cannot do anything else to the ledger,
@@ -257,11 +261,11 @@ class ConductorApiHandler implements RomeAppApiHandler {
   }
 }
 
-function refreshedTask(facts: Fact[], composition: CoreComposition, config?: ConductorConfig, storedSessions: TaskSessionRef[] = []): Response {
+function refreshedTask(facts: Fact[], composition: CoreComposition, config?: ConductorConfig, storedSessions: TaskSessionRef[] = [], coordinatorInstance?: AgentInstanceRef): Response {
   if (!facts.length) return json({ error: "task_not_found" }, 404);
   const now = new Date();
   const task = foldTask(facts);
-  return json({ ...taskSummary(task, now, composition, config, storedSessions), facts: task.facts.map(factJson) });
+  return json({ ...taskSummary(task, now, composition, config, storedSessions, coordinatorInstance), facts: task.facts.map(factJson) });
 }
 
 function mergeConfig(current: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
@@ -307,7 +311,7 @@ function runtimeControlJson(control: RuntimeControl) {
   };
 }
 
-function taskSummary(task: TaskView, now: Date, composition: CoreComposition, config?: ConductorConfig, storedSessions: TaskSessionRef[] = []) {
+function taskSummary(task: TaskView, now: Date, composition: CoreComposition, config?: ConductorConfig, storedSessions: TaskSessionRef[] = [], coordinatorInstance?: AgentInstanceRef) {
   const attention = needsAttention(task, now);
   const presentation = composition.projectPresentation?.(task.project, config);
   return {
@@ -319,6 +323,13 @@ function taskSummary(task: TaskView, now: Date, composition: CoreComposition, co
     workRepo: presentation?.workRepo,
     createdBy: task.createdBy,
     coordinatorAgent: config?.orchestratorAgent,
+    coordinatorInstance: coordinatorInstance ? {
+      id: coordinatorInstance.id,
+      agent: coordinatorInstance.agentName,
+      status: coordinatorInstance.status,
+      sessionId: coordinatorInstance.sessionId,
+      deliveredThroughSeq: coordinatorInstance.cursorSeq,
+    } : undefined,
     createdAt: task.facts[0].createdAt.toISOString(),
     updatedAt: task.latest.createdAt.toISOString(),
     state: task.state,

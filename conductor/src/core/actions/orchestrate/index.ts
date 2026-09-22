@@ -4,10 +4,11 @@ import { createLedgerRepository } from "../../db/repositories/ledger.js";
 import { createLockRepository, orchestrateLock } from "../../db/repositories/lock.js";
 import { createSettingsRepository } from "../../db/repositories/settings.js";
 import { createTaskSessionRepository } from "../../db/repositories/task-sessions.js";
+import { createAgentInstanceRepository } from "../../db/repositories/agent-instances.js";
 import { RUNTIME, type NewFact } from "../../lib/facts.js";
 import { fold, foldTask, needsAttention } from "../../lib/fold.js";
 import { buildOrchestratorPrompt } from "../../lib/prompts.js";
-import { readSummonOutput } from "../run-worker/index.js";
+import { isResumeRejection, readSummonOutput } from "../run-worker/index.js";
 
 const log = createAppLogger("conductor:wake_task_coordinator");
 
@@ -50,10 +51,40 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
           return { status: "ok", data: { taskId, skipped: "circuit breaker" } };
         }
 
+        const agentInstances = createAgentInstanceRepository(appContext.db);
+        let coordinatorInstance;
+        try {
+          coordinatorInstance = agentInstances.ensureTaskCoordinator(taskId, settings.orchestratorAgent);
+        } catch (err) {
+          return { status: "error", error: err instanceof Error ? err.message : String(err) };
+        }
+        if (coordinatorInstance.status !== "active") {
+          return { status: "error", error: `Agent Instance ${coordinatorInstance.id} is ${coordinatorInstance.status}; its one Agent Session cannot be resumed` };
+        }
+
         const snapshot = fold(now, ledger.all());
         const children = snapshot.tasks.filter((candidate) => candidate.parent?.taskId === task.id);
-        const prompt = buildOrchestratorPrompt({ task, children, config: settings, now, why: attention.why, providerFor: composition.providerFor, defaultWorkspaceKind: composition.defaultWorkspaceKind, projectNote: composition.projectPromptNote?.(task, "orchestrator"), sharedContracts: composition.sharedPromptContracts });
-        log.info("waking orchestrator", { taskId, seenSeq: task.latest.seq, why: attention.why });
+        const prompt = buildOrchestratorPrompt({
+          task,
+          children,
+          config: settings,
+          now,
+          why: attention.why,
+          providerFor: composition.providerFor,
+          defaultWorkspaceKind: composition.defaultWorkspaceKind,
+          projectNote: composition.projectPromptNote?.(task, "orchestrator"),
+          sharedContracts: composition.sharedPromptContracts,
+          ...(coordinatorInstance.sessionId && coordinatorInstance.cursorSeq !== undefined
+            ? { deliveredThroughSeq: coordinatorInstance.cursorSeq }
+            : {}),
+        });
+        log.info("waking orchestrator", {
+          taskId,
+          agentInstanceId: coordinatorInstance.id,
+          agentSessionId: coordinatorInstance.sessionId,
+          seenSeq: task.latest.seq,
+          why: attention.why,
+        });
 
         const taskSessions = createTaskSessionRepository(appContext.db);
         const rememberSession = (data: unknown, resultSeq?: number) => {
@@ -70,14 +101,40 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
 
         const summon = (p: string, sessionId?: string) => appContext.runAction("system:summon", { agentName: settings.orchestratorAgent, prompt: p, ...(sessionId ? { sessionId } : {}) })
           .catch((error: unknown) => ({ status: "error" as const, error: error instanceof Error ? error.message : String(error) }));
-        let result = await summon(prompt);
+        let result = await summon(prompt, coordinatorInstance.sessionId);
         let reply = result.status === "ok" ? readSummonOutput(result.data).reply : "";
         let error = result.status === "ok" ? undefined : result.status === "error" ? result.error : `summon returned ${result.status}`;
 
+        const acceptAgentSession = (data: unknown): string | undefined => {
+          const sessionId = readSummonOutput(data).sessionId;
+          if (!sessionId) {
+            error = "Summoned coordinator did not return a resumable Agent Session id";
+            return undefined;
+          }
+          try {
+            agentInstances.bindRuntimeSession(coordinatorInstance.id, sessionId);
+            // This cursor advances only through the contiguous facts actually
+            // present in the prompt. The coordinator's own new decision is
+            // deliberately delivered again on its next turn rather than
+            // risking skipping a concurrent fact with a lower seq.
+            agentInstances.advanceTaskCursor(coordinatorInstance.id, task.latest.seq);
+            return sessionId;
+          } catch (err) {
+            error = err instanceof Error ? err.message : String(err);
+            agentInstances.markBroken(coordinatorInstance.id);
+            return undefined;
+          }
+        };
+
+        let sessionId = result.status === "ok" ? acceptAgentSession(result.data) : undefined;
+        if (error && coordinatorInstance.sessionId && isResumeRejection(error)) {
+          agentInstances.markBroken(coordinatorInstance.id);
+          error = `Agent Instance ${coordinatorInstance.id} cannot resume its one Agent Session ${coordinatorInstance.sessionId}: ${error}`;
+        }
+
         let after = foldTask(ledger.factsFor(taskId));
         let decided = after.lastDecisionSeq > task.lastDecisionSeq || after.state !== "open";
-        if (result.status === "ok") rememberSession(result.data, decided ? after.lastDecisionSeq : undefined);
-        const sessionId = result.status === "ok" ? readSummonOutput(result.data).sessionId : undefined;
+        if (result.status === "ok" && sessionId) rememberSession(result.data, decided ? after.lastDecisionSeq : undefined);
         if (!decided && !error && sessionId) {
           // It talked instead of acting. Nobody reads its chat; give it one
           // chance, in the same session, to record what it just said.
@@ -88,9 +145,14 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
           ].join("\n"), sessionId);
           reply = result.status === "ok" ? readSummonOutput(result.data).reply || reply : reply;
           error = result.status === "ok" ? undefined : result.status === "error" ? result.error : `summon returned ${result.status}`;
+          if (result.status === "ok") sessionId = acceptAgentSession(result.data);
+          if (error && isResumeRejection(error)) {
+            agentInstances.markBroken(coordinatorInstance.id);
+            error = `Agent Instance ${coordinatorInstance.id} cannot resume its one Agent Session ${sessionId}: ${error}`;
+          }
           after = foldTask(ledger.factsFor(taskId));
           decided = after.lastDecisionSeq > task.lastDecisionSeq || after.state !== "open";
-          if (result.status === "ok") rememberSession(result.data, decided ? after.lastDecisionSeq : undefined);
+          if (result.status === "ok" && sessionId) rememberSession(result.data, decided ? after.lastDecisionSeq : undefined);
         }
         if (!decided) {
           // The runtime observed a failed/incomplete wake; it must not turn that
@@ -98,8 +160,8 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
           // an unseen runtime Event also leaves the Task eligible for retry.
           ledger.append(coordinatorWakeMissedFact(taskId, { error, reply }));
         }
-        log.info("orchestrator wake finished", { taskId, decided, error });
-        return { status: "ok", data: { taskId, decided, decision: decided ? after.lastDecision?.kind : undefined, error } };
+        log.info("orchestrator wake finished", { taskId, agentInstanceId: coordinatorInstance.id, agentSessionId: sessionId, decided, error });
+        return { status: "ok", data: { taskId, agentInstanceId: coordinatorInstance.id, agentSessionId: sessionId, decided, decision: decided ? after.lastDecision?.kind : undefined, error } };
       } finally {
         locks.release(orchestrateLock(taskId));
       }

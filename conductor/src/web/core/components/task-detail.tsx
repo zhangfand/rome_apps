@@ -272,7 +272,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
         </TabsContent>
 
         <TabsContent value="Usage" className="flex flex-col gap-3.5 pt-2">
-          <TaskUsageSummary usage={usage.analysis?.usage} loading={usage.loading} unavailable={usage.unavailable} />
+          <TaskUsageSummary usage={usage.analysis?.usage} loading={usage.loading} unavailable={usage.unavailable} coordinatorInstance={task.coordinatorInstance} />
           <TaskUsageExplorer task={task} analysis={usage.analysis} loading={usage.loading} unavailable={usage.unavailable} />
         </TabsContent>
 
@@ -302,7 +302,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
 function OverviewMetrics({ task, workerCount, now }: { task: TaskDetailJson; workerCount: number; now: number }) {
   const items = [
     { label: "Events", value: task.factCount.toLocaleString() },
-    { label: "Agent sessions", value: task.usageSessions.length.toLocaleString() },
+    { label: "Trace sessions", value: task.usageSessions.length.toLocaleString() },
     { label: "Workers", value: workerCount.toLocaleString() },
     { label: "Last update", value: formatRelative(task.updatedAt, now) },
   ];

@@ -19,6 +19,14 @@ export interface TaskSummary {
   createdBy: string;
   /** Agent id configured to coordinate this task (for example conductor:engineer-lead). */
   coordinatorAgent?: string;
+  /** Conductor-owned logical identity whose one Agent Session coordinates this Task. */
+  coordinatorInstance?: {
+    id: string;
+    agent: string;
+    status: "active" | "broken" | "retired";
+    sessionId?: string;
+    deliveredThroughSeq?: number;
+  };
   createdAt: string;
   updatedAt: string;
   state: "open" | "completed" | "cancelled";

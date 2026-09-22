@@ -60,8 +60,10 @@ The title, current standing, and primary actions stay visible; four tabs divide
 the rest into **Overview**, **Activity**, **Usage**, and **Work**. Overview is
 the default and shows a compact count strip plus the three newest non-routine
 events. Activity owns the full Stream/Lanes/Table history and its routine-step
-filter. Usage owns both token totals and causal diagnostics; its session trace
-requests do not start until that tab is opened. Work owns domain panels such as
+filter. Usage identifies the Task's stable coordinator Agent Instance and its
+one bound Agent Session, then shows token totals and causal diagnostics across
+the separate Rome trace sessions. Trace requests do not start until that tab is
+opened. Work owns domain panels such as
 pull requests, so their polling likewise only runs while that tab is mounted.
 The reply composer is closed by default unless the Task is waiting for a person;
 the primary Reply action returns to Overview and opens it.

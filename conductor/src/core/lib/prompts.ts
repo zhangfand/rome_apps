@@ -75,9 +75,19 @@ export function buildOrchestratorPrompt(input: {
   defaultWorkspaceKind: string;
   projectNote?: string;
   sharedContracts?: readonly SharedPromptContract[];
+  /**
+   * Last Task fact already delivered to this Agent Instance's one Session.
+   * Absent for the first turn, which receives a complete durable snapshot.
+   */
+  deliveredThroughSeq?: number;
 }): string {
   const { task, config, now, why } = input;
   const seenSeq = task.latest.seq;
+  const resumed = input.deliveredThroughSeq !== undefined;
+  const deliveredThroughSeq = input.deliveredThroughSeq ?? 0;
+  const deliveredFacts = resumed
+    ? task.facts.filter((fact) => fact.seq > deliveredThroughSeq)
+    : task.facts;
   const lines: string[] = [];
   lines.push(
     `# Orchestrator wake for task ${task.id}`,
@@ -90,10 +100,12 @@ export function buildOrchestratorPrompt(input: {
     `Decisions you have made since the person last spoke: ${task.decisionsSinceLastPersonFact}`,
     `seenSeq: ${seenSeq}  ← pass this on every decision action`,
     "",
-    "## Agents you may create a Job for",
-    ...Object.entries(config.workerAgents).map(([agent, description]) => `- \`${agent}\`: ${description}`),
-    "",
-    ...(input.sharedContracts?.length ? [
+    ...(!resumed ? [
+      "## Agents you may create a Job for",
+      ...Object.entries(config.workerAgents).map(([agent, description]) => `- \`${agent}\`: ${description}`),
+      "",
+    ] : []),
+    ...(!resumed && input.sharedContracts?.length ? [
       "## Shared artifact contracts",
       "",
       ...input.sharedContracts.flatMap((contract) => [
@@ -102,7 +114,7 @@ export function buildOrchestratorPrompt(input: {
         "",
       ]),
     ] : []),
-    ...(input.task.parent ? [
+    ...(!resumed && input.task.parent ? [
       "## Delivery lineage",
       `Parent task: ${input.task.parent.taskId}`,
       `Engineering-plan item: ${input.task.parent.planItemId}`,
@@ -120,11 +132,15 @@ export function buildOrchestratorPrompt(input: {
       }),
       "",
     ] : []),
-    "## Ledger (every fact on this task, oldest first)",
-    ...task.facts.map((fact) => describeFact(fact, { full: fact.seq > task.lastDecisionSeq || fact.kind === "Created" })),
+    resumed
+      ? `## New ledger facts after #${deliveredThroughSeq} (oldest first)`
+      : "## Ledger (every fact on this task, oldest first)",
+    ...deliveredFacts.map((fact) => describeFact(fact, { full: resumed || fact.seq > task.lastDecisionSeq || fact.kind === "Created" })),
     "",
     "## Now",
-    task.lastDecision ? `Your last decision was #${task.lastDecisionSeq} (${task.lastDecision.kind}); everything after it is new to you.` : "This is the first time you see this task.",
+    resumed
+      ? `This is another turn of the same Agent Instance and Session. Earlier Task history remains in your conversation context; only the facts after #${deliveredThroughSeq} are repeated above.`
+      : task.lastDecision ? `Your last decision was #${task.lastDecisionSeq} (${task.lastDecision.kind}); everything after it is new to you.` : "This is the first time you see this task.",
     `Decide the next step and record it with one decision action, citing taskId="${task.id}" and seenSeq=${seenSeq}.`,
   );
   return lines.join("\n");

@@ -1,10 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@rome-os/ui/card";
 import { formatCost, formatTokens, type TaskTokenUsage } from "../lib/task-usage.js";
+import type { TaskSummary } from "../lib/types.js";
 
-export function TaskUsageSummary({ usage, loading, unavailable }: {
+export function TaskUsageSummary({ usage, loading, unavailable, coordinatorInstance }: {
   usage?: TaskTokenUsage;
   loading: boolean;
   unavailable: boolean;
+  coordinatorInstance?: TaskSummary["coordinatorInstance"];
 }) {
   const noSessions = !usage || usage.sessionCount === 0;
   return (
@@ -23,17 +25,28 @@ export function TaskUsageSummary({ usage, loading, unavailable }: {
         <Metric label="Cache write" value={noSessions ? "0" : formatTokens(usage.cacheWriteTokens)} />
         <Metric label="Cost" value={noSessions ? "$0.00" : formatCost(usage.costUsd)} />
       </CardContent>
-      {!noSessions && (
+      {(coordinatorInstance || !noSessions) && (
         <CardContent className="flex flex-wrap gap-x-6 gap-y-1 border-t pt-4 text-aux text-muted-foreground">
-          <span>Coordinator <strong className="font-medium text-foreground">{formatTokens(usage.coordinator.totalTokens)}</strong></span>
-          <span>Workers <strong className="font-medium text-foreground">{formatTokens(usage.workers.totalTokens)}</strong></span>
-          <span>{usage.runCount} model run{usage.runCount === 1 ? "" : "s"}</span>
-          {usage.loadedSessionCount < usage.sessionCount && <span>{usage.sessionCount - usage.loadedSessionCount} session{usage.sessionCount - usage.loadedSessionCount === 1 ? "" : "s"} not found</span>}
-          <span className="basis-full">Historical Tasks include their linked worker sessions; coordinator sessions are linked from this version onward.</span>
+          {coordinatorInstance && <>
+            <span>Lead instance <strong className="font-mono font-medium text-foreground" title={coordinatorInstance.id}>{shortId(coordinatorInstance.id)}</strong></span>
+            <span>{coordinatorInstance.sessionId ? "1 bound Agent Session" : "Agent Session pending"}</span>
+            {coordinatorInstance.status !== "active" && <span className="text-warning">Instance {coordinatorInstance.status}</span>}
+          </>}
+          {!noSessions && <>
+            <span>Coordinator <strong className="font-medium text-foreground">{formatTokens(usage.coordinator.totalTokens)}</strong></span>
+            <span>Workers <strong className="font-medium text-foreground">{formatTokens(usage.workers.totalTokens)}</strong></span>
+            <span>{usage.runCount} model run{usage.runCount === 1 ? "" : "s"}</span>
+            {usage.loadedSessionCount < usage.sessionCount && <span>{usage.sessionCount - usage.loadedSessionCount} session{usage.sessionCount - usage.loadedSessionCount === 1 ? "" : "s"} not found</span>}
+            <span className="basis-full">Historical Tasks include their linked worker sessions; coordinator trace sessions are linked from this version onward.</span>
+          </>}
         </CardContent>
       )}
     </Card>
   );
+}
+
+function shortId(value: string): string {
+  return value.length > 18 ? `${value.slice(0, 15)}…` : value;
 }
 
 function Metric({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
