@@ -5,6 +5,7 @@ import { createTaskSessionRepository } from "../../db/repositories/task-sessions
 import { foldTask } from "../../lib/fold.js";
 import {
   buildLedgerSnapshotPrompt,
+  latestLedgerSnapshot,
   parseLedgerSnapshotReply,
   shouldSnapshotTask,
   SNAPSHOT_AGENT,
@@ -50,7 +51,15 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
           return { status: "ok", data: { taskId, skipped: "snapshot threshold not reached" } };
         }
 
-        const { prompt, input } = buildLedgerSnapshotPrompt(task);
+        const previous = latestLedgerSnapshot(task.facts);
+        let externalizedPreviousSummary: string | undefined;
+        if (previous && !previous.payload.summary) {
+          if (!composition.readTaskSnapshot || !previous.payload.workRepo) {
+            return { status: "error", error: `Snapshot #${previous.seq} has no inline body or readable work-repository artifact` };
+          }
+          externalizedPreviousSummary = await composition.readTaskSnapshot(task, previous.payload.workRepo);
+        }
+        const { prompt, input } = buildLedgerSnapshotPrompt(task, externalizedPreviousSummary);
         log.info("compacting task ledger", {
           taskId,
           throughSeq: task.latest.seq,
@@ -81,8 +90,8 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
           payload: {
             coversThroughSeq: task.latest.seq,
             ...(input.previous ? { previousSnapshotSeq: input.previous.seq } : {}),
-            summary,
-            schemaVersion: 1,
+            ...(workRepoRef ? {} : { summary }),
+            schemaVersion: workRepoRef ? 2 : 1,
             inputFactCount: input.factCount,
             estimatedInputTokens: input.estimatedTokens,
             ...(workRepoRef ? { workRepo: {

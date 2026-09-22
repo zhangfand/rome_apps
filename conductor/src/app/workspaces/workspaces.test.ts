@@ -12,9 +12,6 @@ import {
 import { type GitWorktreeWorkspace, gitWorktreeProvider } from "../../domain/workspaces/git-worktree.js";
 import { noWorkspaceProvider } from "../../core/workspaces/none.js";
 import { providerFor } from "./index.js";
-import { PRODUCT_SPEC_FORMAT } from "../../domain/product-spec-format.js";
-import { TECHNICAL_SPEC_FORMAT } from "../../domain/technical-spec-format.js";
-import { WORK_REPO_CONTRACT } from "../../domain/work-repo-contract.js";
 
 let seq = 0;
 const t0 = Date.parse("2026-09-14T00:00:00Z");
@@ -145,7 +142,15 @@ describe("prompts follow the workspace kind", () => {
     expect(prompt).not.toContain("legacy global policy");
   });
 
-  it("injects the identical shared spec formats for the lead and workers", () => {
+  it("gives the lead and workers immutable shared-contract references", () => {
+    const sharedContracts = ["product-spec-format.md", "technical-spec-format.md", "work-repo-contract.md"].map((name, index) => ({
+      name,
+      artifact: {
+        repo: "owner/work", path: `_conductor/contracts/${name}`,
+        commit: String(index + 1).repeat(40), sha256: "a".repeat(64), bytes: 100 + index,
+        url: `https://example.test/${name}`,
+      },
+    }));
     const worker = buildWorkerPrompt({
       task,
       instructions: "write the spec",
@@ -153,11 +158,7 @@ describe("prompts follow the workspace kind", () => {
       resuming: false,
       providerFor,
       defaultWorkspaceKind: "git-worktree",
-      sharedContracts: [
-        { name: "product-spec-format.md", content: PRODUCT_SPEC_FORMAT },
-        { name: "technical-spec-format.md", content: TECHNICAL_SPEC_FORMAT },
-        { name: "work-repo-contract.md", content: WORK_REPO_CONTRACT },
-      ],
+      sharedContracts,
     });
     const lead = buildOrchestratorPrompt({
       task,
@@ -166,18 +167,14 @@ describe("prompts follow the workspace kind", () => {
       why: "new facts",
       providerFor,
       defaultWorkspaceKind: "git-worktree",
-      sharedContracts: [
-        { name: "product-spec-format.md", content: PRODUCT_SPEC_FORMAT },
-        { name: "technical-spec-format.md", content: TECHNICAL_SPEC_FORMAT },
-        { name: "work-repo-contract.md", content: WORK_REPO_CONTRACT },
-      ],
+      sharedContracts,
     });
-    expect(worker).toContain(PRODUCT_SPEC_FORMAT.trim());
-    expect(lead).toContain(PRODUCT_SPEC_FORMAT.trim());
-    expect(worker).toContain(TECHNICAL_SPEC_FORMAT.trim());
-    expect(lead).toContain(TECHNICAL_SPEC_FORMAT.trim());
-    expect(worker).toContain(WORK_REPO_CONTRACT.trim());
-    expect(lead).toContain(WORK_REPO_CONTRACT.trim());
+    for (const contract of sharedContracts) {
+      expect(worker).toContain(contract.artifact.path);
+      expect(lead).toContain(contract.artifact.path);
+    }
+    expect(worker).not.toContain("# Product spec format");
+    expect(lead).not.toContain("# Product spec format");
   });
 });
 

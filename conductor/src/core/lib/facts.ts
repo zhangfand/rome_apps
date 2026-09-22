@@ -175,6 +175,8 @@ export type JobCreatedFact = FactOf<"JobCreated", {
   agent: string;
   /** The coordinator's self-contained direction to that agent. */
   instructions: string;
+  /** Shared contract ids the worker must be able to read for this Job. */
+  contracts?: string[];
   /** Why this job is the next useful work; shown to people. */
   note?: string;
 }>;
@@ -194,9 +196,9 @@ export type SnapshotFact = FactOf<"Snapshot", {
   coversThroughSeq: number;
   /** Previous Snapshot folded into this one, when present. */
   previousSnapshotSeq?: number;
-  /** Prompt-ready Markdown containing the Task's durable current state. */
-  summary: string;
-  schemaVersion: 1;
+  /** Legacy inline body. New snapshots with a work-repo ref omit it. */
+  summary?: string;
+  schemaVersion: 1 | 2;
   /** Observability for why this compaction happened. */
   inputFactCount: number;
   estimatedInputTokens: number;
@@ -222,6 +224,8 @@ export type DispatchedFact = FactOf<"Dispatched", {
   agent: string;
   /** Copied from the Job so a historical run remains self-describing. */
   instructions: string;
+  /** Shared contract ids rendered into this run as immutable references. */
+  contracts?: string[];
   /** The full prompt the worker was launched with (instructions + runtime framing). */
   prompt: string;
   /** Why the orchestrator started this worker; shown to people. */
@@ -352,7 +356,11 @@ export function describeFact(fact: Fact, opts: { full?: boolean } = {}): string 
         return `${fact.payload.source}/${fact.payload.type}: ${fact.payload.summary}${artifact ? `\nArtifact: ${artifact}` : ""}`;
       }
       case "Snapshot":
-        return `covers through #${fact.payload.coversThroughSeq}${fact.payload.previousSnapshotSeq ? `, replacing snapshot #${fact.payload.previousSnapshotSeq}` : ""}${fact.payload.workRepo ? `\nWork-repository mirror: ${fact.payload.workRepo.repo}:${fact.payload.workRepo.path} at ${fact.payload.workRepo.commit}` : ""}\n${fact.payload.summary}`;
+        return [
+          `covers through #${fact.payload.coversThroughSeq}${fact.payload.previousSnapshotSeq ? `, replacing snapshot #${fact.payload.previousSnapshotSeq}` : ""}`,
+          fact.payload.workRepo ? `Snapshot artifact: ${describeArtifactRef(fact.payload.workRepo)}` : "",
+          fact.payload.summary ?? "",
+        ].filter(Boolean).join("\n");
     }
   })();
   const cited = fact.source && fact.by !== RUNTIME && fact.by !== ORCHESTRATOR ? ` [source: ${clip(fact.source, 300)}]` : "";

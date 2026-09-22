@@ -43,6 +43,14 @@ export type PersistTextArtifacts = (
   message: string,
 ) => Promise<Map<string, WorkRepoArtifactRef>>;
 
+export interface PinnedTextArtifactRef {
+  repo: string;
+  path: string;
+  commit: string;
+  sha256: string;
+  bytes: number;
+}
+
 /**
  * Commit immutable JSON evidence through an isolated clone, leaving the shared
  * work-repository checkout untouched. A push race is retried from the newest
@@ -67,6 +75,36 @@ export const persistTextArtifacts: PersistTextArtifacts = async (workRepo, draft
   });
   return persistPreparedArtifacts(workRepo, prepared, message);
 };
+
+/** Read and verify an immutable text artifact without trusting a stale checkout. */
+export async function readPinnedTextArtifact(
+  workRepo: WorkRepoConfig,
+  ref: PinnedTextArtifactRef,
+): Promise<string> {
+  if (ref.repo.toLowerCase() !== workRepo.repo.toLowerCase()) {
+    throw new Error(`Snapshot artifact repository ${ref.repo} does not match ${workRepo.repo}`);
+  }
+  if (!/^[0-9a-f]{40}$/i.test(ref.commit)) throw new Error("Pinned artifact commit must be a full Git SHA");
+  const artifactPath = safeArtifactPath(ref.path);
+  const origin = (await git(workRepo.workingDir, "remote", "get-url", "origin")).trim();
+  if (!origin) throw new Error(`Work repository ${workRepo.repo} has no origin remote`);
+
+  const checkout = await mkdtemp(path.join(os.tmpdir(), "conductor-artifact-read-"));
+  try {
+    await git(checkout, "init", "--quiet");
+    await git(checkout, "remote", "add", "origin", origin);
+    await git(checkout, "fetch", "--quiet", "--depth=1", "origin", ref.commit);
+    const content = await git(checkout, "show", `FETCH_HEAD:${artifactPath}`);
+    const bytes = Buffer.byteLength(content);
+    const sha256 = createHash("sha256").update(content).digest("hex");
+    if (bytes !== ref.bytes || sha256 !== ref.sha256) {
+      throw new Error(`Pinned artifact verification failed for ${ref.repo}@${ref.commit}:${artifactPath}`);
+    }
+    return content;
+  } finally {
+    await rm(checkout, { recursive: true, force: true });
+  }
+}
 
 async function persistPreparedArtifacts(
   workRepo: WorkRepoConfig,

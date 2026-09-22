@@ -72,6 +72,30 @@ describe("ledger snapshots", () => {
     expect(coordinatorFacts(task, 4).facts.map((item) => item.seq)).toEqual([5]);
   });
 
+  it("uses an externally loaded previous Snapshot body for the next compaction", () => {
+    const snapshot = fact(4, {
+      kind: "Snapshot",
+      by: "conductor:ledger-compactor",
+      payload: {
+        coversThroughSeq: 3,
+        schemaVersion: 2,
+        inputFactCount: 3,
+        estimatedInputTokens: 20,
+        workRepo: {
+          repo: "owner/work", path: "_conductor/tasks/t-1/snapshot.md",
+          commit: "a".repeat(40), sha256: "b".repeat(64), bytes: 321,
+          url: "https://example.test/snapshot",
+        },
+      },
+    });
+    const task = foldTask([created(), fact(2, {}), fact(3, {}), snapshot, fact(5, { kind: "Reply", by: "guardian", payload: { text: "new" } })]);
+    expect(() => buildLedgerSnapshotPrompt(task)).toThrow(/external artifact was not loaded/);
+    const built = buildLedgerSnapshotPrompt(task, "Pinned current state");
+    expect(built.prompt).toContain("Pinned current state");
+    expect(built.prompt).toContain("new");
+    expect(built.prompt).not.toContain("note 2");
+  });
+
   it("parses the bounded fenced result", () => {
     expect(parseLedgerSnapshotReply("```ledger-snapshot\n# State\nReady\n```\n")).toBe("# State\nReady");
   });

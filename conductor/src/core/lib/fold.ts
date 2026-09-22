@@ -34,6 +34,7 @@ export interface JobRef {
   jobId: string;
   agent: string;
   instructions: string;
+  contracts?: string[];
   note?: string;
   createdAt: Date;
   createdSeq: number;
@@ -177,6 +178,7 @@ function jobRef(fact: Fact | undefined): JobRef | undefined {
     jobId: job.payload.jobId,
     agent: job.payload.agent,
     instructions: job.payload.instructions,
+    ...(job.payload.contracts?.length ? { contracts: job.payload.contracts } : {}),
     ...(job.payload.note ? { note: job.payload.note } : {}),
     createdAt: job.createdAt,
     createdSeq: job.seq,

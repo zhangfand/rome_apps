@@ -1,6 +1,7 @@
 import type { TaskSnapshotMirrorRef } from "../core/lib/composition.js";
 import type { TaskView } from "../core/lib/fold.js";
 import { persistTextArtifacts } from "./work-repo-artifacts.js";
+import { readPinnedTextArtifact } from "./work-repo-artifacts.js";
 import { workRepoFor } from "./work-repo.js";
 
 /** Mirror the newest generated Task state into the project's work repository. */
@@ -43,9 +44,28 @@ export function archivedSnapshotMarkdown(input: {
     "",
     `# Task ledger snapshot: ${input.brief}`,
     "",
-    "> Runtime-owned mirror of the latest Conductor Snapshot fact. The append-only Task ledger remains authoritative.",
+    "> Runtime-owned body referenced by a Conductor Snapshot fact. The append-only Task ledger remains authoritative for identity, ordering, and coverage.",
     "",
     input.summary.trim(),
     "",
   ].join("\n");
+}
+
+/** Extract the compacted state body from the self-describing archived file. */
+export function archivedSnapshotSummary(markdown: string): string {
+  const quote = markdown.indexOf("\n> ");
+  const body = quote < 0 ? -1 : markdown.indexOf("\n\n", quote);
+  if (body < 0) throw new Error("Pinned Snapshot artifact has no body separator");
+  const summary = markdown.slice(body + 2).trim();
+  if (!summary) throw new Error("Pinned Snapshot artifact has an empty body");
+  return summary;
+}
+
+export async function readArchivedTaskSnapshot(
+  task: TaskView,
+  ref: TaskSnapshotMirrorRef,
+): Promise<string> {
+  const workRepo = workRepoFor(task.project);
+  if (!workRepo) throw new Error("Task has no configured work repository for its externalized Snapshot");
+  return archivedSnapshotSummary(await readPinnedTextArtifact(workRepo, ref));
 }

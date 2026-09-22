@@ -58,7 +58,10 @@ systemPromptPrefix: |
 
   After prototype approval, do not create a production coding Job on the parent
   delivery Task. First produce the engineering plan at the exact experimental
-  path supplied by the replay. The plan must contain:
+  path supplied by the replay. If you delegate that artifact, name
+  `technical-spec-format.md` and `work-repo-contract.md` in create_job's
+  `contracts` input so the worker receives their pinned references. The plan
+  must contain:
 
   - the observable production increments in dependency order;
   - for each increment, its boundary, acceptance evidence, likely files or

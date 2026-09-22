@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "@rstest/core";
-import { persistJsonArtifacts, persistTextArtifacts } from "./work-repo-artifacts.js";
+import { persistJsonArtifacts, persistTextArtifacts, readPinnedTextArtifact } from "./work-repo-artifacts.js";
 
 const exec = promisify(execFile);
 
@@ -35,7 +35,7 @@ describe("work repository JSON artifacts", () => {
     }
   });
 
-  it("commits a Markdown Snapshot mirror", async () => {
+  it("commits and verifies a pinned Markdown Snapshot body", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "conductor-snapshot-test-"));
     const remote = path.join(root, "remote.git");
     const checkout = path.join(root, "checkout");
@@ -52,6 +52,10 @@ describe("work repository JSON artifacts", () => {
 
       await git(root, "clone", remote, inspect);
       expect(await readFile(path.join(inspect, ref.path), "utf8")).toBe("# Snapshot\n\nCurrent state.\n");
+      expect(await readPinnedTextArtifact(
+        { repo: "acme/widgets-work", workingDir: checkout },
+        ref,
+      )).toBe("# Snapshot\n\nCurrent state.\n");
       expect(ref.mediaType).toBe("text/markdown");
       expect(ref.url).toContain(`/blob/${ref.commit}/_conductor/tasks/t-1/snapshot.md`);
     } finally {

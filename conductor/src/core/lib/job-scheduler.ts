@@ -70,7 +70,15 @@ export async function dispatchPendingJobs(input: {
       }
       const project = task.project!;
 
-      const previousWorkerId = config.reuseSessions ? reusableWorkerForAgent(task, job.agent) : undefined;
+      const contractNames = composition.promptContracts
+        ? [...new Set([
+            ...composition.promptContracts.defaultForWorker(job.agent),
+            ...(job.contracts ?? []),
+          ])]
+        : [];
+      const previousWorkerId = config.reuseSessions
+        ? reusableWorkerForAgent(task, job.agent, contractNames)
+        : undefined;
       const resumeSessionId = previousWorkerId ? sessionLeftBy(task, previousWorkerId) : undefined;
       const workerId = `w-${crypto.randomUUID().slice(0, 8)}`;
       const workspaceKind = projectWorkspaceKind(project, composition.defaultWorkspaceKind);
@@ -88,6 +96,9 @@ export async function dispatchPendingJobs(input: {
           outcome.pending.push({ taskId: task.id, jobId: job.jobId });
           break;
         }
+        const contracts = !resumeSessionId && contractNames.length
+          ? await composition.promptContracts!.resolve(task, contractNames)
+          : [];
         const prompt = buildWorkerPrompt({
           task,
           jobId: job.jobId,
@@ -97,13 +108,14 @@ export async function dispatchPendingJobs(input: {
           providerFor: composition.providerFor,
           defaultWorkspaceKind: composition.defaultWorkspaceKind,
           projectNote: composition.projectPromptNote?.(task, "worker"),
-          sharedContracts: composition.sharedPromptContracts,
+          sharedContracts: contracts,
         });
         const payload: DispatchedFact["payload"] = {
           jobId: job.jobId,
           workerId,
           agent: job.agent,
           instructions: job.instructions,
+          ...(contractNames.length ? { contracts: contractNames } : {}),
           prompt,
           ...(job.note ? { note: job.note } : {}),
           ...(resumeSessionId && previousWorkerId
@@ -173,13 +185,23 @@ function appendJobFailure(
 }
 
 /** The newest cleanly returned session for this logical agent, if one exists. */
-export function reusableWorkerForAgent(task: TaskView, agent: string): string | undefined {
+export function reusableWorkerForAgent(
+  task: TaskView,
+  agent: string,
+  requiredContracts: readonly string[] = [],
+): string | undefined {
   for (const fact of [...task.facts].reverse()) {
     if (fact.kind !== "Returned" || !fact.payload.sessionId) continue;
     const dispatch = task.facts.find((candidate) =>
       candidate.kind === "Dispatched" && candidate.payload.workerId === fact.payload.workerId,
     );
-    if (dispatch?.kind === "Dispatched" && dispatch.payload.agent === agent) return fact.payload.workerId;
+    if (dispatch?.kind === "Dispatched" && dispatch.payload.agent === agent) {
+      const available = new Set(dispatch.payload.contracts ?? []);
+      const hasContracts = requiredContracts.every((name) =>
+        available.has(name) || dispatch.payload.prompt.includes(name),
+      );
+      if (hasContracts) return fact.payload.workerId;
+    }
   }
   return undefined;
 }

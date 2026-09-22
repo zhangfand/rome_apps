@@ -38,12 +38,8 @@ export function buildWorkerPrompt(input: {
       "",
     );
   }
-  if (input.sharedContracts?.length) {
-    lines.push("## Shared artifact contracts", "");
-    for (const contract of input.sharedContracts) {
-      lines.push(`### ${contract.name}`, contract.content.trim(), "");
-    }
-  }
+  const contracts = resuming ? [] : contractLines(input.sharedContracts, { allowInline: true });
+  if (contracts.length) lines.push("## Shared artifact contracts", "", ...contracts);
   lines.push("## Job instructions from the task coordinator", instructions, "");
   // A workspace kind with nothing to say adds no section: a worker on a task
   // that touches no files is never told about checkouts or branches.
@@ -108,11 +104,7 @@ export function buildOrchestratorPrompt(input: {
     ...(!resumed && input.sharedContracts?.length ? [
       "## Shared artifact contracts",
       "",
-      ...input.sharedContracts.flatMap((contract) => [
-        `### ${contract.name}`,
-        contract.content.trim(),
-        "",
-      ]),
+      ...contractLines(input.sharedContracts, { allowInline: true }),
     ] : []),
     ...(!resumed && input.task.parent ? [
       "## Delivery lineage",
@@ -151,6 +143,10 @@ export function buildOrchestratorPrompt(input: {
       : resumed
         ? `## New ledger facts after #${deliveredThroughSeq} (oldest first)`
         : "## Ledger (every fact on this task, oldest first)",
+    ...(context.compacted && !context.snapshot!.payload.summary ? [
+      `Snapshot #${context.snapshot!.seq} has an externalized body. Fetch its pinned commit if needed and read that exact Snapshot artifact before deciding; the commit-pinned file, not the work repository's current branch, replaces the covered facts.`,
+      "",
+    ] : []),
     ...deliveredFacts.map((fact) => describeFact(fact, { full: resumed || fact.seq > task.lastDecisionSeq || fact.kind === "Created" })),
     "",
     "## Now",
@@ -162,4 +158,30 @@ export function buildOrchestratorPrompt(input: {
     `Decide the next step and record it with one decision action, citing taskId="${task.id}" and seenSeq=${seenSeq}.`,
   );
   return lines.join("\n");
+}
+
+function contractLines(
+  contracts: readonly SharedPromptContract[] | undefined,
+  options: { allowInline: boolean },
+): string[] {
+  if (!contracts?.length) return [];
+  const lines = [
+    "Contracts are immutable inputs, not text to copy into another artifact. Read a pinned file only when this Job or decision requires it.",
+    "Use the named work-repository checkout and fetch the pinned commit from origin first if that object is not present locally.",
+    "",
+  ];
+  for (const contract of contracts) {
+    if (contract.artifact) {
+      const ref = contract.artifact;
+      lines.push(
+        `- \`${contract.name}\`: \`${ref.repo}@${ref.commit}:${ref.path}\` (sha256 \`${ref.sha256}\`, ${ref.bytes} bytes)`,
+      );
+    } else if (options.allowInline && contract.content) {
+      // Projects without a work repository retain a correctness-preserving
+      // fallback. Resumed worker Sessions never receive this stable body again.
+      lines.push(`### ${contract.name}`, contract.content.trim(), "");
+    }
+  }
+  lines.push("");
+  return lines;
 }

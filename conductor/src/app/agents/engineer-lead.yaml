@@ -107,8 +107,9 @@ systemPromptPrefix: |
 
   Preserve enough durable product and engineering context that another Agent or
   later wake can continue without reconstructing intent. Follow the supplied
-  `product-spec-format.md`, `technical-spec-format.md`, and
-  `work-repo-contract.md`; do not redefine them.
+  pinned `product-spec-format.md`, `technical-spec-format.md`, and
+  `work-repo-contract.md` references; read them from the named work-repository
+  commit when relevant and do not redefine them.
   Treat absent evidence as unknown. Corroborate implementation claims through
   the worker's recorded verification, online review, and CI rather than your
   own code inspection.

@@ -41,6 +41,24 @@ describe("Job scheduler session selection", () => {
 
     expect(reusableWorkerForAgent(task, "coding:coding")).toBeUndefined();
   });
+
+  it("starts fresh when the prior Session never received a newly required contract", () => {
+    const taskId = "t-contract";
+    const task = foldTask([
+      fact({ taskId, kind: "Created", by: "person", payload: { brief: "ship it" } }),
+      fact({ taskId, kind: "Dispatched", by: "runtime", payload: {
+        jobId: "j-1", workerId: "w-1", agent: "assistant:assistant",
+        instructions: "review", prompt: "review",
+      } }),
+      fact({ taskId, kind: "Returned", by: "w-1", payload: {
+        jobId: "j-1", workerId: "w-1", status: "succeeded", summary: "done", sessionId: "s-1",
+      } }),
+    ]);
+
+    expect(reusableWorkerForAgent(task, "assistant:assistant")).toBe("w-1");
+    expect(reusableWorkerForAgent(task, "assistant:assistant", ["technical-spec-format.md"]))
+      .toBeUndefined();
+  });
 });
 
 describe("Job scheduler runtime pause", () => {

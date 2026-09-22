@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@rstest/core";
-import { archivedSnapshotMarkdown } from "./task-snapshot-artifact.js";
+import { archivedSnapshotMarkdown, archivedSnapshotSummary } from "./task-snapshot-artifact.js";
 
 describe("archived Task ledger Snapshot", () => {
-  it("is a self-describing runtime-owned Markdown mirror", () => {
+  it("is a self-describing runtime-owned reference body", () => {
     const value = archivedSnapshotMarkdown({
       taskId: "t-1",
       brief: "Ship it",
@@ -13,7 +13,8 @@ describe("archived Task ledger Snapshot", () => {
     expect(value).toContain("taskId: t-1");
     expect(value).toContain("coversThroughSeq: 42");
     expect(value).toContain("# Task ledger snapshot: Ship it");
-    expect(value).toContain("append-only Task ledger remains authoritative");
+    expect(value).toContain("append-only Task ledger remains authoritative for identity, ordering, and coverage");
     expect(value).toContain("## Current state\nReady.");
+    expect(archivedSnapshotSummary(value)).toBe("## Current state\nReady.");
   });
 });

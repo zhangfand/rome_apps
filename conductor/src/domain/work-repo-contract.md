@@ -13,7 +13,7 @@ repository; it replaces neither.
   never here.
 - The Task ledger remains the record of events, decisions, Jobs, and execution
   state. Do not manually copy the ledger into documents; the runtime-owned
-  `_conductor/` Snapshot mirror described below is the sole exception. Link
+  `_conductor/` artifacts described below are the sole exception. Link
   Task ids, PRs, commits, and other evidence where they help another Agent
   recover the reasoning.
 - Commit and push meaningful changes before handing work to another Agent. Git
@@ -31,7 +31,8 @@ Tasks or Jobs contribute to it:
 │   ├── product-spec.md   # product contract; PM-owned when PM is involved
 │   ├── technical-spec.md # approved prototype distilled into production design
 │   └── artifacts/    # optional supporting evidence that merits its own file
-├── _conductor/           # runtime-owned Task context mirrors
+├── _conductor/           # runtime-owned contracts and Task context
+│   ├── contracts/         # runtime-owned, versioned Agent prompt contracts
 │   └── tasks/<task-id>/snapshot.md
 ├── _experiments/         # isolated, non-canonical replay/prompt experiments
 │   └── replays/<task-id>/technical-spec.md
@@ -56,11 +57,15 @@ Tasks or Jobs contribute to it:
   than Task, Agent, or Run id. Agents may read these files but must not edit
   them. Ledger events cite the repository path and the exact Git commit; the
   compact ledger envelope remains authoritative for ordering and deduplication.
+- `_conductor/contracts/` is runtime-owned. It contains the canonical prompt
+  contracts packaged with the installed Conductor version. Prompts cite an
+  exact repository commit; Agents read that pinned file when their role or Job
+  requires it and never edit these files.
 - `_conductor/tasks/<task-id>/snapshot.md` is runtime-owned and overwritten
-  whenever Conductor writes a newer ledger `Snapshot` fact. It is a
-  human-readable recovery mirror, not a second source of truth: the Snapshot
-  fact cites its exact repository commit, while the append-only ledger remains
-  authoritative. Agents may read this file but must not edit it.
+  whenever Conductor writes a newer ledger `Snapshot` fact. The reference-only
+  Snapshot fact cites its exact repository commit and remains authoritative for
+  identity, ordering, and ledger coverage; this pinned file contains the
+  compacted state body. Agents may read this file but must not edit it.
 - `_experiments/replays/<task-id>/technical-spec.md` is used only by a Task replay that
   explicitly names that path. It isolates prompt/decomposition experiments
   from the canonical workstream `technical-spec.md`. A replay may update its own file,

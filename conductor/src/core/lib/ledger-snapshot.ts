@@ -22,11 +22,14 @@ export function latestLedgerSnapshot(facts: readonly Fact[]): SnapshotFact | und
 }
 
 /** Facts not yet compressed by the newest Snapshot. Snapshot facts themselves are metadata. */
-export function snapshotInput(task: Pick<TaskView, "facts">): SnapshotInput {
+export function snapshotInput(
+  task: Pick<TaskView, "facts">,
+  externalizedPreviousSummary?: string,
+): SnapshotInput {
   const previous = latestLedgerSnapshot(task.facts);
   const after = previous?.payload.coversThroughSeq ?? 0;
   const facts = task.facts.filter((fact) => fact.seq > after && fact.kind !== "Snapshot");
-  const rendered = renderSnapshotSource(previous, facts);
+  const rendered = renderSnapshotSource(previous, facts, externalizedPreviousSummary);
   return {
     previous,
     facts,
@@ -36,8 +39,16 @@ export function snapshotInput(task: Pick<TaskView, "facts">): SnapshotInput {
 }
 
 export function shouldSnapshotTask(task: Pick<TaskView, "facts">): boolean {
-  const input = snapshotInput(task);
-  return input.factCount >= SNAPSHOT_FACT_THRESHOLD || input.estimatedTokens >= SNAPSHOT_TOKEN_THRESHOLD;
+  const previous = latestLedgerSnapshot(task.facts);
+  const after = previous?.payload.coversThroughSeq ?? 0;
+  const facts = task.facts.filter((fact) => fact.seq > after && fact.kind !== "Snapshot");
+  const factTokens = estimateTokens(facts.map((fact) => describeFact(fact, { full: true })).join("\n"));
+  const previousTokens = previous?.payload.summary
+    ? estimateTokens(previous.payload.summary)
+    : previous?.payload.workRepo
+      ? Math.ceil(previous.payload.workRepo.bytes / 3)
+      : 0;
+  return facts.length >= SNAPSHOT_FACT_THRESHOLD || factTokens + previousTokens >= SNAPSHOT_TOKEN_THRESHOLD;
 }
 
 /**
@@ -79,8 +90,11 @@ export function coordinatorFacts(
   };
 }
 
-export function buildLedgerSnapshotPrompt(task: TaskView): { prompt: string; input: SnapshotInput } {
-  const input = snapshotInput(task);
+export function buildLedgerSnapshotPrompt(
+  task: TaskView,
+  externalizedPreviousSummary?: string,
+): { prompt: string; input: SnapshotInput } {
+  const input = snapshotInput(task, externalizedPreviousSummary);
   const newest = task.latest.seq;
   return {
     input,
@@ -97,7 +111,7 @@ export function buildLedgerSnapshotPrompt(task: TaskView): { prompt: string; inp
       `Keep the snapshot under ${SNAPSHOT_MAX_CHARS} characters. Return only the Markdown snapshot inside one fenced block named \`ledger-snapshot\`.`,
       "",
       "## Source",
-      renderSnapshotSource(input.previous, input.facts),
+      renderSnapshotSource(input.previous, input.facts, externalizedPreviousSummary),
     ].join("\n"),
   };
 }
@@ -110,12 +124,20 @@ export function parseLedgerSnapshotReply(reply: string): string | undefined {
   return summary;
 }
 
-function renderSnapshotSource(previous: SnapshotFact | undefined, facts: readonly Fact[]): string {
+function renderSnapshotSource(
+  previous: SnapshotFact | undefined,
+  facts: readonly Fact[],
+  externalizedPreviousSummary?: string,
+): string {
   const lines: string[] = [];
   if (previous) {
+    const previousSummary = previous.payload.summary ?? externalizedPreviousSummary;
+    if (!previousSummary) {
+      throw new Error(`Snapshot #${previous.seq} has no inline body and its external artifact was not loaded`);
+    }
     lines.push(
       `### Previous Snapshot #${previous.seq} (covers through #${previous.payload.coversThroughSeq})`,
-      previous.payload.summary,
+      previousSummary,
       "",
       "### Facts after the previous covered prefix",
     );

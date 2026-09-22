@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@rstest/core";
 import { foldTask } from "./fold.js";
 import type { Fact } from "./facts.js";
-import { buildOrchestratorPrompt } from "./prompts.js";
+import { buildOrchestratorPrompt, buildWorkerPrompt } from "./prompts.js";
 
 const at = (minute: number) => new Date(`2026-09-22T00:${String(minute).padStart(2, "0")}:00.000Z`);
 
@@ -54,5 +54,43 @@ describe("orchestrator Agent Instance prompts", () => {
     expect(value).not.toContain("Durable contract");
     expect(value).not.toContain("Implementation agent");
     expect(value).toContain("same Agent Instance and Session");
+  });
+});
+
+describe("worker prompt contracts", () => {
+  const providerFor = () => ({
+    note: () => "",
+    instructions: () => "workspace",
+    prepare: async () => ({ kind: "none" as const }),
+    validate: async () => undefined,
+  });
+  const artifact = {
+    repo: "owner/work",
+    path: "_conductor/contracts/product-spec-format.md",
+    commit: "a".repeat(40),
+    sha256: "b".repeat(64),
+    bytes: 123,
+    url: "https://example.test/contract",
+  };
+
+  it("passes fresh workers a pinned reference rather than contract contents", () => {
+    const value = buildWorkerPrompt({
+      task: task(), jobId: "j-1", instructions: "do it", workspace: { kind: "none" },
+      resuming: false, providerFor, defaultWorkspaceKind: "none",
+      sharedContracts: [{ name: "product-spec-format.md", artifact }],
+    });
+    expect(value).toContain("owner/work@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:_conductor/contracts/product-spec-format.md");
+    expect(value).not.toContain("Durable contract body");
+  });
+
+  it("does not repeat stable contract bodies when a worker Session resumes", () => {
+    const value = buildWorkerPrompt({
+      task: task(), jobId: "j-2", instructions: "continue", workspace: { kind: "none" },
+      resuming: true, providerFor, defaultWorkspaceKind: "none",
+      sharedContracts: [{ name: "contract.md", content: "Durable contract body" }],
+    });
+    expect(value).not.toContain("Shared artifact contracts");
+    expect(value).not.toContain("Durable contract body");
+    expect(value).not.toContain("## Original request");
   });
 });
