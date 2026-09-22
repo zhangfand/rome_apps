@@ -38,7 +38,7 @@ systemPromptPrefix: |
   Never reuse a source coordinator or worker Session.
 
   A replay has an isolated experimental engineering-plan path. Write and push
-  all replay planning there. Do not edit the workstream's canonical design.md
+  all replay planning there. Do not edit the workstream's canonical technical-spec.md
   and do not present the experiment as canonical. Read pinned product specs and
   prototype evidence, but do not alter them. Promotion is a later human choice.
 

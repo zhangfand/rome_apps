@@ -12,7 +12,8 @@ import {
 import { type GitWorktreeWorkspace, gitWorktreeProvider } from "../../domain/workspaces/git-worktree.js";
 import { noWorkspaceProvider } from "../../core/workspaces/none.js";
 import { providerFor } from "./index.js";
-import { PRODUCT_SPEC_CONTRACT } from "../../domain/product-spec-contract.js";
+import { PRODUCT_SPEC_FORMAT } from "../../domain/product-spec-format.js";
+import { TECHNICAL_SPEC_FORMAT } from "../../domain/technical-spec-format.js";
 import { WORK_REPO_CONTRACT } from "../../domain/work-repo-contract.js";
 
 let seq = 0;
@@ -144,7 +145,7 @@ describe("prompts follow the workspace kind", () => {
     expect(prompt).not.toContain("legacy global policy");
   });
 
-  it("injects the identical shared product contract for the lead and workers", () => {
+  it("injects the identical shared spec formats for the lead and workers", () => {
     const worker = buildWorkerPrompt({
       task,
       instructions: "write the spec",
@@ -153,7 +154,8 @@ describe("prompts follow the workspace kind", () => {
       providerFor,
       defaultWorkspaceKind: "git-worktree",
       sharedContracts: [
-        { name: "product-spec-contract.md", content: PRODUCT_SPEC_CONTRACT },
+        { name: "product-spec-format.md", content: PRODUCT_SPEC_FORMAT },
+        { name: "technical-spec-format.md", content: TECHNICAL_SPEC_FORMAT },
         { name: "work-repo-contract.md", content: WORK_REPO_CONTRACT },
       ],
     });
@@ -165,12 +167,15 @@ describe("prompts follow the workspace kind", () => {
       providerFor,
       defaultWorkspaceKind: "git-worktree",
       sharedContracts: [
-        { name: "product-spec-contract.md", content: PRODUCT_SPEC_CONTRACT },
+        { name: "product-spec-format.md", content: PRODUCT_SPEC_FORMAT },
+        { name: "technical-spec-format.md", content: TECHNICAL_SPEC_FORMAT },
         { name: "work-repo-contract.md", content: WORK_REPO_CONTRACT },
       ],
     });
-    expect(worker).toContain(PRODUCT_SPEC_CONTRACT.trim());
-    expect(lead).toContain(PRODUCT_SPEC_CONTRACT.trim());
+    expect(worker).toContain(PRODUCT_SPEC_FORMAT.trim());
+    expect(lead).toContain(PRODUCT_SPEC_FORMAT.trim());
+    expect(worker).toContain(TECHNICAL_SPEC_FORMAT.trim());
+    expect(lead).toContain(TECHNICAL_SPEC_FORMAT.trim());
     expect(worker).toContain(WORK_REPO_CONTRACT.trim());
     expect(lead).toContain(WORK_REPO_CONTRACT.trim());
   });

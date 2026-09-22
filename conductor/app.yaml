@@ -31,6 +31,9 @@ agents:
   - app/agents/ledger-compactor.yaml
   - app/agents/pm.yaml
 
+skills:
+  - app/skills/split-approved-prototype
+
 hooks:
   - app/hooks/frontdesk-shadow
 

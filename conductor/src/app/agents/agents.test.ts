@@ -2,7 +2,8 @@ import { describe, expect, it } from "@rstest/core";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PRODUCT_SPEC_CONTRACT, PRODUCT_SPEC_CONTRACT_FILE } from "../../domain/product-spec-contract.js";
+import { PRODUCT_SPEC_FORMAT, PRODUCT_SPEC_FORMAT_FILE } from "../../domain/product-spec-format.js";
+import { TECHNICAL_SPEC_FORMAT, TECHNICAL_SPEC_FORMAT_FILE } from "../../domain/technical-spec-format.js";
 import { WORK_REPO_CONTRACT, WORK_REPO_CONTRACT_FILE } from "../../domain/work-repo-contract.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -36,6 +37,16 @@ describe("Conductor agent boundaries", () => {
     expect(lead).not.toContain("conductor:stop_worker");
   });
 
+  it("caps review-driven code changes at three rounds per PR", () => {
+    const lead = read("engineer-lead.yaml").replace(/\s+/g, " ");
+    expect(lead).toContain("Limit review-driven code changes on one PR to three rounds");
+    expect(lead).toContain("only when a review-response Job pushes a new head");
+    expect(lead).toContain("a no-change disposition does not consume one");
+    expect(lead).toContain("do not create a fourth remediation Job");
+    expect(lead).toContain("report the unresolved findings, their risk, and the three prior fix rounds");
+    expect(lead).toContain("person explicitly authorizes a bounded exception");
+  });
+
   it("prototypes medium and large work before production implementation", () => {
     const lead = read("engineer-lead.yaml");
     const prose = lead.replace(/\s+/g, " ");
@@ -54,6 +65,29 @@ describe("Conductor agent boundaries", () => {
     expect(prose).toContain("do not process review-bot findings on it");
     expect(prose).toContain("Only act on the prototype again when the person asks");
     expect(lead).not.toContain("## Prototype Contract");
+  });
+
+  it("loads the approved-prototype PR splitting skill before production work", () => {
+    const manifest = readFileSync(path.resolve(here, "../../../app.yaml"), "utf8");
+    const lead = read("engineer-lead.yaml").replace(/\s+/g, " ");
+    const skill = readFileSync(
+      path.resolve(here, "../skills/split-approved-prototype/SKILL.md"),
+      "utf8",
+    ).replace(/\s+/g, " ");
+    expect(manifest).toContain("app/skills/split-approved-prototype");
+    expect(lead).toContain("After approval, turn the approved prototype into the canonical `<slug>/technical-spec.md`");
+    expect(lead).toContain("Then load and follow the `split-approved-prototype` skill");
+    expect(lead).toContain("Record only the PRs that can open now in the technical spec's Tasks section");
+    expect(lead).toContain("do not plan downstream PRs");
+    expect(lead).toContain("Re-run the split after merged work or new evidence");
+    expect(skill).toContain("Main stays releasable after each PR");
+    expect(skill).toContain("Every PR is one of two kinds");
+    expect(skill).toContain("pull requests that can open today");
+    expect(skill).toContain("needs nothing unmerged");
+    expect(skill).toContain("touches no file another PR in this round touches");
+    expect(skill).toContain("behavior PR would exceed 400 lines of non-test diff");
+    expect(skill).toContain("For each PR give the Conventional Commit title, the kind");
+    expect(skill).toContain("every scenario in the spec is already proven on main");
   });
 
   it("keeps delivery policy in Agent system prompts rather than a runtime SOP", () => {
@@ -129,7 +163,7 @@ describe("Conductor agent boundaries", () => {
     expect(replay).toContain("do not create a production coding Job on the parent delivery Task");
     expect(replay).toContain("Materialize production work with conductor:create_child_tasks");
     expect(replay).toContain("Do not pack a roadmap into one worker instruction");
-    expect(replay).toContain("Do not edit the workstream's canonical design.md");
+    expect(replay).toContain("Do not edit the workstream's canonical technical-spec.md");
   });
 
   it("does not give the PM the global action catalog", () => {
@@ -139,24 +173,28 @@ describe("Conductor agent boundaries", () => {
     expect(pm).toContain("one bounded PM Job");
     expect(pm).toContain("## Product responsibility");
     expect(pm).toContain("## Durable handoff");
-    expect(pm).toContain("`product-spec-contract.md`");
+    expect(pm).toContain("`product-spec-format.md`");
     expect(pm).not.toContain("Its header records");
     expect(pm).not.toContain("scenarios and scope agree");
     expect(pm).not.toContain("find and read the `conductor:pm` skill");
   });
 
-  it("defines the product spec once and points both producer and consumer to it", () => {
+  it("uses the shared product and technical spec formats", () => {
     const lead = read("engineer-lead.yaml");
     const pm = read("pm.yaml");
-    expect(PRODUCT_SPEC_CONTRACT).toContain("# Product Spec Contract");
-    expect(PRODUCT_SPEC_CONTRACT_FILE).toBe("product-spec-contract.md");
-    expect(PRODUCT_SPEC_CONTRACT).toContain("`<slug>/spec.md`");
-    expect(PRODUCT_SPEC_CONTRACT).toContain("`Status: draft | ready`");
-    expect(PRODUCT_SPEC_CONTRACT).toContain("## Size semantics");
-    expect(PRODUCT_SPEC_CONTRACT).not.toContain("Version:");
-    expect(PRODUCT_SPEC_CONTRACT).toContain("Appetite** and **Increments** are required for a large spec");
-    expect(pm).toContain("`product-spec-contract.md`");
-    expect(lead).toContain("`product-spec-contract.md`");
+    expect(PRODUCT_SPEC_FORMAT).toContain("# Product spec format");
+    expect(PRODUCT_SPEC_FORMAT_FILE).toBe("product-spec-format.md");
+    expect(PRODUCT_SPEC_FORMAT).toContain("`<slug>/product-spec.md`");
+    expect(PRODUCT_SPEC_FORMAT).toContain("`Status: draft | ready | dropped`");
+    expect(PRODUCT_SPEC_FORMAT).toContain("## Sizes");
+    expect(TECHNICAL_SPEC_FORMAT).toContain("# Technical spec format");
+    expect(TECHNICAL_SPEC_FORMAT_FILE).toBe("technical-spec-format.md");
+    expect(TECHNICAL_SPEC_FORMAT).toContain("`<slug>/technical-spec.md`");
+    expect(TECHNICAL_SPEC_FORMAT).toContain("### Prototypes");
+    expect(TECHNICAL_SPEC_FORMAT).toContain("## Done");
+    expect(pm).toContain("`product-spec-format.md`");
+    expect(lead).toContain("`product-spec-format.md`");
+    expect(lead).toContain("`technical-spec-format.md`");
     expect(lead).not.toContain("The person's answer does not itself make a draft ready");
   });
 
@@ -165,8 +203,8 @@ describe("Conductor agent boundaries", () => {
     const pm = read("pm.yaml");
     expect(WORK_REPO_CONTRACT_FILE).toBe("work-repo-contract.md");
     expect(WORK_REPO_CONTRACT).toContain("# Agent Work Repository Contract");
-    expect(WORK_REPO_CONTRACT).toContain("├── spec.md");
-    expect(WORK_REPO_CONTRACT).toContain("├── design.md");
+    expect(WORK_REPO_CONTRACT).toContain("├── product-spec.md");
+    expect(WORK_REPO_CONTRACT).toContain("├── technical-spec.md");
     expect(WORK_REPO_CONTRACT).toContain("_conductor/tasks/<task-id>/snapshot.md");
     expect(pm).toContain("`work-repo-contract.md`");
     expect(lead).toContain("`work-repo-contract.md`");

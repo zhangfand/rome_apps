@@ -129,7 +129,7 @@ export function buildOrchestratorPrompt(input: {
       `Experimental engineering plan: ${input.task.replay.workRepoPath}`,
       "This is a fresh execution branch, not a continuation of the source Task's Agent Session.",
       "The source ledger was intentionally not copied because later facts, stale execution state, and secrets must not leak into this run.",
-      "Treat the seed below as the complete checkpoint state. Do not read or mutate the source Task, its later production branch, or its canonical design.md.",
+      "Treat the seed below as the complete checkpoint state. Do not read or mutate the source Task, its later production branch, or its canonical technical-spec.md.",
       "Write replay-specific engineering decisions only to the experimental plan path above. Canonical promotion is a separate human decision.",
       "",
       "### Sanitized checkpoint seed",

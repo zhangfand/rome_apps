@@ -111,7 +111,7 @@ describe("coordinator wake observations", () => {
       source: "create",
       payload: { brief: "ORIGINAL_BRIEF", projectId: "app", project: { workspace: "none" }, replay: {
         sourceTaskId: "source", sourceThroughSeq: 12, coordinatorAgent: "conductor:engineer-lead-replay-v1",
-        seed: "approved prototype", workRepoPath: "_experiments/replays/t-1/design.md",
+        seed: "approved prototype", workRepoPath: "_experiments/replays/t-1/technical-spec.md",
       } },
     });
     const composition = {

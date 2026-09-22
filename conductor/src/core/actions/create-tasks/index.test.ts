@@ -34,7 +34,7 @@ describe("engineering lead task materialization", () => {
       source: "build it",
       payload: { brief: "deliver feature", projectId: "app", project: { workingDir: "/repo" }, replay: {
         sourceTaskId: "source", sourceThroughSeq: 9, coordinatorAgent: "conductor:engineer-lead-replay-v1",
-        seed: "approved prototype", workRepoPath: "_experiments/replays/parent/design.md",
+        seed: "approved prototype", workRepoPath: "_experiments/replays/parent/technical-spec.md",
       } },
     });
     const action = createAction({} as ActionConfig, { appContext } as unknown as AppActionRuntimeDeps);

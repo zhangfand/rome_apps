@@ -51,7 +51,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       if (!checkpoint) return { status: "error", error: `task ${taskId} has no fact #${throughSeq}` };
       const sourceTask = foldTask(sourceFacts);
       const newTaskId = `t-${crypto.randomUUID().slice(0, 8)}`;
-      const workRepoPath = `_experiments/replays/${newTaskId}/design.md`;
+      const workRepoPath = `_experiments/replays/${newTaskId}/technical-spec.md`;
       const result = await writePersonFact(appContext, {
         taskId: newTaskId,
         kind: "Created",

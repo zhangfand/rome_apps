@@ -28,21 +28,22 @@ Tasks or Jobs contribute to it:
 ```text
 .
 ├── <workstream-slug>/
-│   ├── spec.md       # product contract; PM-owned when PM is involved
-│   ├── design.md     # evolving engineering plan and decisions, when needed
+│   ├── product-spec.md   # product contract; PM-owned when PM is involved
+│   ├── technical-spec.md # approved prototype distilled into production design
 │   └── artifacts/    # optional supporting evidence that merits its own file
 ├── _conductor/           # runtime-owned Task context mirrors
 │   └── tasks/<task-id>/snapshot.md
 ├── _experiments/         # isolated, non-canonical replay/prompt experiments
-│   └── replays/<task-id>/design.md
+│   └── replays/<task-id>/technical-spec.md
 └── _evidence/        # runtime-owned snapshots of external payloads
 ```
 
 - Use a short, stable, kebab-case slug derived from the outcome. Do not organize
   the repository by Agent, Worker, Run, or transient Task id.
-- `spec.md` follows `product-spec-contract.md`. Do not encode its format again
+- `product-spec.md` follows `product-spec-format.md`. Do not encode its format again
   here.
-- `design.md` is owned by the engineering lead. It holds only durable knowledge
+- `technical-spec.md` follows `technical-spec-format.md`. The engineering lead
+  creates it after a prototype is approved. It holds only durable knowledge
   needed to continue the delivery: current architecture understanding,
   executable and future work, actual outcomes, discoveries that changed the
   plan, and important review dispositions. It is not required for a change
@@ -60,9 +61,9 @@ Tasks or Jobs contribute to it:
   human-readable recovery mirror, not a second source of truth: the Snapshot
   fact cites its exact repository commit, while the append-only ledger remains
   authoritative. Agents may read this file but must not edit it.
-- `_experiments/replays/<task-id>/design.md` is used only by a Task replay that
+- `_experiments/replays/<task-id>/technical-spec.md` is used only by a Task replay that
   explicitly names that path. It isolates prompt/decomposition experiments
-  from the canonical workstream `design.md`. A replay may update its own file,
+  from the canonical workstream `technical-spec.md`. A replay may update its own file,
   but never promotes it automatically; a person chooses a winning experiment
   before an engineering lead reconciles useful decisions into the canonical
   workstream.
@@ -73,6 +74,6 @@ Tasks or Jobs contribute to it:
   path and commit rather than reconstructing it from chat summaries.
 - A later Agent preserves settled decisions and records revisions explicitly.
   It does not fork competing truths.
-- Product discoveries go back into `spec.md` through its owner. Engineering
-  discoveries and plan reconciliation go into `design.md` through the
+- Product discoveries go back into `product-spec.md` through its owner. Engineering
+  discoveries and plan reconciliation go into `technical-spec.md` through the
   engineering lead.
