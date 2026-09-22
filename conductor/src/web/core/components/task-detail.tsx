@@ -40,11 +40,17 @@ import { WorkerLink } from "./worker-link";
 import { useTaskUsageAnalysis } from "../lib/use-task-usage-analysis";
 import { TaskUsageSummary } from "./task-usage";
 import { TaskUsageExplorer } from "./task-usage-explorer";
+import { groupActivityRounds, orderActivity, type ActivityOrder, type ActivityRound } from "../lib/activity";
 
 type HistoryView = "Stream" | "Lanes" | "Table";
 type DetailTab = "Overview" | "Activity" | "Usage" | "Work";
 const VIEW_KEY = "conductor-history-view";
+const ORDER_KEY = "conductor-activity-order";
 const VIEW_OPTIONS = (["Stream", "Lanes", "Table"] as HistoryView[]).map((value) => ({ value, label: value }));
+const ORDER_OPTIONS: Array<{ value: ActivityOrder; label: string }> = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+];
 const DETAIL_REPLIES = ["accepted, thanks", "please revise", "hold for now"];
 
 export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskChanged: (task: TaskSummary) => void }) {
@@ -56,6 +62,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
   const [composerOpen, setComposerOpen] = useState(false);
   const [openEntries, setOpenEntries] = useState<Set<number>>(() => new Set());
   const [historyView, setHistoryView] = useState<HistoryView>(readView);
+  const [activityOrder, setActivityOrder] = useState<ActivityOrder>(readActivityOrder);
   const [hideRoutine, setHideRoutine] = useState(true);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const composerInitialized = useRef(false);
@@ -82,6 +89,10 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
   useEffect(() => {
     try { window.localStorage.setItem(VIEW_KEY, historyView); } catch { /* preference persistence is optional */ }
   }, [historyView]);
+
+  useEffect(() => {
+    try { window.localStorage.setItem(ORDER_KEY, activityOrder); } catch { /* preference persistence is optional */ }
+  }, [activityOrder]);
 
   useEffect(() => {
     if (!task || composerInitialized.current) return;
@@ -148,8 +159,9 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
     return <p className="my-6 font-mono text-[13px] tracking-[0.06em] text-muted-foreground">reading this task<span className="loading-dot">.</span><span className="loading-dot loading-dot-2">.</span><span className="loading-dot loading-dot-3">.</span></p>;
   }
 
-  const visible = task.facts.filter((item) => !(hideRoutine && isRoutine(item)));
-  const rounds = groupRounds(visible);
+  const filtered = task.facts.filter((item) => !(hideRoutine && isRoutine(item)));
+  const visible = orderActivity(filtered, activityOrder);
+  const rounds = groupActivityRounds(filtered, activityOrder);
   const sessions = workerSessions(task.facts);
   const workerAgents = workerAgentNames(task.facts);
   const recent = task.facts.filter((item) => !isRoutine(item)).slice(-3).reverse();
@@ -259,6 +271,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
                 <Switch checked={hideRoutine} onCheckedChange={setHideRoutine} />
                 hide routine steps
               </label>
+              <SegmentedControl options={ORDER_OPTIONS} value={activityOrder} onValueChange={setActivityOrder} size="sm" aria-label="Activity time order" />
               <SegmentedControl options={VIEW_OPTIONS} value={historyView} onValueChange={setHistoryView} size="sm" aria-label="History view" />
             </div>
           </div>
@@ -382,7 +395,7 @@ function ReplyComposer({ composerRef, reply, setReply, sending, error, onSend, o
   );
 }
 
-function StreamView({ rounds, sessions, workerAgents, coordinatorAgent, openEntries, toggle }: { rounds: Array<{ stamp: string; entries: FactJson[] }>; sessions: ReadonlyMap<string, WorkerSession>; workerAgents: ReadonlyMap<string, string>; coordinatorAgent?: string; openEntries: Set<number>; toggle: (seq: number) => void }) {
+function StreamView({ rounds, sessions, workerAgents, coordinatorAgent, openEntries, toggle }: { rounds: ActivityRound[]; sessions: ReadonlyMap<string, WorkerSession>; workerAgents: ReadonlyMap<string, string>; coordinatorAgent?: string; openEntries: Set<number>; toggle: (seq: number) => void }) {
   return (
     <div className="flex flex-col gap-4">
       {rounds.map((round, index) => (
@@ -547,20 +560,6 @@ function whereItStands(task: TaskDetailJson): string {
   return `${latestText(task)} Nothing is running right now.`;
 }
 
-function groupRounds(entries: FactJson[]): Array<{ stamp: string; entries: FactJson[] }> {
-  const groups: Array<{ stamp: string; entries: FactJson[] }> = [];
-  let current: { stamp: string; entries: FactJson[] } | undefined;
-  for (const item of entries) {
-    if (!current) {
-      current = { stamp: item.createdAt, entries: [] };
-      groups.push(current);
-    }
-    current.entries.push(item);
-    if (authorLabel(item.by, item.kind) === "conductor") current = undefined;
-  }
-  return groups;
-}
-
 function toggleSet(current: Set<number>, value: number): Set<number> {
   const next = new Set(current);
   if (next.has(value)) next.delete(value); else next.add(value);
@@ -573,6 +572,14 @@ function readView(): HistoryView {
     if (value === "Stream" || value === "Lanes" || value === "Table") return value;
   } catch { /* use the default */ }
   return "Stream";
+}
+
+function readActivityOrder(): ActivityOrder {
+  try {
+    const value = window.localStorage.getItem(ORDER_KEY);
+    if (value === "newest" || value === "oldest") return value;
+  } catch { /* use the default */ }
+  return "newest";
 }
 
 async function responseError(response: Response): Promise<string> {
