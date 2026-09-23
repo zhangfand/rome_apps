@@ -1,6 +1,7 @@
 import {
   createConfigParser,
   DEFAULT_INTERVAL_MINUTES,
+  DEFAULT_HEARTBEAT_LEASE_MINUTES,
   DEFAULT_MAX_DECISIONS_PER_TURN,
   DEFAULT_MAX_WORKERS,
   DEFAULT_ORCHESTRATOR_AGENT,
@@ -64,6 +65,7 @@ export const initialAppConfig: ConductorConfig = {
   intervalMinutes: DEFAULT_INTERVAL_MINUTES,
   reuseSessions: DEFAULT_REUSE_SESSIONS,
   maxDecisionsPerTurn: DEFAULT_MAX_DECISIONS_PER_TURN,
+  heartbeatLeaseMinutes: DEFAULT_HEARTBEAT_LEASE_MINUTES,
   frontdeskShadow: DEFAULT_FRONTDESK_SHADOW,
   github: { intakeLabel: DEFAULT_INTAKE_LABEL, reviewAuthors: [...DEFAULT_REVIEW_AUTHORS] },
 };

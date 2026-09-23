@@ -11,6 +11,8 @@ export interface ConductorConfig {
   intervalMinutes: number;
   reuseSessions: boolean;
   maxDecisionsPerTurn: number;
+  /** Minutes without a wrapper heartbeat before a worker run is declared Lost. */
+  heartbeatLeaseMinutes: number;
   [extension: string]: unknown;
 }
 
@@ -39,6 +41,7 @@ export const DEFAULT_MAX_WORKERS = 3;
 export const DEFAULT_INTERVAL_MINUTES = 5;
 export const DEFAULT_REUSE_SESSIONS = true;
 export const DEFAULT_MAX_DECISIONS_PER_TURN = 25;
+export const DEFAULT_HEARTBEAT_LEASE_MINUTES = 3;
 export const CONFIG_KEY = "conductor_config";
 export const TICK_ROUTINE_KEY = "conductor-tick";
 export const TICK_ROUTINE_NAME = "Conductor: reconcile tasks";
@@ -109,6 +112,7 @@ export function parseConfig(raw: unknown, defaults: ConfigDefaults, extensions: 
     intervalMinutes: positiveInt(args.intervalMinutes, DEFAULT_INTERVAL_MINUTES, 24 * 60),
     reuseSessions: typeof args.reuseSessions === "boolean" ? args.reuseSessions : DEFAULT_REUSE_SESSIONS,
     maxDecisionsPerTurn: positiveInt(args.maxDecisionsPerTurn, DEFAULT_MAX_DECISIONS_PER_TURN, 1000),
+    heartbeatLeaseMinutes: positiveInt(args.heartbeatLeaseMinutes, DEFAULT_HEARTBEAT_LEASE_MINUTES, 24 * 60),
     ...(rootExtension.values ?? {}),
   };
   const extensionError = extensions.validate?.(config);

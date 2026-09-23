@@ -95,6 +95,7 @@ export interface ConfigJson {
   intervalMinutes: number;
   reuseSessions: boolean;
   maxDecisionsPerTurn: number;
+  heartbeatLeaseMinutes: number;
 }
 
 export interface ProjectPresentation { repo?: string; subtitle?: string; workRepo?: { repo: string; url: string }; sourceEnabled?: boolean; sourceLabel?: string; sourceValue?: string; emptySubtitle?: string }

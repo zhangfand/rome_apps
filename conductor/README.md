@@ -202,7 +202,8 @@ conductor:configure_conductor {
   workRepoOwner?: "owner", // default owner for derived <project>-work repositories
   github?: { intakeLabel: "conductor" },
   workerAgents?: { "conductor:pm": "...", "coding:coding": "...", "assistant:assistant": "..." },
-  maxWorkers?: 3, intervalMinutes?: 5, reuseSessions?: true, maxDecisionsPerTurn?: 25
+  maxWorkers?: 3, intervalMinutes?: 5, reuseSessions?: true,
+  maxDecisionsPerTurn?: 25, heartbeatLeaseMinutes?: 3
 }
 ```
 

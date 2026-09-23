@@ -198,6 +198,35 @@ describe("configuration writes", () => {
     expect(JSON.parse(stored.value)).toMatchObject({ projects: { first: { workingDir: "/repo" } } });
     sqlite.close();
   });
+
+  it("updates every Runtime limit and reschedules the tick when its interval changes", async () => {
+    const { sqlite, handler, actions } = configuredHandler({ projects: { app: { workspace: "none" } } });
+    const response = await handler.handle(configRequest("PATCH", {
+      orchestratorAgent: "custom:lead",
+      maxWorkers: 7,
+      intervalMinutes: 10,
+      reuseSessions: false,
+      maxDecisionsPerTurn: 40,
+      heartbeatLeaseMinutes: 8,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      config: {
+        orchestratorAgent: "custom:lead",
+        maxWorkers: 7,
+        intervalMinutes: 10,
+        reuseSessions: false,
+        maxDecisionsPerTurn: 40,
+        heartbeatLeaseMinutes: 8,
+      },
+      runtime: { heartbeatLeaseSeconds: 480 },
+    });
+    expect(actions).toEqual(["system:create_routine"]);
+    const stored = sqlite.prepare("SELECT value FROM conductor__config WHERE key = ?").get("conductor_config") as { value: string };
+    expect(JSON.parse(stored.value)).toMatchObject({ intervalMinutes: 10, heartbeatLeaseMinutes: 8 });
+    sqlite.close();
+  });
 });
 
 describe("developer runtime control", () => {
@@ -258,6 +287,7 @@ const initialConfig = {
   intervalMinutes: 5,
   reuseSessions: true,
   maxDecisionsPerTurn: 25,
+  heartbeatLeaseMinutes: 3,
 };
 
 function configuredHandler(

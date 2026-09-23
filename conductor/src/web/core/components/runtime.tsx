@@ -3,31 +3,27 @@ import { fetchAppApi } from "@rome-os/app-web-sdk";
 import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
 import { Badge } from "@rome-os/ui/badge";
 import { Button } from "@rome-os/ui/button";
-import { FormRow, FormRowControl, FormRowDescription, FormRowHeading, FormRowLabel, FormRows } from "@rome-os/ui/layout-form";
 import { List, ListRow, ListRowContent, ListRowDescription, ListRowTitle } from "@rome-os/ui/list-row";
 import { Section, SectionDescription, SectionHeader, SectionHeading, SectionTitle } from "@rome-os/ui/page";
-import { presentConfig, responseError, type ConfigResponse } from "../lib/config-api";
+import { responseError, type ConfigResponse } from "../lib/config-api";
 import { safeText } from "../lib/facts";
 import { formatRelative } from "../lib/format";
-import type { ConfigJson, RuntimeJson, StateJson } from "../lib/types";
+import type { RuntimeJson, StateJson } from "../lib/types";
 
 /**
- * The Runtime tab: what the loop is set to and what it is doing right now.
- * The limits are read-only here — they are set with `conductor:configure_conductor` — and
- * the live part comes from the same state feed the board polls.
+ * The Runtime tab is intentionally operational: live workers and immediate
+ * developer controls. Persistent settings live in the Settings dialog.
  */
 export function Runtime({ state }: { state: StateJson | null }) {
-  const [config, setConfig] = useState<ConfigJson | null>(null);
   const [runtime, setRuntime] = useState<RuntimeJson | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [pauseSaving, setPauseSaving] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const response = await fetchAppApi("config");
       if (!response.ok) throw new Error(await responseError(response));
       const body = await response.json() as ConfigResponse;
-      setConfig(presentConfig(body.config));
       setRuntime(body.runtime);
       setError(null);
     } catch (caught) {
@@ -38,7 +34,7 @@ export function Runtime({ state }: { state: StateJson | null }) {
   useEffect(() => { void load(); }, [load]);
 
   const setPaused = useCallback(async (paused: boolean) => {
-    setSaving(true);
+    setPauseSaving(true);
     try {
       const response = await fetchAppApi("runtime/pause", {
         method: "POST",
@@ -52,11 +48,11 @@ export function Runtime({ state }: { state: StateJson | null }) {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The runtime control could not be changed. Try again.");
     } finally {
-      setSaving(false);
+      setPauseSaving(false);
     }
   }, []);
 
-  if (error && !config) {
+  if (error && !runtime) {
     return (
       <Alert variant="destructive" className="max-w-[70ch]">
         <AlertTitle>The runtime settings could not be read.</AlertTitle>
@@ -64,18 +60,11 @@ export function Runtime({ state }: { state: StateJson | null }) {
       </Alert>
     );
   }
-  if (!config || !runtime) return <Loading />;
+  if (!runtime) return <Loading />;
 
   const now = state ? Date.parse(state.now) : Date.now();
   const workers = state?.workers ?? [];
-  const limits: Array<[string, string, string?]> = [
-    ["Coordinator", coordinatorName(config.orchestratorAgent), "The agent that reads each task's history and records the next step."],
-    ["Max workers", String(config.maxWorkers), "Across all tasks at once."],
-    ["Tick every", `${config.intervalMinutes} min`, "How often sources are polled and open tasks are looked at."],
-    ["Reuse sessions", config.reuseSessions ? "on" : "off", "A follow-up worker continues the previous worker's session."],
-    ["Decisions per turn", String(config.maxDecisionsPerTurn), "Steps taken on a task before it waits for a person."],
-    ["Heartbeat lease", compactSeconds(runtime.heartbeatLeaseSeconds), "A worker silent this long is treated as gone."],
-  ];
+  const maxWorkers = state?.maxWorkers ?? 0;
 
   return (
     <div className="flex min-w-0 flex-col gap-8">
@@ -85,7 +74,7 @@ export function Runtime({ state }: { state: StateJson | null }) {
             <SectionTitle>Now</SectionTitle>
             <SectionDescription>
               {state?.runtimePaused ? "Runtime paused." : state?.tickRunning ? "A tick is running." : "Idle between ticks."}
-              {` ${workers.length} of ${config.maxWorkers} worker slot${config.maxWorkers === 1 ? "" : "s"} in use.`}
+              {` ${workers.length} of ${maxWorkers} worker slot${maxWorkers === 1 ? "" : "s"} in use.`}
             </SectionDescription>
           </SectionHeading>
         </SectionHeader>
@@ -120,68 +109,18 @@ export function Runtime({ state }: { state: StateJson | null }) {
           <Button
             variant={runtime.paused ? "outline" : "destructive"}
             size="sm"
-            disabled={saving}
+            disabled={pauseSaving}
             onClick={() => void setPaused(!runtime.paused)}
           >
-            {saving ? "Saving…" : runtime.paused ? "Resume runtime" : "Pause runtime"}
+            {pauseSaving ? "Saving…" : runtime.paused ? "Resume runtime" : "Pause runtime"}
           </Button>
           {runtime.pauseChangedAt && <span className="text-aux text-muted-foreground">changed {formatRelative(runtime.pauseChangedAt, now)}</span>}
         </div>
         {error && <p className="mt-3 text-ui text-destructive">{safeText(error)}</p>}
       </Section>
 
-      <Section>
-        <SectionHeader>
-          <SectionHeading>
-            <SectionTitle>Limits</SectionTitle>
-            <SectionDescription>Set with <code className="rounded bg-surface-muted px-1.5 font-mono">conductor:configure_conductor</code>.</SectionDescription>
-          </SectionHeading>
-        </SectionHeader>
-        <FormRows>
-          {limits.map(([label, value, description]) => (
-            <FormRow key={label}>
-              <FormRowHeading>
-                <FormRowLabel>{label}</FormRowLabel>
-                {description && <FormRowDescription>{description}</FormRowDescription>}
-              </FormRowHeading>
-              <FormRowControl><span className="font-mono text-aux">{value}</span></FormRowControl>
-            </FormRow>
-          ))}
-        </FormRows>
-      </Section>
-
-      <Section>
-        <SectionHeader>
-          <SectionHeading>
-            <SectionTitle>Worker agents</SectionTitle>
-            <SectionDescription>What the coordinator may hand a task to.</SectionDescription>
-          </SectionHeading>
-        </SectionHeader>
-        <List>
-          {Object.entries(config.workerAgents).map(([id, description]) => (
-            <ListRow key={id}>
-              <ListRowContent>
-                <ListRowTitle className="font-mono text-aux">{safeText(id)}</ListRowTitle>
-                <ListRowDescription>{safeText(description)}</ListRowDescription>
-              </ListRowContent>
-            </ListRow>
-          ))}
-        </List>
-      </Section>
     </div>
   );
-}
-
-function coordinatorName(value: string): string {
-  const safe = safeText(value);
-  const parts = safe.split(":");
-  return parts.length === 2 && parts[0] === parts[1] ? parts[0] : safe;
-}
-
-function compactSeconds(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = seconds / 60;
-  return Number.isInteger(minutes) ? `${minutes} min` : `${minutes.toFixed(1)} min`;
 }
 
 function Loading() {

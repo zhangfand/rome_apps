@@ -52,7 +52,11 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         const applied: string[] = [];
 
         // 1. observe
-        applied.push(...observeWorkerHealth(ledger, createWorkerHealthRepository(appContext.db)));
+        applied.push(...observeWorkerHealth(
+          ledger,
+          createWorkerHealthRepository(appContext.db),
+          conductorConfig.heartbeatLeaseMinutes * 60_000,
+        ));
         applied.push(...observeChildOutcomes(ledger));
         const observedAt = new Date();
         const snapshot = fold(observedAt, ledger.all());
@@ -157,13 +161,18 @@ export function observeChildOutcomes(ledger: Pick<LedgerRepository, "all" | "app
   return applied;
 }
 
-export function observeWorkerHealth(ledger: Pick<LedgerRepository, "all">, health: Pick<WorkerHealthRepository, "expire">, now = new Date()): string[] {
+export function observeWorkerHealth(
+  ledger: Pick<LedgerRepository, "all">,
+  health: Pick<WorkerHealthRepository, "expire">,
+  leaseMs: number,
+  now = new Date(),
+): string[] {
   const applied: string[] = [];
   for (const task of fold(now, ledger.all()).tasks) {
     const worker = task.liveWorker;
     if (!worker) continue;
     try {
-      if (health.expire(task.id, worker.workerId, now)) applied.push(`Lost(${task.id}): worker heartbeat expired`);
+      if (health.expire(task.id, worker.workerId, leaseMs, now)) applied.push(`Lost(${task.id}): worker heartbeat expired`);
     } catch (error) {
       log.warn("worker health unavailable; leaving worker unchanged", { taskId: task.id, workerId: worker.workerId, error: String(error) });
     }

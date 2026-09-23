@@ -15,6 +15,7 @@ import { presentConfig, responseError, type ConfigResponse } from "../lib/config
 import { safeText } from "../lib/facts";
 import type { ConfigJson, ProjectPresentation, RuntimeJson } from "../lib/types";
 import { PathSelector } from "./path-selector";
+import { RuntimeSettings } from "./runtime-settings";
 
 const JSON_HEADERS = { "content-type": "application/json" };
 
@@ -50,7 +51,7 @@ export function ProjectsOverview({ onOpenProject, onAddProject }: {
   onOpenProject: (id: string) => void;
   onAddProject: () => void;
 }) {
-  const { config, projectPresentation, error } = useConfig();
+  const { config, projectPresentation, error, accept } = useConfig();
 
   if (error && !config) return <ErrorCard message={error} />;
   if (!config) return <Loading />;
@@ -97,7 +98,7 @@ export function ProjectsOverview({ onOpenProject, onAddProject }: {
           </Card>
         )}
       </Section>
-
+      <RuntimeSettings config={config} onSaved={accept} />
     </div>
   );
 }

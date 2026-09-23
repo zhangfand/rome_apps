@@ -27,6 +27,13 @@ describe("app config composition", () => {
     expect(parsed.config.orchestratorAgent).toBe(DEFAULT_ORCHESTRATOR_AGENT);
     expect(parsed.config.github).toEqual({ intakeLabel: DEFAULT_INTAKE_LABEL, reviewAuthors: [...DEFAULT_REVIEW_AUTHORS] });
     expect(parsed.config.frontdeskShadow).toEqual({ enabled: true, model: "jev-latest" });
+    expect(parsed.config.heartbeatLeaseMinutes).toBe(3);
+  });
+
+  it("accepts a configurable worker heartbeat lease", () => {
+    const parsed = parseAppConfig({ ...base, heartbeatLeaseMinutes: 12 });
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(parsed.config.heartbeatLeaseMinutes).toBe(12);
   });
 
   it("drops legacy global and project SOP fields instead of injecting runtime policy", () => {

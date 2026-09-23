@@ -6,13 +6,12 @@ import { createWorkerHealthRepository } from "../db/repositories/worker-health.j
 import { createTaskSessionRepository, type TaskSessionRef } from "../db/repositories/task-sessions.js";
 import { createAgentInstanceRepository, type AgentInstanceRef } from "../db/repositories/agent-instances.js";
 import { createRuntimeControlRepository, type RuntimeControl } from "../db/repositories/runtime-control.js";
-import { persistConfiguration } from "../actions/setup/index.js";
+import { ensureRoutine, persistConfiguration } from "../actions/setup/index.js";
 import type { CoreComposition } from "../lib/composition.js";
 import type { ConductorConfig } from "../lib/config.js";
 import { type Fact } from "../lib/facts.js";
 import { fold, foldTask, needsAttention, type TaskView } from "../lib/fold.js";
 import { ingestAtomically, type IngestRequest } from "../lib/ingest.js";
-import { HEARTBEAT_LEASE_MS } from "../lib/worker-health.js";
 import { browseDirectories, DirectoryBrowserError } from "../lib/directory-browser.js";
 import { createFrontdeskShadowRepository } from "../db/repositories/frontdesk-shadow.js";
 import { frontdeskShadowLimit, frontdeskShadowReport } from "../frontdesk/report.js";
@@ -49,7 +48,9 @@ class ConductorApiHandler implements RomeAppApiHandler {
         const now = new Date();
         const snapshot = fold(now, ledger.all());
         const config = settings.get();
-        const health = config ? safe(() => createWorkerHealthRepository(this.ctx.db).status(now)) : [];
+        const health = config
+          ? safe(() => createWorkerHealthRepository(this.ctx.db).status(config.heartbeatLeaseMinutes * 60_000, now))
+          : [];
         const lock = createLockRepository(this.ctx.db).peek(TICK_LOCK);
         const storedSessions = safe(() => createTaskSessionRepository(this.ctx.db).all()) ?? [];
         const sessionsByTask = groupTaskSessions(storedSessions);
@@ -221,6 +222,10 @@ class ConductorApiHandler implements RomeAppApiHandler {
         const parsed = this.composition.parseConfig(merged);
         if (!parsed.ok) return json({ error: parsed.error }, 400);
         if (current) {
+          if (current.intervalMinutes !== parsed.config.intervalMinutes) {
+            const routine = await ensureRoutine(this.ctx, parsed.config);
+            if (!routine.ok) return json({ error: routine.error }, 503);
+          }
           settings.put(parsed.config);
         } else {
           const installed = await persistConfiguration(this.ctx, this.composition, parsed.config);
@@ -316,7 +321,7 @@ function configPresentation(config: ConductorConfig, composition: CoreCompositio
 
 function runtimeJson(composition: CoreComposition, config?: ConductorConfig, control: RuntimeControl = { paused: false }) {
   return {
-    heartbeatLeaseSeconds: HEARTBEAT_LEASE_MS / 1000,
+    heartbeatLeaseSeconds: (config?.heartbeatLeaseMinutes ?? 3) * 60,
     workspaceKinds: composition.workspaceKinds,
     defaultWorkspaceKind: composition.defaultWorkspaceKind,
     ...runtimeControlJson(control),

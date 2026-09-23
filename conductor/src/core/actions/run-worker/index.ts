@@ -9,6 +9,7 @@ import type { CoreComposition } from "../../lib/composition.js";
 import { createLedgerRepository, type LedgerRepository } from "../../db/repositories/ledger.js";
 import { createWorkerHealthRepository } from "../../db/repositories/worker-health.js";
 import { createTaskSessionRepository } from "../../db/repositories/task-sessions.js";
+import { createSettingsRepository } from "../../db/repositories/settings.js";
 import { startHeartbeatTimer } from "../../lib/worker-health.js";
 import { type DispatchedFact, isWorkerTerminalKind } from "../../lib/facts.js";
 import { parseWorkerReply } from "../../lib/worker-reply.js";
@@ -52,6 +53,9 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
       if (!taskId || !workerId) return { status: "error", error: "taskId and workerId are required" };
 
       const ledger = createLedgerRepository(appContext.db);
+      const conductorConfig = createSettingsRepository(appContext.db, composition.parseConfig).get();
+      if (!conductorConfig) return { status: "error", error: "Conductor is not configured." };
+      const heartbeatLeaseMs = conductorConfig.heartbeatLeaseMinutes * 60_000;
       const dispatched = ledger.factsFor(taskId).find((f): f is DispatchedFact => f.kind === "Dispatched" && f.payload.workerId === workerId);
       if (!dispatched) return { status: "error", error: `no Dispatched fact for worker ${workerId} on task ${taskId}` };
       if (ledger.factsFor(taskId).some((f) => isWorkerTerminalKind(f.kind) && (f.payload as { workerId?: string }).workerId === workerId)) {
@@ -61,11 +65,11 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
 
       const health = createWorkerHealthRepository(appContext.db);
       const ownerId = crypto.randomUUID();
-      if (!health.claim(dispatched, ownerId)) {
+      if (!health.claim(dispatched, ownerId, heartbeatLeaseMs)) {
         return { status: "ok", data: { taskId, workerId, outcome: "skipped (heartbeat lease unavailable)" } };
       }
       const stopHeartbeat = startHeartbeatTimer(
-        () => health.renew(taskId, workerId, ownerId),
+        () => health.renew(taskId, workerId, ownerId, heartbeatLeaseMs),
         (error) => log.warn("worker heartbeat write failed", { taskId, workerId, error: String(error) }),
       );
 

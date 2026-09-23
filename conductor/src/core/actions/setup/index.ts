@@ -12,6 +12,7 @@ import { createLedgerRepository } from "../../db/repositories/ledger.js";
 import { createLockRepository, TICK_LOCK } from "../../db/repositories/lock.js";
 import {
   DEFAULT_INTERVAL_MINUTES,
+  DEFAULT_HEARTBEAT_LEASE_MINUTES,
   DEFAULT_MAX_DECISIONS_PER_TURN,
   DEFAULT_MAX_WORKERS,
   DEFAULT_ORCHESTRATOR_AGENT,
@@ -56,6 +57,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         maxWorkers: { type: "number", description: `Workers allowed to run at once across every task. Defaults to ${DEFAULT_MAX_WORKERS}.` },
         intervalMinutes: { type: "number", description: `How often the tick routine fires. Defaults to ${DEFAULT_INTERVAL_MINUTES}.` },
         reuseSessions: { type: "boolean", description: `Whether runtime may continue an earlier compatible worker session. Defaults to ${DEFAULT_REUSE_SESSIONS}.` },
+        heartbeatLeaseMinutes: { type: "number", description: `Minutes without a wrapper heartbeat before a worker run is declared Lost. Defaults to ${DEFAULT_HEARTBEAT_LEASE_MINUTES}.` },
         ...(composition.setupSchema?.rootProperties ?? {}),
         maxDecisionsPerTurn: { type: "number", description: `Safety valve: orchestrator decisions allowed on a task since a person last spoke. Defaults to ${DEFAULT_MAX_DECISIONS_PER_TURN}.` },
       },

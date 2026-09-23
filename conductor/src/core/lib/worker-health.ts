@@ -1,8 +1,7 @@
 import type { DispatchedFact } from "./facts.js";
 
 export const HEARTBEAT_INTERVAL_MS = 30_000;
-export const HEARTBEAT_LEASE_MS = 3 * 60_000;
-export const WORKER_START_GRACE_MS = 3 * 60_000;
+export const DEFAULT_HEARTBEAT_LEASE_MS = 3 * 60_000;
 
 export interface WorkerHeartbeat {
   workerId: string;
@@ -13,8 +12,15 @@ export interface WorkerHeartbeat {
 }
 
 /** Observations, not task state. Expiry is suspicion of loss, not proof of death. */
-export function heartbeatState(dispatched: DispatchedFact, heartbeat: WorkerHeartbeat | undefined, now: Date) {
-  const deadline = heartbeat?.expiresAt ?? dispatched.createdAt.getTime() + WORKER_START_GRACE_MS;
+export function heartbeatState(
+  dispatched: DispatchedFact,
+  heartbeat: WorkerHeartbeat | undefined,
+  now: Date,
+  leaseMs = DEFAULT_HEARTBEAT_LEASE_MS,
+) {
+  // Derive the deadline from the configured lease rather than trusting the
+  // stored expiry so a changed setting takes effect on the next observation.
+  const deadline = (heartbeat?.lastHeartbeatAt ?? dispatched.createdAt.getTime()) + leaseMs;
   return {
     status: now.getTime() >= deadline ? "expired" as const : heartbeat ? "alive" as const : "starting" as const,
     lastHeartbeatAt: heartbeat ? new Date(heartbeat.lastHeartbeatAt).toISOString() : undefined,
