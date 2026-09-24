@@ -6,7 +6,7 @@ import { FamilyHealthStore } from "../src/db/repositories/store.js";
 import type { AgentCaller, AgentResult } from "../src/lib/agent.js";
 import { extractJson } from "../src/lib/agent.js";
 import { parseExtractorOutput, parseMapperOutput } from "../src/lib/extraction-parse.js";
-import { EXTRACTOR_AGENT, MAPPER_AGENT, isStaleExtraction, renormalizeResult, runExtraction } from "../src/lib/extraction.js";
+import { BATCH_SIZE, EXTRACTION_CONCURRENCY, EXTRACTOR_AGENT, MAPPER_AGENT, isStaleExtraction, mapPool, renormalizeResult, runExtraction } from "../src/lib/extraction.js";
 import {
   DISCLAIMER,
   buildReportPayload,
@@ -59,6 +59,8 @@ function reportWithPages(pages: number) {
 }
 
 const ok = (data: unknown): AgentResult<unknown> => ({ ok: true, data, raw: "" });
+/** Old one-call-per-5-pages layout, for tests about merge/retry semantics rather than batching. */
+const SERIAL = { batchSize: 5, concurrency: 1 };
 
 describe("extractor output parsing", () => {
   it("repairs common model mistakes", () => {
@@ -134,7 +136,7 @@ describe("runExtraction", () => {
       ],
       [MAPPER_AGENT]: [ok({ mappings: [{ raw_name: "胆固醇总量(酶法)", code: "TC" }] })],
     });
-    const out = await runExtraction(report.id, { store, callAgent: agent.call });
+    const out = await runExtraction(report.id, { store, callAgent: agent.call, ...SERIAL });
     expect(out).toMatchObject({ status: "needs_review", results: 3, findings: 1, warnings: [] });
     const rep = store.getReport(report.id)!;
     expect(rep).toMatchObject({ status: "needs_review", examDate: "2025-06-10", provider: "演示体检", pagesDone: 7, pagesTotal: 7, error: null });
@@ -161,7 +163,7 @@ describe("runExtraction", () => {
         { ok: false, error: "timeout again" },
       ],
     });
-    const out = await runExtraction(report.id, { store, callAgent: agent.call });
+    const out = await runExtraction(report.id, { store, callAgent: agent.call, ...SERIAL });
     expect(out.status).toBe("needs_review");
     expect(out.warnings[0]).toContain("第 6–10 页识别失败");
     expect(store.getReport(report.id)!.error).toContain("第 6–10 页");
@@ -171,16 +173,16 @@ describe("runExtraction", () => {
   it("fails cleanly when every batch fails, and a retry starts from scratch", async () => {
     const { report } = reportWithPages(3);
     const failing = fakeAgent({ [EXTRACTOR_AGENT]: [{ ok: false, error: "boom" }, { ok: false, error: "boom" }] });
-    const out = await runExtraction(report.id, { store, callAgent: failing.call });
+    const out = await runExtraction(report.id, { store, callAgent: failing.call, ...SERIAL });
     expect(out.status).toBe("failed");
     expect(store.getReport(report.id)!.status).toBe("failed");
     expect(store.getReport(report.id)!.error).toMatch(/识别失败/);
 
     const row = { page: 1, section: null, name: "ALT", value: "30", unit: "U/L", ref: "9-50", flag: null };
     const good = fakeAgent({ [EXTRACTOR_AGENT]: [ok({ exam_date: null, provider: null, results: [row], findings: [], skipped_pages: [] })] });
-    await runExtraction(report.id, { store, callAgent: good.call });
+    await runExtraction(report.id, { store, callAgent: good.call, ...SERIAL });
     const again = fakeAgent({ [EXTRACTOR_AGENT]: [ok({ exam_date: null, provider: null, results: [row], findings: [], skipped_pages: [] })] });
-    await runExtraction(report.id, { store, callAgent: again.call });
+    await runExtraction(report.id, { store, callAgent: again.call, ...SERIAL });
     expect(store.listReportResults(report.id)).toHaveLength(1);
     expect(store.getReport(report.id)!.status).toBe("needs_review");
   });
@@ -206,7 +208,7 @@ describe("runExtraction", () => {
         }),
       ],
     });
-    const out = await runExtraction(report.id, { store, callAgent: agent.call });
+    const out = await runExtraction(report.id, { store, callAgent: agent.call, ...SERIAL });
     expect(out.status).toBe("needs_review");
     const rows = store.listReportResults(report.id);
     const bp = rows.filter((r) => r.indicatorCode === "SBP" || r.indicatorCode === "DBP");
@@ -223,7 +225,7 @@ describe("runExtraction", () => {
 
     // Re-extraction clears stale skip marks before the new run.
     const again = fakeAgent({ [EXTRACTOR_AGENT]: [ok({ exam_date: null, provider: null, results: [], findings: [], skipped_pages: [] })] });
-    await runExtraction(report.id, { store, callAgent: again.call });
+    await runExtraction(report.id, { store, callAgent: again.call, ...SERIAL });
     expect(store.getReport(report.id)!.pageImages.some((p) => p.skipped)).toBe(false);
   });
 
@@ -248,6 +250,111 @@ describe("runExtraction", () => {
     expect(edited.flag).toBe("H");
     const unmapped = renormalizeResult({ rawName: "甘油三酯", rawValue: "2.1", rawUnit: "mmol/L", refText: null, indicatorCode: null }, "male");
     expect(unmapped).toMatchObject({ indicatorCode: null, valueNum: 2.1, flag: null });
+  });
+});
+
+describe("concurrent extraction batches", () => {
+  /** Fake extractor: answers each batch from the page numbers in its prompt, with per-batch delays. */
+  function pagedAgent(opts: { delay: (pages: number[]) => number; fail?: (pages: number[], attempt: number) => boolean }) {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const attempts = new Map<string, number>();
+    const calls: number[][] = [];
+    const call: AgentCaller = async <T>(_agent: string, prompt: string) => {
+      const pages = [...prompt.matchAll(/第 (\d+) 页：/g)].map((m) => Number(m[1]));
+      const key = pages.join(",");
+      const attempt = (attempts.get(key) ?? 0) + 1;
+      attempts.set(key, attempt);
+      calls.push(pages);
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((r) => setTimeout(r, opts.delay(pages)));
+      inFlight--;
+      if (opts.fail?.(pages, attempt)) return { ok: false, error: `batch ${key} down` } as AgentResult<T>;
+      return ok({
+        exam_date: pages[0] === 1 ? "2026-08-18" : "2020-01-01",
+        provider: pages[0] === 1 ? "康瑞健康体检中心" : "别的机构",
+        // one row per page, value = page number, so order and page mapping are checkable
+        results: pages.map((p) => ({ page: p, section: "肝功能", name: "谷丙转氨酶(ALT)", value: String(10 + p), unit: "U/L", ref: "9-50", flag: null })),
+        findings: [],
+        skipped_pages: [],
+      }) as AgentResult<T>;
+    };
+    return { call, calls, get maxInFlight() { return maxInFlight; } };
+  }
+
+  it("uses small batches with bounded concurrency and merges in page order", async () => {
+    expect(BATCH_SIZE).toBe(2);
+    expect(EXTRACTION_CONCURRENCY).toBe(3);
+    const { report } = reportWithPages(11); // 6 batches
+    // Later batches finish first.
+    const agent = pagedAgent({ delay: (pages) => 60 - pages[0] * 4 });
+    const progress: number[] = [];
+    const origUpdate = store.updateReport.bind(store); // store is rebuilt per test
+    store.updateReport = ((id, patch) => {
+      if (patch.pagesDone != null) progress.push(patch.pagesDone);
+      return origUpdate(id, patch);
+    }) as typeof store.updateReport;
+    const out = await runExtraction(report.id, { store, callAgent: agent.call });
+    expect(out.status).toBe("needs_review");
+    expect(agent.calls).toHaveLength(6);
+    expect(agent.calls.every((p) => p.length <= 2)).toBe(true);
+    expect(agent.maxInFlight).toBe(3);
+    // Progress: starts at 0, rises monotonically by batch sizes, ends at 11.
+    const running = progress.slice(1, -1);
+    expect(progress[0]).toBe(0);
+    expect(running).toEqual([...running].sort((a, b) => a - b));
+    expect(running.at(-1)).toBe(11);
+    expect(new Set(running).size).toBe(6);
+    // Rows are in page order with correct page numbers, and header fields come from the first pages.
+    const rows = store.listReportResults(report.id);
+    expect(rows.map((r) => [r.page, r.valueNum])).toEqual(Array.from({ length: 11 }, (_, i) => [i + 1, 11 + i]));
+    const r = store.getReport(report.id)!;
+    expect([r.examDate, r.provider, r.pagesDone]).toEqual(["2026-08-18", "康瑞健康体检中心", 11]);
+  });
+
+  it("retries a failed batch once and keeps the others when it still fails", async () => {
+    const { report } = reportWithPages(6); // batches 1-2, 3-4, 5-6
+    const agent = pagedAgent({
+      delay: () => 5,
+      fail: (pages, attempt) => pages[0] === 3 || (pages[0] === 5 && attempt === 1),
+    });
+    const out = await runExtraction(report.id, { store, callAgent: agent.call });
+    expect(out.status).toBe("needs_review");
+    expect(agent.calls.filter((p) => p[0] === 3)).toHaveLength(2); // retried once
+    expect(agent.calls.filter((p) => p[0] === 5)).toHaveLength(2); // recovered on retry
+    expect(out.warnings).toEqual([expect.stringContaining("第 3–4 页识别失败")]);
+    expect(store.listReportResults(report.id).map((r) => r.page)).toEqual([1, 2, 5, 6]);
+    expect(store.getReport(report.id)!.pagesDone).toBe(6);
+  });
+
+  it("survives an agent call that throws", async () => {
+    const { report } = reportWithPages(4);
+    let n = 0;
+    const call: AgentCaller = async <T>(_a: string, prompt: string) => {
+      n++;
+      if (prompt.includes("第 1 页：")) throw new Error("socket closed");
+      return ok({ exam_date: null, provider: null, results: [{ page: 3, section: null, name: "ALT", value: "30", unit: "U/L", ref: "9-50", flag: null }], findings: [], skipped_pages: [] }) as AgentResult<T>;
+    };
+    const out = await runExtraction(report.id, { store, callAgent: call });
+    expect(n).toBe(3);
+    expect(out.status).toBe("needs_review");
+    expect(out.warnings[0]).toContain("第 1–2 页识别失败（socket closed）");
+  });
+
+  it("mapPool keeps input order and respects the limit", async () => {
+    let inFlight = 0;
+    let max = 0;
+    const res = await mapPool([30, 5, 20, 1, 10], 2, async (ms, i) => {
+      inFlight++;
+      max = Math.max(max, inFlight);
+      await new Promise((r) => setTimeout(r, ms));
+      inFlight--;
+      return i;
+    });
+    expect(res).toEqual([0, 1, 2, 3, 4]);
+    expect(max).toBe(2);
+    expect(await mapPool([], 3, async () => 1)).toEqual([]);
   });
 });
 

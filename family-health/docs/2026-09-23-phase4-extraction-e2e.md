@@ -54,3 +54,17 @@ range (the app correctly leaves the flag empty — ground-truth fix, not an app 
 - Review table: rebalanced columns, tighter cell/input padding, wrapping raw names
   (0 of 135 inputs clip at 1440 and 1024 px); confirm bar clears the host chat bubble
   on desktop too; `10^9` rendered as 10⁹ in AI report/trend text.
+
+## Phase 4b — concurrent batches
+
+- Extraction now runs 2-page batches with at most 3 extractor calls in flight
+  (`mapPool`, `BATCH_SIZE = 2`, `EXTRACTION_CONCURRENCY = 3`). `pagesDone` is
+  persisted as each batch finishes (monotonic); results are merged in page order,
+  exam date / provider still come from the earliest pages; per-batch retry and
+  partial-failure warnings are unchanged; a thrown agent call fails only its batch.
+- Synthetic 4-page PDF, live app: review-ready in 23.6 s (was 26.5–26.9 s),
+  progress 0/4 → 2/4 (11.3 s) → 4/4; still 45/45 rows, 3/3 findings, pages 1/4 skipped.
+  The gain grows with page count (a 30-page report was 6 serial ~25–40 s calls; now
+  15 small calls in waves of 3) — not measured live.
+- README / store listing written (privacy wording notes that extraction sends
+  page images, which show whatever is printed on them).

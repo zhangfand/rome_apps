@@ -1,32 +1,50 @@
-# Family Health
+# 家庭体检助手
 
-<!--
-This README is the App Store listing for Family Health. It is shown to people
-deciding whether to install — not to developers reading the source.
+全家体检报告自动整理，指标趋势一目了然。
+*Family health-checkup tracker: turns your family's checkup reports into clear, private trend charts (UI in Simplified Chinese).*
 
-Write it as product copy, not as technical documentation:
+## 它能做什么
 
-- Lead with what the app *does* for the user, in one or two sentences.
-- List the main features as short bullets, framed from the user's point of view.
-- Mention when someone would reach for this app (the situations it fits).
-- Skip the implementation: no schemas, file paths, build commands, or API names.
-- Keep it short. A few screens of scrolling is too long.
--->
+把每年的体检报告（PDF、扫描件或手机拍照）上传进来，AI 会逐行识别出检验结果和超声、心电图等检查结论，统一单位、对照参考范围，交给你逐项核对后保存。之后，每位家人的每个指标都能看到多年变化曲线，并配有通俗易懂的解读。
 
-One-line tagline: what Family Health helps someone do.
+## 主要功能
 
-## What it does
+- **自动识别报告**：支持多页 PDF 和照片，两栏表格、↑↓/H/L 标记、mg/dL 等单位都会自动处理；封面、广告页自动跳过。
+- **人工核对再入库**：识别结果与原件页面并排显示，可以修改数值、单位、参考范围和指标匹配，确认后才计入趋势。
+- **指标趋势**：每个指标一张时间轴图，显示参考范围、异常点、家里自测的数值，以及饮食、运动、用药等调整的时间段。
+- **按目标关注**：减重/代谢、血脂/心血管、肝功能/脂肪肝、老人常规四个面板；超声结论（如脂肪肝、甲状腺结节）按年份对比。
+- **通俗解读**：每份报告按“需尽快就医 / 建议复查 / 生活方式 / 可观察”分级解读；危急值有醒目提示。
+- **在聊天里记录**：直接说“我从上周开始每天快走”“爸爸今天血压 135/85”“我爸的尿酸这两年怎么样”，就能记录或查询。
 
-A short paragraph (2–4 sentences) describing the product in plain language.
-Focus on the outcome the user gets, not how it is built.
+## 隐私
 
-## Features
+体检数据、上传的文件和识别结果都只保存在这台电脑上，不上传到任何外部服务，不使用外部接口、统计或 CDN。唯一离开本机的是通过 Rome 自带智能体运行时发出的 AI 调用：识别时发送报告页面图片（图片上印着的内容，包括姓名，会随图片一起发送）；生成解读时只发送年龄、性别、身高、关注目标和检查结果，**不含姓名和备注**。删除成员或报告时，对应的文件会一并删除。
 
-- **Feature one** — what the user can do, and why it matters.
-- **Feature two** — another concrete capability, stated as a user benefit.
-- **Feature three** — keep these tight; cut anything that isn't a headline.
+## 试用演示数据
 
-## When to use it
+没有成员时，首页提供“加载演示数据”：一个四口之家（本人、配偶、父亲、母亲）的多年体检报告、干预记录和自测数据，全部带“演示”标记。首页的“清空演示数据”只会删除演示数据，不会动你自己录入的内容。也可以在聊天里说“加载家庭体检助手的演示数据”。
 
-A sentence or two on the moments where this app earns its place on the
-guardian's dashboard. Examples of real situations work better than abstractions.
+## 支持的文件
+
+PDF、JPG、PNG、HEIC/HEIF、WebP；单个文件不超过 60 MB，PDF 最多 80 页。一份报告可以分多次上传多个文件（比如每页一张照片）。
+
+## 聊天里可用的操作
+
+应用附带 `log-from-chat` 技能，Rome 会在你聊到家人健康数据时自动使用这些操作：
+
+| 操作 | 用途 |
+|---|---|
+| 列出成员 `family_health_list_members` | 弄清“我 / 老婆 / 我爸”对应哪位成员 |
+| 新增成员 `family_health_add_member` | 添加家庭成员 |
+| 记录干预 `family_health_log_intervention` | 开始一项饮食、运动、用药等调整 |
+| 结束干预 `family_health_end_intervention` | 停止某项调整 |
+| 记录自测 `family_health_log_measurement` | 体重、血压、血糖、腰围、心率等（自动换算单位） |
+| 查询 `family_health_query` | 某人的异常项、红旗提示、指标历史 |
+| 演示数据 `family_health_seed_demo` | 加载或清空演示数据 |
+
+## 已知限制
+
+- **不是医疗建议**：所有解读仅供参考，不能替代医生诊断；有疑问请咨询医生。
+- **识别准确度**：在合成的中文体检报告（清晰 PDF 和倾斜、光照不均的手机照片）上逐行完全正确，但还没有在大量真实扫描件上验证；排版特殊、模糊或手写的报告可能出错，请务必在核对页逐项检查。
+- **只有简体中文界面**。
+- PDF/图片处理使用 [mupdf](https://mupdf.com)（AGPL-3.0 许可）。

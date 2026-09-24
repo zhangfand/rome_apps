@@ -5,11 +5,15 @@ version: 0.1.0
 description: >-
   Family health-checkup tracker (UI in Simplified Chinese). Stores family
   members, uploaded checkup reports (PDF/photo), AI-extracted lab results and
-  imaging findings, lifestyle interventions and home measurements; shows
-  per-indicator trends and plain-language interpretations. Use its actions to
-  list members, log an intervention or a home measurement (weight, blood
-  pressure) from chat, end an intervention, or query a member's indicator
-  history and abnormal results. All data stays on this machine.
+  imaging findings (reviewed by the user before saving), lifestyle
+  interventions and home measurements; shows per-indicator trends and
+  plain-language interpretations. Use its actions to list or add members, log
+  or end an intervention, log a home measurement (weight, blood pressure,
+  glucose) from chat, query a member's abnormal results and indicator
+  history, or load/clear demo data. All data stays on this machine; the only
+  outbound traffic is AI calls through Rome's agent runtime (report page
+  images for extraction; interpretations get results without names or
+  notes). Not medical advice.
 tagline: 全家体检报告自动整理，指标趋势一目了然
 icon: assets/icon.svg
 appRoot: dist

@@ -1,13 +1,14 @@
 /**
  * Report extraction pipeline:
  *
- *   page images → batches of 5 → extractor agent (vision, strict JSON)
+ *   page images → batches of 2 (≤3 in flight) → extractor agent (vision, strict JSON)
  *   → validate/repair → deterministic mapping (normalizeRow)
  *   → one mapper-agent call for all unmapped names → flags
  *   → findings normalization → status `needs_review`
  *
- * Progress (`pagesDone` / `pagesTotal`) is persisted after every batch so the
- * UI can poll. A failed batch is retried once; if it still fails the other
+ * Progress (`pagesDone` / `pagesTotal`) is persisted as each batch finishes
+ * (monotonic, in completion order) so the UI can poll. Results are merged in
+ * page order regardless of completion order. A failed batch is retried once; if it still fails the other
  * batches' rows are kept and a partial warning is stored in `error`. The run
  * is idempotent: it starts by clearing the report's unconfirmed rows.
  */
@@ -22,7 +23,10 @@ import { parseExtractorOutput, parseMapperOutput, type ExtractedFinding, type Ex
 
 export const EXTRACTOR_AGENT = "family-health:extractor";
 export const MAPPER_AGENT = "family-health:mapper";
-export const BATCH_SIZE = 5;
+/** Pages per extractor call: small enough that dense pages get full attention. */
+export const BATCH_SIZE = 2;
+/** Extractor calls in flight at once for one report. */
+export const EXTRACTION_CONCURRENCY = 3;
 /** An `extracting` report not updated for this long is considered abandoned (e.g. daemon restart). */
 export const STALE_EXTRACTION_MS = 15 * 60 * 1000;
 
@@ -97,8 +101,29 @@ export interface ExtractionOutcome {
 export interface ExtractionDeps {
   store: FamilyHealthStore;
   callAgent: AgentCaller;
+  /** Override pages per extractor call (tests). */
+  batchSize?: number;
+  /** Override extractor calls in flight (tests). */
+  concurrency?: number;
   now?: () => Date;
   log?: { info: (m: string, d?: Record<string, unknown>) => void; warn: (m: string, d?: Record<string, unknown>) => void };
+}
+
+/**
+ * Run `fn` over `items` with at most `limit` calls in flight; results keep
+ * input order. `fn` must not throw (failures are part of its result).
+ */
+export async function mapPool<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker));
+  return out;
 }
 
 function pageRangeLabel(pages: number[]): string {
@@ -138,13 +163,14 @@ export async function runExtraction(reportId: string, deps: ExtractionDeps): Pro
   let okBatches = 0;
   let done = 0;
 
-  for (const batch of chunkPages(pages)) {
+  const batches = chunkPages(pages, deps.batchSize ?? BATCH_SIZE);
+  const outcomes = await mapPool(batches, deps.concurrency ?? EXTRACTION_CONCURRENCY, async (batch) => {
     const pageNums = batch.map((p) => p.page);
     const prompt = buildExtractorPrompt(batch);
-    let parsed = null;
+    let parsed: ReturnType<typeof parseExtractorOutput> = null;
     let lastError = "";
     for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
-      const res = await callAgent(EXTRACTOR_AGENT, prompt);
+      const res = await callAgent(EXTRACTOR_AGENT, prompt).catch((err: Error) => ({ ok: false as const, error: err?.message ?? String(err) }));
       if (!res.ok) {
         lastError = res.error;
         continue;
@@ -152,6 +178,14 @@ export async function runExtraction(reportId: string, deps: ExtractionDeps): Pro
       parsed = parseExtractorOutput(res.data, pageNums, now());
       if (!parsed) lastError = "模型返回的内容不是有效的 JSON 对象";
     }
+    // Single-threaded JS: this increment + write happens atomically per batch.
+    done += batch.length;
+    store.updateReport(reportId, { pagesDone: done });
+    return { pageNums, parsed, lastError };
+  });
+
+  // Merge in page order (batches finish in any order).
+  for (const { pageNums, parsed, lastError } of outcomes) {
     if (parsed) {
       okBatches++;
       extractedResults.push(...parsed.results);
@@ -163,8 +197,6 @@ export async function runExtraction(reportId: string, deps: ExtractionDeps): Pro
       warnings.push(`${pageRangeLabel(pageNums)}识别失败（${lastError.slice(0, 80)}），可重新识别或手动补充`);
       deps.log?.warn("extractor batch failed", { reportId, pages: pageNums, error: lastError });
     }
-    done += batch.length;
-    store.updateReport(reportId, { pagesDone: done });
   }
 
   if (okBatches === 0) {

@@ -1,23 +1,38 @@
-title: Family Health
-description: Family Health helps your guardian work with a focused Rome app.
+title: 家庭体检助手
+description: 全家体检报告自动整理，指标趋势一目了然。Private family health-checkup tracker (Simplified Chinese).
 long_description: |
-  Family Health gives your guardian a focused place to manage the information,
-  actions, or agent experience you care about. Replace this copy with the
-  concrete outcome your app provides and the moments where someone should
-  install it.
+  上传每年的体检报告（PDF、扫描件或手机拍照），AI 逐行识别检验结果和超声、心电图等结论，
+  统一单位、对照参考范围，经你核对确认后保存。每位家人的每个指标都有多年趋势图，
+  标出参考范围、异常点、家里自测的数值和饮食/运动/用药调整的时间段，并配有分级的通俗解读。
+  在聊天里说“爸爸今天血压 135/85”“我从上周开始每天快走”即可记录。
+
+  数据只保存在本机；唯一离开本机的是通过 Rome 智能体运行时发出的 AI 调用（识别时发送报告页面图片，
+  生成解读时不含姓名和备注）。
+  自带演示数据，可一键加载和清空。解读仅供参考，不能替代医生诊断。
+
+  Upload yearly checkup reports, review the AI-extracted results, and follow each family
+  member's indicators over time. Data stays on this machine; UI in Simplified Chinese.
 categories:
-  - Tools
+  - Health
+  - Productivity
+  - 体检
+  - 健康管理
 keywords:
-  - rome app
-  - automation
-  - tools
+  - 体检报告
+  - 体检
+  - 健康
+  - 指标趋势
+  - 家庭健康
+  - health checkup
+  - lab results
+  - family health
 # Optional store-only media. Paths are relative to this .rome_store directory
 # and are uploaded separately from the installable app bundle.
 # image: assets/store-og.png
-# image_alt: Family Health preview
+# image_alt: 家庭体检助手首页
 # media:
 #   - type: image
 #     path: assets/screenshot.png
-#     alt: Family Health main screen
+#     alt: 家庭体检助手 指标趋势页
 preview: off
 noindex: false
