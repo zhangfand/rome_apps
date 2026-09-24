@@ -23,3 +23,5 @@
    semantic-token form for its canvas because its published UI dependency floor
    predates the named `bg-app-canvas` utility. To override a host token (e.g. pin
    a corner radius), re-declare it in a `:root` block here. */
+
+@import "@rome-os/ui/markdown.css";

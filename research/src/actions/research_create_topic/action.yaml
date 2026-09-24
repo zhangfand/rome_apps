@@ -1,0 +1,8 @@
+name: research_create_topic
+type: custom
+description: "Create a new long-running research topic folder (TOPIC.md, log, conversations/, sources/, notes/). Returns its id."
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

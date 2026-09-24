@@ -1,0 +1,8 @@
+name: research_get_context
+type: custom
+description: "Load a research topic's accumulated context: TOPIC.md (question, current state, open questions), recent timeline, the latest conversation summaries, and the list of saved sources and notes. Call this at the start of every research conversation."
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: read-only

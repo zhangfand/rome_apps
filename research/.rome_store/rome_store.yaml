@@ -1,23 +1,16 @@
 title: Research
-description: Research helps your guardian work with a focused Rome app.
+description: Long-running research topics that remember every conversation, source and note.
 long_description: |
-  Research gives your guardian a focused place to manage the information,
-  actions, or agent experience you care about. Replace this copy with the
-  concrete outcome your app provides and the moments where someone should
-  install it.
+  Research gives each long-running question its own home. Start a conversation from a topic and the
+  agent picks up where you left off. Every chat is archived with a running summary and full transcript,
+  and links, PDFs, code and images are saved with notes on why they matter. Everything lives as plain
+  files you can open anywhere.
 categories:
-  - Tools
+  - Productivity
 keywords:
-  - rome app
-  - automation
-  - tools
-# Optional store-only media. Paths are relative to this .rome_store directory
-# and are uploaded separately from the installable app bundle.
-# image: assets/store-og.png
-# image_alt: Research preview
-# media:
-#   - type: image
-#     path: assets/screenshot.png
-#     alt: Research main screen
-preview: off
+  - research
+  - knowledge base
+  - notes
+  - obsidian
+  - long-term memory
 noindex: false

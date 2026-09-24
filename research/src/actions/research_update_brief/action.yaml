@@ -1,0 +1,8 @@
+name: research_update_brief
+type: custom
+description: "Rewrite the body of a topic's TOPIC.md — the living brief with the research question, current state / leaning conclusions, and open questions. Pass the full new Markdown body (it replaces the old one)."
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

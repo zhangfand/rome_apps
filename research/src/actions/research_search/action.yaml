@@ -1,0 +1,8 @@
+name: research_search
+type: custom
+description: "Full-text search across research topics (TOPIC.md, notes, conversation summaries and transcripts, extracted source text). Omit topic to search all topics."
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: read-only

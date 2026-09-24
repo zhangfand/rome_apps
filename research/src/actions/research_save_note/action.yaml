@@ -1,0 +1,8 @@
+name: research_save_note
+type: custom
+description: "Create or update a Markdown note (an idea, insight, comparison, draft) in a topic's notes/ folder. Pass id to overwrite an existing note."
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

@@ -1,0 +1,8 @@
+name: research_update_source
+type: custom
+description: "Update a saved source's title, why-it-matters note, summary, or tags."
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

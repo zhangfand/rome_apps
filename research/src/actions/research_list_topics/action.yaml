@@ -1,0 +1,8 @@
+name: research_list_topics
+type: custom
+description: "List every research topic (id, title, last update, counts of conversations/sources/notes)."
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: read-only

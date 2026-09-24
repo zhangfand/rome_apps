@@ -1,0 +1,8 @@
+name: research_save_source
+type: custom
+description: "Save a piece of research material into a topic's sources/ folder with a meta.md (why it matters, summary). Accepts any type: a URL (the page or PDF is downloaded and its text extracted), a local file path (e.g. a chat upload), or pasted text. PDFs get their text extracted to content.md so they are searchable."
+entry: ./index.ts
+complexity: simple
+speed: moderate
+reliability: high
+sideEffects: write
