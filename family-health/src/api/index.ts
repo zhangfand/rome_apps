@@ -486,6 +486,13 @@ class FamilyHealthApi implements RomeAppApiHandler {
       return json(reportDetail(s(), s().getReport(r.id)!));
     });
 
+    this.on("POST", "reports/:id/reopen", (_req, p) => {
+      const r = this.report(p.id);
+      if (r.status !== "confirmed") throw new UserFacingError("只有已确认的报告可以重新编辑", "invalid_status");
+      s().reopenReport(r.id);
+      return json(reportDetail(s(), s().getReport(r.id)!));
+    });
+
     // ---- review edits: results
     this.on("POST", "reports/:id/results", (req, p) => {
       const r = this.report(p.id);

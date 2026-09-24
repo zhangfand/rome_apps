@@ -242,3 +242,14 @@ describe("weight trend", () => {
     expect(w.ref).toEqual({ low: 56.7, high: 73.2 });
   });
 });
+
+describe("reopen", () => {
+  it("returns a confirmed report to review and hides it from trends", () => {
+    seedDemoData(store);
+    store.reopenReport("demo-self-2026");
+    expect(store.getReport("demo-self-2026")!.status).toBe("needs_review");
+    const dates = buildSnapshots(store.listMemberResults("demo-self"), memberCtx(store.getMember("demo-self")!)).map((s) => s.examDate);
+    expect(dates).not.toContain("2026-06-15");
+    expect(store.listReportResults("demo-self-2026").every((r) => !r.confirmed)).toBe(true);
+  });
+});

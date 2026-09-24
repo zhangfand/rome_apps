@@ -172,13 +172,14 @@ export interface IndicatorSummary {
   name: string;
   unit: string;
   category: string;
+  direction: string;
   derived: boolean;
   latest: SeriesPoint | null;
   previous: SeriesPoint | null;
   delta: number | null;
   trend: Trend | null;
   concerning: boolean;
-  series: Array<{ date: string; value: number; source: SeriesPoint["source"] }>;
+  series: Array<{ date: string; value: number; source: SeriesPoint["source"]; flag: Flag | null }>;
   ref: NumericRange | null;
 }
 
@@ -204,13 +205,14 @@ export function summarize(code: string, snaps: ExamSnapshot[], measurements: Mea
     name: def.zh,
     unit: def.unit,
     category: def.category,
+    direction: def.direction,
     derived: !!def.derived,
     latest,
     previous: prevExam,
     delta,
     trend,
     concerning: isConcerning(latestExam?.flag, def),
-    series: points.filter((p): p is SeriesPoint & { value: number } => p.value != null).map((p) => ({ date: p.date, value: p.value, source: p.source })),
+    series: points.filter((p): p is SeriesPoint & { value: number } => p.value != null).map((p) => ({ date: p.date, value: p.value, source: p.source, flag: p.flag })),
     ref: range,
   };
 }

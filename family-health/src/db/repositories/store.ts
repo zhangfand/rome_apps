@@ -194,6 +194,17 @@ export class FamilyHealthStore {
     return this.getReport(id);
   }
 
+  /** Re-open a confirmed report for edits: rows become unconfirmed again. */
+  reopenReport(id: string): ReportRow | undefined {
+    const now = new Date();
+    this.db.transaction((tx) => {
+      tx.update(this.t.results).set({ confirmed: false, updatedAt: now }).where(eq(this.t.results.reportId, id)).run();
+      tx.update(this.t.findings).set({ confirmed: false, updatedAt: now }).where(eq(this.t.findings.reportId, id)).run();
+      tx.update(this.t.reports).set({ status: "needs_review", confirmedAt: null, updatedAt: now }).where(eq(this.t.reports.id, id)).run();
+    });
+    return this.getReport(id);
+  }
+
   // ---------------------------------------------------------------- results
   listReportResults(reportId: string): ResultRow[] {
     return this.db
