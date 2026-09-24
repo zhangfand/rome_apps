@@ -83,12 +83,12 @@ function ResultsEditor({ detail, mutate, onJump, activePage }: { detail: ReportD
       <div className="hidden rounded-lg border border-border md:block">
         <Table className="table-fixed">
           <colgroup>
-            <col className="w-[26%]" />
+            <col className="w-[25%]" />
             <col className="w-[20%]" />
             <col className="w-[13%]" />
             <col className="w-[14%]" />
             <col className="w-[22%]" />
-            <col className="w-[5%]" />
+            <col className="w-12" />
           </colgroup>
           <TableHeader>
             <TableRow>
