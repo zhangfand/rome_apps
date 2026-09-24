@@ -1,0 +1,9 @@
+name: family_health_generate_insight
+type: custom
+description: 家庭体检助手内部使用：生成（或重新生成）一份 AI 解读。scope=report 时传 report_id；scope=indicator 时传 member_id 和 indicator 代码。
+entry: ./index.ts
+visibility: explicit
+complexity: complex
+speed: slow
+reliability: medium
+sideEffects: write

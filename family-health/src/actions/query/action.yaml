@@ -1,0 +1,13 @@
+name: family_health_query
+type: custom
+description: >-
+  家庭体检助手：查询某位家庭成员的体检数据，返回精简 JSON：历次体检日期、最近一次体检的异常项、
+  需要就医的红旗提示、超声/影像结论的历年变化、进行中的干预措施；指定 indicator 时还返回该指标的完整历史
+  （体检值 + 家庭自测值 + 同期干预）。参数：member 成员（姓名/id/称呼，必填）；indicator 指标名称或别名（可选，如 尿酸、甘油三酯、体重）；
+  from / to 日期范围 YYYY-MM-DD（可选）。例：“我爸的尿酸这两年怎么样” → {"member":"我爸","indicator":"尿酸","from":"2024-09-23"}。
+  回答时只描述数据与时间上的同时发生，不做诊断，并附上“仅供参考，不能替代医生诊断”。
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: read-only

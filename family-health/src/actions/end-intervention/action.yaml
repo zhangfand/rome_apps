@@ -1,0 +1,12 @@
+name: family_health_end_intervention
+type: custom
+description: >-
+  家庭体检助手：结束一项进行中的干预措施（设置结束日期）。参数：intervention_id（已知时直接用）；或 member 成员 + title
+  干预名称关键词（如“快走”）；end_date 结束日期 YYYY-MM-DD（省略=今天）。
+  例：“爸爸上个月停了降压药” → {"member":"爸爸","title":"降压药","end_date":"2026-08-23"}。
+  匹配到多条或没有匹配时，错误里会列出 candidates，请让用户选择。
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

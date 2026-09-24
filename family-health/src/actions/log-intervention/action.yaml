@@ -1,0 +1,14 @@
+name: family_health_log_intervention
+type: custom
+description: >-
+  家庭体检助手：记录一项生活方式或用药干预（会在指标趋势图上显示为时间段）。参数：member 成员（姓名、id，
+  或“我/老婆/老公/爸爸/妈妈/儿子”等称呼）；title 简短名称（如“每周3次快走”）；category 饮食/运动/药物/睡眠/体重管理/其他
+  （可省略，会按名称推断）；description 细节；start_date 开始日期 YYYY-MM-DD（省略=今天，请先把“上周”“3月初”换算成具体日期）；
+  end_date 结束日期（进行中则省略）。例：用户说“我从上周一开始每天跑步5公里” →
+  {"member":"我","title":"每天跑步5公里","category":"运动","start_date":"2026-09-14"}。
+  成员不明确时返回的错误里含 candidates，请据此追问用户。
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

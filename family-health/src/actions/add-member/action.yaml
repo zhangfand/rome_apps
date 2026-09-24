@@ -1,0 +1,13 @@
+name: family_health_add_member
+type: custom
+description: >-
+  家庭体检助手：新增一位家庭成员。参数：name 姓名（必填）；relation 与用户的关系，取值 本人/配偶/父亲/母亲/子女/其他；
+  sex 性别 male/female（或 男/女）；birth_date 出生日期 YYYY-MM-DD；height_cm 身高厘米；
+  goals 关注目标数组，可选 weight_metabolic(减重/代谢)、lipid_cardio(血脂/心血管)、liver(肝功能/脂肪肝)、senior(老人常规)。
+  例：{"name":"张建国","relation":"父亲","sex":"male","birth_date":"1956-11-08","goals":["senior"]}。
+  性别和出生日期会影响参考范围和 eGFR 计算，缺失时建议先问用户。
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

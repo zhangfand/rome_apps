@@ -1,0 +1,11 @@
+name: family_health_seed_demo
+type: custom
+description: >-
+  家庭体检助手：写入（或替换）演示数据——4 位演示家庭成员（本人、配偶、父亲、母亲）、多年已确认体检报告、
+  超声结论、干预记录和家庭自测数据，所有演示数据都带“演示”标记。参数 clear_only=true 时只清空演示数据。
+  只会删除演示数据，绝不会动用户自己录入的真实数据。仅在用户明确要求演示/试用时调用。
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write

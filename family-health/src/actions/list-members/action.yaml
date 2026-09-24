@@ -1,0 +1,11 @@
+name: family_health_list_members
+type: custom
+description: >-
+  家庭体检助手：列出已登记的家庭成员（id、姓名、与用户的关系 本人/配偶/父亲/母亲/子女/其他、性别、年龄、
+  关注目标、最近一次体检日期、异常项数量、进行中的干预措施）。在记录干预/自测数据或查询某人指标前，
+  如果不确定用户说的“我/老婆/我爸”对应谁，先调用它。无参数。
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: read-only

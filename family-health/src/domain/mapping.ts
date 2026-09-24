@@ -61,6 +61,7 @@ const SECTION_PATTERNS: Array<[RegExp, CategoryKey]> = [
   [/血常规|血细胞|全血细胞|cbc/i, "blood_routine"],
   [/肝功|肝脏|liver/i, "liver"],
   [/肾功|肾脏|kidney|renal/i, "kidney"],
+  [/^尿酸$|痛风|uric/i, "uric_acid"],
   [/血脂|脂类|lipid/i, "lipid"],
   [/血糖|糖代谢|糖尿病|glucose/i, "glucose"],
   [/甲功|甲状腺|thyroid/i, "thyroid"],

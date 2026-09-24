@@ -1,0 +1,9 @@
+name: family_health_extract_report
+type: custom
+description: 家庭体检助手内部使用：对一份已上传的体检报告运行识别流程（页面图片 → 识别 → 映射 → 待确认）。参数 report_id。
+entry: ./index.ts
+visibility: explicit
+complexity: complex
+speed: slow
+reliability: medium
+sideEffects: write

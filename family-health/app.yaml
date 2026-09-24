@@ -26,3 +26,23 @@ api:
 db:
   migrations: db/migrations
   tablePrefix: family_health
+
+actions:
+  - actions/list-members
+  - actions/add-member
+  - actions/log-intervention
+  - actions/end-intervention
+  - actions/log-measurement
+  - actions/query
+  - actions/seed-demo
+  - actions/extract-report
+  - actions/generate-insight
+
+agents:
+  - agents/extractor.yaml
+  - agents/mapper.yaml
+  - agents/interpreter.yaml
+  - agents/trend-interpreter.yaml
+
+skills:
+  - skills/log-from-chat

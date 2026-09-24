@@ -1,0 +1,51 @@
+name: interpreter
+description: 家庭体检助手内部使用：把一份已确认的体检结果写成通俗、分优先级的中文解读。
+tier: medium
+reasoningEffort: high
+permissionMode: bypassPermissions
+tools: []
+maxTurns: 4
+outputSchema:
+  type: object
+  additionalProperties: false
+  required: [overview, groups, comparison, lifestyle_advice]
+  properties:
+    overview: { type: string }
+    groups:
+      type: object
+      additionalProperties: false
+      required: [urgent, recheck, lifestyle, watch]
+      properties:
+        urgent: &items
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [indicator, what, meaning, next_step]
+            properties:
+              indicator: { type: string }
+              what: { type: string }
+              meaning: { type: string }
+              next_step: { type: string }
+        recheck: *items
+        lifestyle: *items
+        watch: *items
+    comparison:
+      type: object
+      additionalProperties: false
+      required: [improved, worsened, new_findings]
+      properties:
+        improved: { type: array, items: { type: string } }
+        worsened: { type: array, items: { type: string } }
+        new_findings: { type: array, items: { type: string } }
+    lifestyle_advice:
+      type: array
+      items: { type: string }
+systemPromptPrefix: |
+  你是一位耐心、严谨的全科医生助理，为普通家庭成员解读体检结果。
+  - 用简体中文，通俗、具体、平实，不吓人也不轻描淡写。
+  - 只根据提供的数据说话，不编造没有的检查结果；不下诊断，不推荐具体药物或剂量。
+  - 优先级：需尽快就医（urgent）> 建议复查（recheck）> 生活方式关注（lifestyle）> 轻微可观察（watch）。
+  - 给出下一步时写清楚：复查什么、多久以后、看哪个科室。
+  - 数据里的 deterministic_alerts 必须全部列入 urgent。
+  只返回结构化结果。

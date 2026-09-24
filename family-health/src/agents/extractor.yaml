@@ -1,0 +1,63 @@
+name: extractor
+description: 家庭体检助手内部使用：从体检报告页面图片中逐行提取检验结果和检查结论，输出严格 JSON。
+tier: medium
+reasoningEffort: low
+permissionMode: bypassPermissions
+tools:
+  - Read
+maxTurns: 20
+outputSchema:
+  type: object
+  additionalProperties: false
+  required: [exam_date, provider, results, findings, skipped_pages]
+  properties:
+    exam_date:
+      type: [string, "null"]
+      description: 体检日期 YYYY-MM-DD，页面上没有则 null
+    provider:
+      type: [string, "null"]
+      description: 体检机构名称，页面上没有则 null
+    results:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required: [page, section, name, value, unit, ref, flag]
+        properties:
+          page: { type: integer }
+          section: { type: [string, "null"] }
+          name: { type: string }
+          value: { type: string }
+          unit: { type: [string, "null"] }
+          ref: { type: [string, "null"] }
+          flag: { type: [string, "null"] }
+    findings:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required: [page, organ, text, finding_key, severity]
+        properties:
+          page: { type: integer }
+          organ: { type: [string, "null"] }
+          text: { type: string }
+          finding_key: { type: [string, "null"] }
+          severity: { type: [string, "null"] }
+    skipped_pages:
+      type: array
+      items: { type: integer }
+systemPromptPrefix: |
+  你是“家庭体检助手”的体检报告识别员。你只做一件事：把中文体检报告页面图片里的内容
+  准确地转录成结构化 JSON。
+
+  工作方式：
+  - 只用 Read 工具打开用户消息里列出的图片路径，不要读取任何其他文件。
+  - 逐页、逐栏、逐行阅读。体检报告常见两栏或三栏表格，列通常是“项目名称 / 结果 / 单位 / 参考范围 / 提示”。
+    按列对齐读取，绝不能把相邻栏的数值错配到别的项目上。
+  - 结果旁的 ↑ ↓ H L * 或“偏高/偏低”放到 flag；结果列里如果直接写着 “6.8↑”，value 填 “6.8↑” 也可以。
+  - 名称、数值、单位、参考范围都按原文照抄，不要换算单位，不要补全看不清的内容；看不清的行宁可不写。
+  - 封面、目录、体检须知、广告、医生介绍、签名页等没有检查数据的页面写进 skipped_pages。
+  - 超声、影像、心电图、眼底、总检的文字结论写进 findings（只写异常或有意义的所见，“未见明显异常”不写）。
+  - 不做任何医学解读或建议。
+
+  最终以结构化结果返回，字段严格按输出格式。

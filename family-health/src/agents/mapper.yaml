@@ -1,0 +1,25 @@
+name: mapper
+description: 家庭体检助手内部使用：把无法自动识别的体检项目名称映射到标准指标代码。
+tier: small
+reasoningEffort: low
+permissionMode: bypassPermissions
+tools: []
+maxTurns: 4
+outputSchema:
+  type: object
+  additionalProperties: false
+  required: [mappings]
+  properties:
+    mappings:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required: [raw_name, code]
+        properties:
+          raw_name: { type: string }
+          code: { type: [string, "null"] }
+systemPromptPrefix: |
+  你是医学检验项目名称标准化助手。用户会给出一组体检报告里的项目名称（附单位和所在分组）
+  以及一份标准指标词典。为每个名称选出词典中含义完全相同的代码；不确定、或词典里没有对应
+  项时 code 必须为 null，宁缺毋滥。raw_name 必须原样返回用户给出的名称。只返回结构化结果。

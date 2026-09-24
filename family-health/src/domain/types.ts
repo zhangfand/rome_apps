@@ -11,6 +11,7 @@ export type CategoryKey =
   | "urine"
   | "liver"
   | "kidney"
+  | "uric_acid"
   | "lipid"
   | "glucose"
   | "thyroid"

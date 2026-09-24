@@ -1,0 +1,15 @@
+name: family_health_log_measurement
+type: custom
+description: >-
+  家庭体检助手：记录一次家庭自测数值（体重、血压、血糖、心率、腰围等），会和体检结果一起画在趋势图上。
+  参数：member 成员（姓名/id/称呼）；indicator 指标名称或别名（体重、血压、空腹血糖、腰围、心率…）；
+  value 数值（血压写成 "128/82"）；unit 单位（kg、斤、mmHg、mmol/L、mg/dL…，会自动换算；省略时按标准单位）；
+  date 测量日期 YYYY-MM-DD（省略=今天）；note 备注。
+  例：“老婆今天称了62.5” → {"member":"老婆","indicator":"体重","value":62.5,"unit":"kg"}；
+  “我爸早上血压135/85” → {"member":"爸爸","indicator":"血压","value":"135/85"}。
+  单位不明确（如只说“血糖7.8”但不确定单位）时先问用户。
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write
