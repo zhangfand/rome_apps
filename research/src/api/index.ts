@@ -77,7 +77,7 @@ class ResearchApi implements RomeAppApiHandler {
         ? 404
         : /已存在|busy/i.test(message)
           ? 409
-          : /invalid|required|needs/i.test(message)
+          : /invalid|required|needs|不能为空/i.test(message)
             ? 400
             : 500;
       if (status === 500) this.ctx.log.error("research api error", { error: message, path: request.path.join("/") });
@@ -101,9 +101,9 @@ class ResearchApi implements RomeAppApiHandler {
       if (m === "GET") return json({ topics: await listTopics() });
       if (m === "POST") {
         const body = readJson(request);
-        if (!body) return json({ error: "invalid JSON body" }, { status: 400 });
+        if (!body) return json({ error: "请求格式错误" }, { status: 400 });
         const title = s(body.title);
-        if (!title) return json({ error: "title required" }, { status: 400 });
+        if (!title) return json({ error: "标题不能为空" }, { status: 400 });
         const topic = await createTopic({ title, question: s(body.question), slug: s(body.slug) });
         return json({ topic }, { status: 201 });
       }
@@ -119,7 +119,7 @@ class ResearchApi implements RomeAppApiHandler {
       if (m === "PATCH") {
         const body = readJson(request);
         const title = body && s(body.title);
-        if (!title) return json({ error: "title required" }, { status: 400 });
+        if (!title) return json({ error: "标题不能为空" }, { status: 400 });
         await renameTopic(slug, title);
         return json({ ok: true });
       }
@@ -127,7 +127,7 @@ class ResearchApi implements RomeAppApiHandler {
 
     if (p.length === 3 && p[2] === "brief" && m === "PUT") {
       const body = readJson(request);
-      if (!body || typeof body.brief !== "string" || !body.brief.trim()) return json({ error: "brief required" }, { status: 400 });
+      if (!body || typeof body.brief !== "string" || !body.brief.trim()) return json({ error: "课题状态不能为空" }, { status: 400 });
       await updateBrief(slug, body.brief, "手动编辑了课题状态");
       return json({ ok: true });
     }
@@ -151,7 +151,7 @@ class ResearchApi implements RomeAppApiHandler {
       }
       if (p.length === 4 && m === "PATCH") {
         const body = readJson(request);
-        if (!body) return json({ error: "invalid JSON body" }, { status: 400 });
+        if (!body) return json({ error: "请求格式错误" }, { status: 400 });
         const source = await updateSourceMeta(slug, p[3]!, {
           title: s(body.title),
           why: typeof body.why === "string" ? body.why : undefined,
@@ -184,7 +184,7 @@ class ResearchApi implements RomeAppApiHandler {
       if (p.length === 3 && m === "GET") return json({ notes: await listNotes(slug) });
       if (p.length === 3 && m === "POST") {
         const body = readJson(request);
-        if (!body) return json({ error: "invalid JSON body" }, { status: 400 });
+        if (!body) return json({ error: "请求格式错误" }, { status: 400 });
         const note = await saveNote(slug, { title: s(body.title) ?? "Untitled", body: String(body.body ?? "") });
         return json({ note }, { status: 201 });
       }
@@ -194,7 +194,7 @@ class ResearchApi implements RomeAppApiHandler {
       }
       if (p.length === 4 && m === "PUT") {
         const body = readJson(request);
-        if (!body) return json({ error: "invalid JSON body" }, { status: 400 });
+        if (!body) return json({ error: "请求格式错误" }, { status: 400 });
         const note = await saveNote(slug, { id: p[3]!, title: s(body.title) ?? "Untitled", body: String(body.body ?? "") });
         return json({ note });
       }
@@ -208,7 +208,7 @@ class ResearchApi implements RomeAppApiHandler {
     const type = header(request, "content-type") ?? "";
     if (type.includes("application/json")) {
       const body = readJson(request);
-      if (!body) return json({ error: "invalid JSON body" }, { status: 400 });
+      if (!body) return json({ error: "请求格式错误" }, { status: 400 });
       const source = await saveSource(slug, {
         title: s(body.title),
         url: s(body.url),
@@ -218,7 +218,7 @@ class ResearchApi implements RomeAppApiHandler {
       });
       return json({ source }, { status: 201 });
     }
-    if (!request.body || request.body.byteLength === 0) return json({ error: "file body required" }, { status: 400 });
+    if (!request.body || request.body.byteLength === 0) return json({ error: "文件为空" }, { status: 400 });
     const rawName = header(request, "x-file-name");
     const fileName = rawName ? decodeURIComponent(rawName) : "upload";
     const source = await saveSource(slug, {

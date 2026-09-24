@@ -659,8 +659,8 @@ export async function saveSource(slug: string, input: SaveSourceInput): Promise<
     fileName = fileName ?? safeFileName(basename(srcPath));
   }
   const url = input.url?.trim() || undefined;
-  if (!input.title && !fileName && !url && !input.content) {
-    throw new Error("A source needs at least a title, file, URL, or content");
+  if (!fileName && !url && !input.content?.trim() && !input.fileBytes) {
+    throw new Error("A source needs a url, filePath, or content (required: at least one)");
   }
 
   // Stage into a hidden folder; the final id is derived from the resolved title.
