@@ -98,7 +98,7 @@ class ResearchApi implements RomeAppApiHandler {
         if (!body) return json({ error: "invalid JSON body" }, { status: 400 });
         const title = s(body.title);
         if (!title) return json({ error: "title required" }, { status: 400 });
-        const topic = await createTopic({ title, question: s(body.question) });
+        const topic = await createTopic({ title, question: s(body.question), slug: s(body.slug) });
         return json({ topic }, { status: 201 });
       }
     }

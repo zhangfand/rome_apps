@@ -98,7 +98,12 @@ function TopicList() {
 function NewTopicDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [title, setTitle] = useState("");
   const [question, setQuestion] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
   const [busy, setBusy] = useState(false);
+  const autoSlug = asciiSlug(title);
+  const effectiveSlug = slugTouched ? slug : autoSlug;
+  const slugValid = /^[a-z0-9][a-z0-9-]{0,63}$/.test(effectiveSlug);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(): Promise<void> {
@@ -106,10 +111,16 @@ function NewTopicDialog({ open, onClose }: { open: boolean; onClose: () => void 
     setBusy(true);
     setError(null);
     try {
-      const { topic } = await sendJson<{ topic: TopicDetail }>("topics", "POST", { title, question });
+      const { topic } = await sendJson<{ topic: TopicDetail }>("topics", "POST", {
+        title,
+        question,
+        slug: effectiveSlug,
+      });
       onClose();
       setTitle("");
       setQuestion("");
+      setSlug("");
+      setSlugTouched(false);
       go(topic.slug);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -136,6 +147,23 @@ function NewTopicDialog({ open, onClose }: { open: boolean; onClose: () => void 
             />
           </Field>
           <Field>
+            <FieldLabel htmlFor="topic-slug">ID</FieldLabel>
+            <Input
+              id="topic-slug"
+              value={effectiveSlug}
+              placeholder="agent-memory"
+              onChange={(e) => {
+                setSlugTouched(true);
+                setSlug(e.target.value.toLowerCase());
+              }}
+            />
+            <FieldDescription>
+              {slugValid || !effectiveSlug
+                ? `文件夹 research/${effectiveSlug || "…"}，只能用小写字母、数字和连字符。`
+                : "只能用小写字母、数字和连字符，且以字母或数字开头。"}
+            </FieldDescription>
+          </Field>
+          <Field>
             <FieldLabel htmlFor="topic-question">研究问题</FieldLabel>
             <Textarea
               id="topic-question"
@@ -153,10 +181,18 @@ function NewTopicDialog({ open, onClose }: { open: boolean; onClose: () => void 
         <Button variant="outline" onClick={onClose}>
           取消
         </Button>
-        <Button disabled={busy || !title.trim()} onClick={() => void submit()}>
+        <Button disabled={busy || !title.trim() || !slugValid} onClick={() => void submit()}>
           {busy ? "创建中…" : "创建"}
         </Button>
       </DialogFooter>
     </Dialog>
   );
+}
+
+function asciiSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
 }
