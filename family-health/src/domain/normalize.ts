@@ -11,7 +11,7 @@ import { mapIndicator, type MatchKind } from "./mapping.js";
 import { parseRefRange, type ParsedRange } from "./refRange.js";
 import type { Flag, IndicatorDef, NumericRange, Sex } from "./types.js";
 import { normalizeUnit, toCanonical, type ConversionStatus } from "./units.js";
-import { parseResultValue, type ParsedValue } from "./values.js";
+import { parseResultValue, splitBloodPressure, type ParsedValue } from "./values.js";
 
 export interface RawRow {
   rawName: string;
@@ -125,4 +125,34 @@ export function normalizeRow(row: RawRow, ctx: { sex?: Sex | null } = {}): Norma
     refText: row.refText?.trim() || null,
     flag,
   };
+}
+
+/** Split a printed pair range like `90-139/60-89` or `<140/90`; null when it is not a pair. */
+function splitPairRange(ref: string | null | undefined): [string, string] | null {
+  if (!ref) return null;
+  const t = ref.trim();
+  const m = t.match(/^([<>≤≥]=?|小于|低于)?\s*([^/]+?)\s*\/\s*([^/]+)$/);
+  if (!m) return null;
+  const prefix = m[1] ?? "";
+  return [`${prefix}${m[2].trim()}`, `${prefix}${m[3].trim()}`];
+}
+
+/**
+ * Some report rows carry two indicators in one printed line — most commonly
+ * `血压 138/88 mmHg`. Split such a row into its component rows (named with
+ * dictionary names so they map exactly); returns null for ordinary rows.
+ */
+export function splitCompoundRow(row: RawRow): RawRow[] | null {
+  const name = row.rawName ?? "";
+  if (!/血压|blood\s*pressure|^\s*bp\s*$/i.test(name) || /收缩|舒张|高压|低压|sbp|dbp/i.test(name)) return null;
+  const bp = splitBloodPressure(String(row.rawValue ?? ""));
+  if (!bp) return null;
+  const refs = splitPairRange(row.refText);
+  // A printed ↑/↓ on the pair cannot be attributed to one component; only keep
+  // it when there is no range to recompute the flag from.
+  const arrow = refs ? null : row.arrow;
+  return [
+    { ...row, rawName: "收缩压", rawValue: String(bp.sbp), refText: refs?.[0] ?? null, arrow, indicatorCode: null },
+    { ...row, rawName: "舒张压", rawValue: String(bp.dbp), refText: refs?.[1] ?? null, arrow, indicatorCode: null },
+  ];
 }

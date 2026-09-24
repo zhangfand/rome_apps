@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Eye, EyeOff, Pencil, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
@@ -83,21 +83,21 @@ function ResultsEditor({ detail, mutate, onJump, activePage }: { detail: ReportD
       <div className="hidden rounded-lg border border-border md:block">
         <Table className="table-fixed">
           <colgroup>
-            <col className="w-[25%]" />
-            <col className="w-[20%]" />
-            <col className="w-[13%]" />
-            <col className="w-[14%]" />
             <col className="w-[22%]" />
+            <col className="w-[21%]" />
+            <col className="w-[14%]" />
+            <col className="w-[17%]" />
+            <col className="w-[19%]" />
             <col className="w-12" />
           </colgroup>
           <TableHeader>
             <TableRow>
-              <TableHead>报告原文</TableHead>
-              <TableHead>结果</TableHead>
-              <TableHead>单位</TableHead>
-              <TableHead>参考范围</TableHead>
-              <TableHead>标准指标</TableHead>
-              <TableHead>
+              <TableHead className="px-2">报告原文</TableHead>
+              <TableHead className="px-2">结果</TableHead>
+              <TableHead className="px-2">单位</TableHead>
+              <TableHead className="px-2">参考范围</TableHead>
+              <TableHead className="px-2">标准指标</TableHead>
+              <TableHead className="px-2">
                 <span className="sr-only">操作</span>
               </TableHead>
             </TableRow>
@@ -161,29 +161,29 @@ function ResultEditRow({ row, mutate, onJump }: { row: ResultRow; mutate: Mutate
   const patch = (body: Record<string, unknown>) => mutate("PATCH", `results/${row.id}`, body);
   return (
     <TableRow className={tone} onClick={() => row.page && onJump(row.page)}>
-      <TableCell className="align-top">
+      <TableCell className="align-top whitespace-normal px-2">
         <div className="break-words text-sm text-foreground">{row.rawName}</div>
         <div className="text-xs text-muted-foreground">
           {row.page ? `第 ${row.page} 页` : "手动添加"}
           {row.section ? ` · ${row.section}` : ""}
         </div>
       </TableCell>
-      <TableCell className="align-top">
+      <TableCell className="align-top px-2">
         <div className="flex items-center gap-1.5">
           <EditableCell value={row.rawValue} label={`${row.rawName} 结果`} onSave={(v) => patch({ rawValue: v })} />
           <FlagBadge flag={row.flag} direction={row.direction} className="shrink-0" />
         </div>
       </TableCell>
-      <TableCell className="align-top">
+      <TableCell className="align-top px-2">
         <EditableCell value={row.rawUnit} label={`${row.rawName} 单位`} onSave={(v) => patch({ rawUnit: v })} />
       </TableCell>
-      <TableCell className="align-top">
+      <TableCell className="align-top px-2">
         <EditableCell value={row.refText ?? ""} label={`${row.rawName} 参考范围`} onSave={(v) => patch({ refText: v })} />
       </TableCell>
-      <TableCell className="align-top">
+      <TableCell className="align-top px-2">
         <MappingCell row={row} patch={patch} />
       </TableCell>
-      <TableCell className="align-top">
+      <TableCell className="align-top px-2">
         <IconButton label={`删除 ${row.rawName}`} icon={<Trash2 />} size="sm" onClick={(e) => (e.stopPropagation(), void mutate("DELETE", `results/${row.id}`, undefined, "已删除"))} />
       </TableCell>
     </TableRow>
@@ -407,6 +407,14 @@ export function ReportDetailView({ reportId }: { reportId: string }) {
   const { data, error, loading, reload, setData } = useApi<ReportDetail>(`reports/${encodeURIComponent(reportId)}`);
   const [page, setPage] = useState(1);
   const [showPages, setShowPages] = useState(false);
+  // Open the viewer on the first page that has data (skip the cover etc.), once.
+  const pageInit = useRef(false);
+  const firstDataPage = data?.report.pages.find((p) => !p.skipped)?.page;
+  useEffect(() => {
+    if (pageInit.current || !data || data.report.status === "extracting") return;
+    pageInit.current = true;
+    if (firstDataPage) setPage(firstDataPage);
+  }, [data, firstDataPage]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmReextract, setConfirmReextract] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -608,7 +616,7 @@ export function ReportDetailView({ reportId }: { reportId: string }) {
             </SectionHeader>
             <FindingsEditor detail={data} mutate={mutate} meta={meta} activePage={page} />
           </Section>
-          <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 border-t border-border bg-[var(--app-canvas)] py-3 pr-16 sm:pr-0">
+          <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 border-t border-border bg-[var(--app-canvas)] py-3 pr-16">
             {confirmBlocked ? <span className="text-sm text-warning-fg">{confirmBlocked}</span> : <span className="text-sm text-muted-foreground">确认后数据会计入趋势，并自动生成 AI 解读。</span>}
             <Button onClick={() => void confirm()} disabled={!!confirmBlocked || busy}>
               {busy ? <Spinner size="sm" /> : <CheckCircle2 />} 确认报告

@@ -20,6 +20,8 @@ export interface PageImage {
   sourceIndex: number;
   width: number;
   height: number;
+  /** Set by extraction when the page had no data (cover, ad, notice…). */
+  skipped?: boolean;
 }
 
 export interface UnitConversionRow {

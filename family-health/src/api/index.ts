@@ -80,7 +80,7 @@ export function publicReport(r: ReportRow, now = new Date()) {
     pagesTotal: r.pagesTotal,
     isDemo: r.isDemo,
     files: r.sourceFiles.map((f) => ({ name: f.name, mime: f.mime, size: f.size })),
-    pages: r.pageImages.map((p) => ({ page: p.page, url: pageUrl(r.id, p.page), width: p.width, height: p.height, sourceIndex: p.sourceIndex })),
+    pages: r.pageImages.map((p) => ({ page: p.page, url: pageUrl(r.id, p.page), width: p.width, height: p.height, sourceIndex: p.sourceIndex, skipped: !!p.skipped })),
     confirmedAt: r.confirmedAt,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,

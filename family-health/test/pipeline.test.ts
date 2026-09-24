@@ -185,6 +185,48 @@ describe("runExtraction", () => {
     expect(store.getReport(report.id)!.status).toBe("needs_review");
   });
 
+  it("splits a printed blood-pressure pair and records skipped pages", async () => {
+    const { report } = reportWithPages(3);
+    const agent = fakeAgent({
+      [EXTRACTOR_AGENT]: [
+        ok({
+          exam_date: "2026-08-18",
+          provider: "康瑞健康体检中心",
+          results: [
+            { page: 2, section: "一般检查", name: "血压", value: "138/88", unit: "mmHg", ref: "90-139/60-89", flag: null },
+            { page: 2, section: "一般检查", name: "心率", value: "76", unit: "次/分", ref: "60-100", flag: null },
+            // The model claims page 3 is an ad but also returned a row from it: keep the row, don't mark the page skipped.
+            { page: 3, section: "血脂", name: "甘油三酯 TG", value: "2.35", unit: "mmol/L", ref: "<1.70", flag: "↑" },
+          ],
+          findings: [
+            { page: 2, organ: "心脏", text: "窦性心律", finding_key: null, severity: null },
+            { page: 2, organ: "肝脏", text: "脂肪肝（轻度）", finding_key: "fatty_liver", severity: "轻度" },
+          ],
+          skipped_pages: [1, 3],
+        }),
+      ],
+    });
+    const out = await runExtraction(report.id, { store, callAgent: agent.call });
+    expect(out.status).toBe("needs_review");
+    const rows = store.listReportResults(report.id);
+    const bp = rows.filter((r) => r.indicatorCode === "SBP" || r.indicatorCode === "DBP");
+    expect(bp.map((r) => [r.indicatorCode, r.rawName, r.valueNum, r.refLow, r.refHigh, r.flag])).toEqual([
+      ["SBP", "收缩压", 138, 90, 139, "normal"],
+      ["DBP", "舒张压", 88, 60, 89, "normal"],
+    ]);
+    expect(bp.every((r) => r.confidence === 1)).toBe(true);
+    expect(rows).toHaveLength(4);
+    expect(store.listReportFindings(report.id).map((f) => f.findingKey)).toEqual(["fatty_liver"]);
+    const pages = store.getReport(report.id)!.pageImages;
+    expect(pages.map((p) => !!p.skipped)).toEqual([true, false, false]);
+    expect(agent.prompts[0].prompt).toContain("138/88");
+
+    // Re-extraction clears stale skip marks before the new run.
+    const again = fakeAgent({ [EXTRACTOR_AGENT]: [ok({ exam_date: null, provider: null, results: [], findings: [], skipped_pages: [] })] });
+    await runExtraction(report.id, { store, callAgent: again.call });
+    expect(store.getReport(report.id)!.pageImages.some((p) => p.skipped)).toBe(false);
+  });
+
   it("refuses to re-extract a confirmed report", async () => {
     const { report } = reportWithPages(1);
     store.confirmReport(report.id);

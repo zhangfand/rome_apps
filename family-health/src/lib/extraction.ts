@@ -11,9 +11,9 @@
  * batches' rows are kept and a partial warning is stored in `error`. The run
  * is idempotent: it starts by clearing the report's unconfirmed rows.
  */
-import { detectFindings, parseSeverity, severityLabel } from "../domain/findings.js";
+import { detectFindings, isNormalConclusion, parseSeverity, severityLabel } from "../domain/findings.js";
 import { INDICATORS, getIndicator } from "../domain/indicators.js";
-import { normalizeRow, type NormalizedRow } from "../domain/normalize.js";
+import { normalizeRow, splitCompoundRow, type NormalizedRow } from "../domain/normalize.js";
 import type { Sex } from "../domain/types.js";
 import type { FamilyHealthStore, FindingInsert, ResultInsert } from "../db/repositories/store.js";
 import type { PageImage } from "../db/schema.js";
@@ -46,14 +46,16 @@ export function buildExtractorPrompt(pages: Array<Pick<PageImage, "page" | "path
     "返回一个 JSON 对象（字段见输出格式），只包含你在这些页面上真正看到的内容：",
     "- results：每一行检验结果。name 按原文照抄项目名称（含括号里的英文缩写），value 按原文照抄结果（数字、阴性/阳性、+/++ 等），",
     "  unit 为单位，ref 为参考范围原文，flag 为结果旁的 ↑ ↓ H L * 等标记（没有则 null），section 为该行所在的检查分组标题（如 血常规、肝功能），page 为页码。",
-    "- findings：超声、影像、心电图、眼底、总检结论等文字结论，每条一项，text 照抄原文，organ 为器官/部位，",
+    "- findings：超声、影像、心电图、眼底、总检结论等文字结论，每条一项；text 照抄“检查结论/提示”里对应的那一句原文（如“脂肪肝（轻度）”），",
+    "  不要抄整段“检查所见”；organ 为器官/部位，",
     "  finding_key 从以下取值中选择（都不合适则 null）：fatty_liver, liver_cyst, liver_hemangioma, gallbladder_polyp, gallstone, renal_cyst,",
     "  kidney_stone, thyroid_nodule, breast_nodule, breast_hyperplasia, lung_nodule, carotid_plaque, carotid_imt, prostate_hyperplasia,",
     "  prostate_calcification, uterine_fibroid, ovarian_cyst, sinus_bradycardia, sinus_tachycardia, ecg_st_t, arrhythmia,",
     "  left_ventricular_hypertrophy, fundus_arteriosclerosis, cataract, cervical_spondylosis, osteoporosis, osteopenia；",
     "  severity 为程度（轻度/中度/重度、TI-RADS n类、BI-RADS n类、大小），没有则 null。“未见异常”类的正常结论不要列出。",
     "- exam_date：体检日期（YYYY-MM-DD），provider：体检机构名称；页面上没有则 null。",
-    "- skipped_pages：封面、目录、广告、医生简介、须知等没有检查数据的页码。",
+    "- skipped_pages：封面、目录、广告、医生简介、须知等没有检查数据的页码（这些页上的任何数字都不要写进 results）。",
+    "- 一行里写着两个数值的（如 血压 138/88），value 照抄 “138/88”，由程序拆分。",
     "",
     "注意：表格可能是多栏排版（一页左右两栏），请逐栏逐行读取，不要把相邻两栏的数值串行；不要推测或编造数值；",
     "同一项目在“异常汇总”页和明细页重复出现时都照实列出；不要做任何医学解读。",
@@ -119,13 +121,20 @@ export async function runExtraction(reportId: string, deps: ExtractionDeps): Pro
   }
 
   store.clearReportRows(reportId);
-  store.updateReport(reportId, { status: "extracting", error: null, pagesDone: 0, pagesTotal: pages.length });
+  store.updateReport(reportId, {
+    status: "extracting",
+    error: null,
+    pagesDone: 0,
+    pagesTotal: pages.length,
+    pageImages: pages.map(({ skipped: _s, ...p }) => p),
+  });
 
   const warnings: string[] = [];
   const extractedResults: ExtractedResult[] = [];
   const extractedFindings: ExtractedFinding[] = [];
   let examDate: string | null = null;
   let provider: string | null = null;
+  const skipped = new Set<number>();
   let okBatches = 0;
   let done = 0;
 
@@ -147,6 +156,7 @@ export async function runExtraction(reportId: string, deps: ExtractionDeps): Pro
       okBatches++;
       extractedResults.push(...parsed.results);
       extractedFindings.push(...parsed.findings);
+      parsed.skippedPages.forEach((p) => skipped.add(p));
       examDate = examDate ?? parsed.examDate;
       provider = provider ?? parsed.provider;
     } else {
@@ -164,10 +174,16 @@ export async function runExtraction(reportId: string, deps: ExtractionDeps): Pro
   }
 
   // ---- deterministic mapping
-  const collected: CollectedRow[] = extractedResults.map((row) => ({
-    row,
-    norm: normalizeRow({ rawName: row.name, rawValue: row.value, rawUnit: row.unit, refText: row.ref, arrow: row.flag, section: row.section }, { sex }),
-  }));
+  const collected: CollectedRow[] = extractedResults.flatMap((row) => {
+    const raw = { rawName: row.name, rawValue: row.value, rawUnit: row.unit, refText: row.ref, arrow: row.flag, section: row.section };
+    // e.g. 血压 138/88 → 收缩压 138 + 舒张压 88
+    const parts = splitCompoundRow(raw);
+    if (!parts) return [{ row, norm: normalizeRow(raw, { sex }) }];
+    return parts.map((p) => ({
+      row: { ...row, name: p.rawName, value: String(p.rawValue), ref: p.refText ?? null, flag: p.arrow ?? null },
+      norm: normalizeRow(p, { sex }),
+    }));
+  });
 
   // ---- LLM fallback for unmapped names (one call for the whole report)
   const unmapped: MapperInput[] = [];
@@ -231,6 +247,8 @@ export async function runExtraction(reportId: string, deps: ExtractionDeps): Pro
   const seenFindings = new Set<string>();
   for (const f of extractedFindings) {
     const detected = f.findingKey ? [{ key: f.findingKey, organ: f.organ ?? "", severity: parseSeverity(f.text) }] : detectFindings(f.text).map((d) => ({ key: d.key, organ: d.organ, severity: d.severity }));
+    // Unrecognized text that only states a normal result (窦性心律 / 未见明显异常) is noise.
+    if (!detected.length && isNormalConclusion(f.text)) continue;
     const targets = detected.length ? detected : [{ key: null as string | null, organ: f.organ ?? "", severity: parseSeverity(f.text) }];
     for (const t of targets) {
       const dedupe = `${t.key ?? f.text}`;
@@ -253,8 +271,12 @@ export async function runExtraction(reportId: string, deps: ExtractionDeps): Pro
   store.insertResults(resultRows);
   store.insertFindings(findingRows);
   if (resultRows.length === 0 && findingRows.length === 0) warnings.push("没有识别到检验结果或检查结论，请确认上传的是体检报告，或手动添加");
+  // A page counts as skipped only if the model said so AND nothing was taken from it.
+  const used = new Set([...resultRows.map((r) => r.page), ...findingRows.map((f) => f.page)]);
+  const skippedPages = pages.map(({ skipped: _old, ...p }) => (skipped.has(p.page) && !used.has(p.page) ? { ...p, skipped: true } : p));
   store.updateReport(reportId, {
     status: "needs_review",
+    pageImages: skippedPages,
     examDate: finalExamDate,
     provider: report.provider || provider || "",
     error: warnings.length ? warnings.join("；") : null,

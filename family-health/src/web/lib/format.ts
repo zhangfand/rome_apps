@@ -108,7 +108,12 @@ export function formatDelta(delta: number | null | undefined): string {
 /** Display form of a unit: `10^9/L` → `10⁹/L`. */
 export function formatUnit(u: string | null | undefined): string {
   if (!u) return "";
-  return u.replace("10^12", "10¹²").replace("10^9", "10⁹");
+  return prettyUnits(u);
+}
+
+/** Render `10^9` / `10^12` as superscripts anywhere in text (units, AI prose). */
+export function prettyUnits(text: string): string {
+  return text.replace(/10\^12/g, "10¹²").replace(/10\^9/g, "10⁹");
 }
 
 export function formatBytes(n: number): string {

@@ -73,7 +73,7 @@ export interface Report {
   pagesTotal: number;
   isDemo: boolean;
   files: Array<{ name: string; mime: string; size: number }>;
-  pages: Array<{ page: number; url: string; width: number; height: number; sourceIndex: number }>;
+  pages: Array<{ page: number; url: string; width: number; height: number; sourceIndex: number; skipped?: boolean }>;
   confirmedAt: string | null;
   createdAt: string;
   updatedAt: string;

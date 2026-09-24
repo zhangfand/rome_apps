@@ -1,5 +1,6 @@
 import { Badge } from "@rome-os/ui/badge";
 import type { InsightItem, ReportInsightContent } from "../lib/types";
+import { prettyUnits } from "../lib/format";
 import { Disclaimer } from "./common";
 
 const GROUPS: Array<{ key: keyof ReportInsightContent["groups"]; label: string; variant: "destructive" | "warning" | "info" | "muted" }> = [
@@ -13,26 +14,26 @@ function Item({ item }: { item: InsightItem }) {
   return (
     <li className="rounded-lg border border-border p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h5 className="font-medium text-foreground">{item.indicator}</h5>
+        <h5 className="font-medium text-foreground">{prettyUnits(item.indicator)}</h5>
         {item.source === "rule" ? <Badge variant="outline">系统规则</Badge> : null}
       </div>
       <dl className="grid gap-2 text-sm leading-relaxed sm:grid-cols-[9.5rem_1fr]">
         {item.what ? (
           <>
             <dt className="text-muted-foreground">这是什么</dt>
-            <dd className="text-foreground">{item.what}</dd>
+            <dd className="text-foreground">{prettyUnits(item.what)}</dd>
           </>
         ) : null}
         {item.meaning ? (
           <>
             <dt className="text-muted-foreground">你的数值意味着什么</dt>
-            <dd className="text-foreground">{item.meaning}</dd>
+            <dd className="text-foreground">{prettyUnits(item.meaning)}</dd>
           </>
         ) : null}
         {item.next_step ? (
           <>
             <dt className="text-muted-foreground">下一步</dt>
-            <dd className="text-foreground">{item.next_step}</dd>
+            <dd className="text-foreground">{prettyUnits(item.next_step)}</dd>
           </>
         ) : null}
       </dl>
@@ -47,7 +48,7 @@ export function ReportInsightView({ content }: { content: ReportInsightContent }
     <div className="flex flex-col gap-5">
       <div>
         <h4 className="mb-1 font-medium text-foreground">总体概况</h4>
-        <p className="text-sm leading-relaxed text-foreground">{content.overview || "—"}</p>
+        <p className="text-sm leading-relaxed text-foreground">{prettyUnits(content.overview || "—")}</p>
       </div>
       {GROUPS.map((g) =>
         content.groups[g.key].length ? (
@@ -71,19 +72,19 @@ export function ReportInsightView({ content }: { content: ReportInsightContent }
             {cmp.improved.length ? (
               <>
                 <dt className="text-success">好转</dt>
-                <dd className="text-foreground">{cmp.improved.join("；")}</dd>
+                <dd className="text-foreground">{prettyUnits(cmp.improved.join("；"))}</dd>
               </>
             ) : null}
             {cmp.worsened.length ? (
               <>
                 <dt className="text-destructive">变差</dt>
-                <dd className="text-foreground">{cmp.worsened.join("；")}</dd>
+                <dd className="text-foreground">{prettyUnits(cmp.worsened.join("；"))}</dd>
               </>
             ) : null}
             {cmp.new_findings.length ? (
               <>
                 <dt className="text-warning-fg">新出现</dt>
-                <dd className="text-foreground">{cmp.new_findings.join("；")}</dd>
+                <dd className="text-foreground">{prettyUnits(cmp.new_findings.join("；"))}</dd>
               </>
             ) : null}
           </dl>
@@ -94,7 +95,7 @@ export function ReportInsightView({ content }: { content: ReportInsightContent }
           <h4 className="mb-2 font-medium text-foreground">生活方式建议</h4>
           <ul className="list-disc pl-5 text-sm leading-relaxed text-foreground">
             {content.lifestyle_advice.map((a) => (
-              <li key={a}>{a}</li>
+              <li key={a}>{prettyUnits(a)}</li>
             ))}
           </ul>
         </div>

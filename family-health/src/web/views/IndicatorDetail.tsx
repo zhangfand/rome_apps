@@ -12,7 +12,7 @@ import { Timestamp } from "@rome-os/ui/timestamp";
 import { Disclaimer, ErrorState, FlagBadge, LoadingRows } from "../components/common";
 import { TrendChart } from "../components/charts";
 import { apiGet, apiSend, errorMessage } from "../lib/api";
-import { formatNumber, formatRange, formatUnit } from "../lib/format";
+import { formatNumber, formatRange, formatUnit, prettyUnits } from "../lib/format";
 import { useApi, usePolling } from "../lib/hooks";
 import { Link, paths } from "../lib/router";
 import type { IndicatorDetail, Insight, Member, TrendInsightContent } from "../lib/types";
@@ -73,18 +73,18 @@ function TrendInsightView({ memberId, code, initial }: { memberId: string; code:
       ) : null}
       {content?.summary ? (
         <div className="flex flex-col gap-4 text-sm leading-relaxed text-foreground">
-          <p>{content.summary}</p>
+          <p>{prettyUnits(content.summary)}</p>
           {content.observations.length ? (
             <ul className="list-disc pl-5">
               {content.observations.map((o) => (
-                <li key={o}>{o}</li>
+                <li key={o}>{prettyUnits(o)}</li>
               ))}
             </ul>
           ) : null}
           {content.intervention_timing ? (
             <div>
               <h4 className="mb-1 font-medium">生活方式调整（时间上同时发生）</h4>
-              <p>{content.intervention_timing}</p>
+              <p>{prettyUnits(content.intervention_timing)}</p>
             </div>
           ) : null}
           {content.confounders.length ? (
@@ -92,7 +92,7 @@ function TrendInsightView({ memberId, code, initial }: { memberId: string; code:
               <h4 className="mb-1 font-medium">可能的其他影响因素</h4>
               <ul className="list-disc pl-5">
                 {content.confounders.map((o) => (
-                  <li key={o}>{o}</li>
+                  <li key={o}>{prettyUnits(o)}</li>
                 ))}
               </ul>
             </div>
@@ -100,7 +100,7 @@ function TrendInsightView({ memberId, code, initial }: { memberId: string; code:
           {content.data_note ? (
             <div>
               <h4 className="mb-1 font-medium">数据说明</h4>
-              <p>{content.data_note}</p>
+              <p>{prettyUnits(content.data_note)}</p>
             </div>
           ) : null}
           {content.suggestions.length ? (
@@ -108,7 +108,7 @@ function TrendInsightView({ memberId, code, initial }: { memberId: string; code:
               <h4 className="mb-1 font-medium">建议</h4>
               <ul className="list-disc pl-5">
                 {content.suggestions.map((o) => (
-                  <li key={o}>{o}</li>
+                  <li key={o}>{prettyUnits(o)}</li>
                 ))}
               </ul>
             </div>

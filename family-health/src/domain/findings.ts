@@ -140,3 +140,21 @@ export function severityLabel(s: ParsedSeverity): string {
   if (s.sizeMm != null) parts.push(`${s.sizeMm}mm`);
   return parts.join(" · ");
 }
+
+/**
+ * True for conclusions that only state a normal result (`窦性心律`, `正常心电图`,
+ * `双肾未见明显异常`). The extractor is told not to list these, but models
+ * occasionally do; they are dropped before review so they don't pollute the
+ * findings timeline. Anything with a recognizable abnormality is kept.
+ */
+export function isNormalConclusion(raw: string): boolean {
+  // Split the raw text (normalizeWidth would turn 、 into a comma) into sentences / numbered items.
+  const parts = raw
+    .split(/[；;。\s]+|(?<!\d)[.．](?!\d)|\d+[.、．](?!\d)/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (!parts.length) return false;
+  return parts.every((p) =>
+    /^(窦性心律|正常心电图|心电图(大致)?正常|大致正常心电图|正常范围心电图|(.{0,12})?(未见|未发现|未探及)(明显)?(异常|病变|占位)(回声)?|(.{0,12})?(无|未见)明显异常|(.{0,8})(正常|无异常))$/.test(p),
+  );
+}

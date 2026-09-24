@@ -40,18 +40,20 @@ function usePageImage(reportId: string, page: number | null, version: string): s
   return url;
 }
 
-function Thumb({ reportId, page, active, version, onClick }: { reportId: string; page: number; active: boolean; version: string; onClick: () => void }) {
+function Thumb({ reportId, page, active, version, skipped, onClick }: { reportId: string; page: number; active: boolean; version: string; skipped: boolean; onClick: () => void }) {
   const url = usePageImage(reportId, page, version);
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={`第 ${page} 页`}
+      title={skipped ? "此页没有检查数据，已跳过" : undefined}
       aria-current={active ? "page" : undefined}
       className={`relative shrink-0 overflow-hidden rounded-md border ${active ? "border-primary ring-2 ring-ring" : "border-border"}`}
       style={{ width: 56, height: 76 }}
     >
-      {url ? <img src={url} alt="" className="h-full w-full object-cover object-top" /> : <Skeleton className="h-full w-full" />}
+      {url ? <img src={url} alt="" className={`h-full w-full object-cover object-top ${skipped ? "opacity-50" : ""}`} /> : <Skeleton className="h-full w-full" />}
+      {skipped ? <span className="absolute inset-x-0 top-0 bg-background/90 text-center text-[10px] text-muted-foreground">已跳过</span> : null}
       <span className="absolute bottom-0 right-0 rounded-tl bg-background px-1 text-[10px] text-muted-foreground">{page}</span>
     </button>
   );
@@ -61,6 +63,7 @@ export function PageViewer({ report, page, onPageChange }: { report: Report; pag
   const total = report.pages.length;
   const version = String(report.pagesTotal);
   const url = usePageImage(report.id, total ? page : null, version);
+  const current = report.pages.find((p) => p.page === page);
   const [zoom, setZoom] = useState<"fit" | number>("fit");
   const thumbs = useRef<HTMLDivElement>(null);
 
@@ -95,6 +98,7 @@ export function PageViewer({ report, page, onPageChange }: { report: Report; pag
           <IconButton label="放大" icon={<ZoomIn />} size="sm" onClick={() => setZoom((z) => (z === "fit" ? 1.25 : Math.min(3, z + 0.25)))} />
         </div>
       </div>
+      {current?.skipped ? <p className="text-sm text-muted-foreground">识别时判断此页没有检查数据（如封面、目录、广告），已跳过。</p> : null}
       <div className="max-h-[70vh] overflow-auto rounded-md border border-border bg-muted">
         {url ? (
           <img
@@ -109,7 +113,7 @@ export function PageViewer({ report, page, onPageChange }: { report: Report; pag
       </div>
       <div ref={thumbs} className="flex gap-2 overflow-x-auto pb-1" aria-label="页面缩略图">
         {report.pages.map((p) => (
-          <Thumb key={p.page} reportId={report.id} page={p.page} version={version} active={p.page === page} onClick={() => onPageChange(p.page)} />
+          <Thumb key={p.page} reportId={report.id} page={p.page} version={version} skipped={!!p.skipped} active={p.page === page} onClick={() => onPageChange(p.page)} />
         ))}
       </div>
     </div>
@@ -218,7 +222,7 @@ export function EditableCell({
       aria-label={label}
       inputMode={inputMode}
       disabled={disabled}
-      className={`w-full min-w-0 ${className}`}
+      className={`w-full min-w-0 px-1.5 ${className}`}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
