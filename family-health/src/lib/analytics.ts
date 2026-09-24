@@ -190,12 +190,14 @@ export function summarize(code: string, snaps: ExamSnapshot[], measurements: Mea
   const latest = points.at(-1) ?? null;
   const latestExam = reportPoints.at(-1) ?? null;
   const prevExam = reportPoints.at(-2) ?? null;
-  const range = defaultRange(def, member.sex) ?? null;
+  const range = defaultRange(def, member.sex) ?? healthyWeightRange(def.code, member) ?? null;
   let delta: number | null = null;
   let trend: Trend | null = null;
   if (latestExam?.value != null && prevExam?.value != null) {
     delta = round(latestExam.value - prevExam.value, (def.decimals ?? 2) + 1);
-    trend = trendOf(def, prevExam.value, latestExam.value, range ?? undefined);
+    // Weight has no fixed direction; judge it against the member's healthy BMI range.
+    const trendDef = def.code === "WEIGHT" && range ? { ...def, direction: "both" as const } : def;
+    trend = trendOf(trendDef, prevExam.value, latestExam.value, range ?? undefined);
   }
   return {
     code,
@@ -211,6 +213,13 @@ export function summarize(code: string, snaps: ExamSnapshot[], measurements: Mea
     series: points.filter((p): p is SeriesPoint & { value: number } => p.value != null).map((p) => ({ date: p.date, value: p.value, source: p.source })),
     ref: range,
   };
+}
+
+/** Healthy weight band (BMI 18.5–23.9) for a member with a known height. */
+export function healthyWeightRange(code: string, member: MemberCtx): NumericRange | undefined {
+  if (code !== "WEIGHT" || !member.heightCm) return undefined;
+  const m2 = (member.heightCm / 100) ** 2;
+  return { low: round(18.5 * m2, 1), high: round(23.9 * m2, 1) };
 }
 
 function round(v: number, d: number): number {

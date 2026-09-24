@@ -232,3 +232,13 @@ describe("guardian timezone", () => {
     expect(endIntervention(store, { member: "我", title: "跑步", endDate: "2026-09-23" }).title).toBe("每天跑步5公里");
   });
 });
+
+describe("weight trend", () => {
+  it("judges weight change against the healthy BMI range", () => {
+    seedDemoData(store);
+    const panel = memberPanel(store, store.getMember("demo-self")!, "weight_metabolic")!;
+    const w = panel.items.find((i) => i.code === "WEIGHT")!;
+    expect(w.trend).toBe("better");
+    expect(w.ref).toEqual({ low: 56.7, high: 73.2 });
+  });
+});

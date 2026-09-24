@@ -184,7 +184,7 @@ class FamilyHealthApi implements RomeAppApiHandler {
       try {
         return await route.handler(request, params);
       } catch (err) {
-        if (err instanceof UserFacingError) return fail(400, err.code, err.message, err.details ?? {});
+        if (err instanceof UserFacingError) return fail(statusFor(err.code), err.code, err.message, err.details ?? {});
         this.ctx.log.error("api error", { path: path.join("/"), error: (err as Error).message });
         return fail(500, "internal_error", `服务器出错：${(err as Error).message}`);
       }
@@ -435,7 +435,9 @@ class FamilyHealthApi implements RomeAppApiHandler {
       const name = (req.query.get("name") ?? "upload").slice(0, 200);
       const stem = `f${String(r.sourceFiles.length).padStart(2, "0")}-${Date.now().toString(36)}`;
       const processed = await processUploadIsolated(body, name, reportDir(r.id), stem).catch((err: Error) => {
-        throw new UserFacingError(err.message, "upload_failed");
+        // mupdf/libheif errors are English; keep them as detail behind a Chinese message.
+        const msg = /[\u4e00-\u9fff]/.test(err.message) ? err.message : `无法读取文件“${name}”，可能已损坏或不是有效的 PDF/图片（${err.message}）`;
+        throw new UserFacingError(msg, "upload_failed");
       });
       const updated = s().appendSourceFile(r.id, { name, path: processed.sourcePath, mime: processed.mime, size: body.byteLength }, processed.pages)!;
       // New pages invalidate a previous extraction.
@@ -620,6 +622,13 @@ class FamilyHealthApi implements RomeAppApiHandler {
     const m = this.store.getMember(memberId);
     return m?.sex === "male" || m?.sex === "female" ? m.sex : null;
   }
+}
+
+/** HTTP status for a user-facing error code. */
+export function statusFor(code: string): number {
+  if (code.endsWith("_not_found")) return 404;
+  if (["busy", "report_confirmed", "invalid_status", "not_confirmed", "duplicate_member"].includes(code)) return 409;
+  return 400;
 }
 
 /** For manual rows without an explicit code, use the deterministic mapping by name. */
