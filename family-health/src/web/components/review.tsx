@@ -218,7 +218,7 @@ export function EditableCell({
       aria-label={label}
       inputMode={inputMode}
       disabled={disabled}
-      className={className}
+      className={`w-full min-w-0 ${className}`}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
