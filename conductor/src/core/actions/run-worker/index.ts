@@ -13,6 +13,8 @@ import { createSettingsRepository } from "../../db/repositories/settings.js";
 import { startHeartbeatTimer } from "../../lib/worker-health.js";
 import { type DispatchedFact, isWorkerTerminalKind } from "../../lib/facts.js";
 import { parseWorkerReply } from "../../lib/worker-reply.js";
+import { externalizeReport } from "../../lib/worker-report.js";
+import { foldTask } from "../../lib/fold.js";
 import { workspaceKind } from "../../lib/workspaces.js";
 
 interface SummonSessionStartedEvent {
@@ -83,9 +85,25 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         restarted = run.restarted;
         if (run.ok) {
           const parsed = parseWorkerReply(run.reply);
+          // Handoffs carry references, not content: store the full report and
+          // keep only the result, the structured detail, and its reference.
+          const archive = composition.archiveWorkerReport;
+          const { fields, archiveError } = await externalizeReport(parsed, archive
+            ? (report) => archive(foldTask(ledger.factsFor(taskId)), {
+              jobId: dispatched.payload.jobId,
+              workerId,
+              agent: dispatched.payload.agent,
+              status: parsed.status,
+              summary: parsed.summary,
+              detail: parsed.detail,
+              report,
+              returnedAt: new Date(),
+            })
+            : undefined);
+          if (archiveError) log.warn("worker report kept inline; storing it failed", { taskId, workerId, error: archiveError });
           const written = ledger.appendWorkerOutcome({
             taskId, kind: "Returned", by: workerId, source,
-            payload: { ...(dispatched.payload.jobId ? { jobId: dispatched.payload.jobId } : {}), workerId, ...parsed, sessionId: run.sessionId, ...(restarted ? { restarted } : {}) },
+            payload: { ...(dispatched.payload.jobId ? { jobId: dispatched.payload.jobId } : {}), workerId, ...fields, sessionId: run.sessionId, ...(restarted ? { restarted } : {}) },
           });
           outcome = written ? `Returned(${parsed.status})` : "dropped (worker already closed)";
         } else {

@@ -220,7 +220,10 @@ export function factBody(fact: FactJson): FactContent {
           .map(([k, v]) => `${k}: ${safeText(v as string)}`)
           .join("\n")
         : "";
-      const report = s("report") || s("detail");
+      const ref = p.reportRef && typeof p.reportRef === "object" && !Array.isArray(p.reportRef)
+        ? value(p.reportRef as Record<string, unknown>, "url")
+        : "";
+      const report = s("report") || s("detail") || (ref ? `[Full report](${ref})` : "");
       return { title: sentenceCase(value(p, "status")), body: s("summary"), extra: [detail, report].filter(Boolean).join("\n\n") || undefined };
     }
     case "Failed": return { title: "Work failed", body: s("error") };

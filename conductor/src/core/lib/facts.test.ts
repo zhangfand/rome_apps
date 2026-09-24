@@ -47,4 +47,18 @@ describe("fact prompt rendering", () => {
     const legacy = describeFact(returned({ detail: "Old free-form text." }), { full: true });
     expect(legacy).toContain("worker w-1 blocked: Two readings.\nOld free-form text.");
   });
+
+  it("cites a stored worker report instead of repeating it", () => {
+    const fact = {
+      seq: 21, id: "f21", taskId: "t1", kind: "Returned", by: "w-1",
+      createdAt: new Date("2026-09-24T03:00:00Z"),
+      payload: {
+        workerId: "w-1", status: "blocked", summary: "Two readings.", detail: { needs: "pm" },
+        reportRef: { repo: "acme/work", path: "_conductor/tasks/t1/reports/w-1.md", commit: "abc123", sha256: "d", bytes: 9, url: "https://x" },
+      },
+    } as Fact;
+    const rendered = describeFact(fact, { full: true });
+    expect(rendered).toContain("needs: pm");
+    expect(rendered).toContain("Full report: acme/work@abc123:_conductor/tasks/t1/reports/w-1.md");
+  });
 });

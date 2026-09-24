@@ -68,9 +68,10 @@ describe("Conductor agent boundaries", () => {
     expect(prose).not.toContain("technical-spec.md");
     expect(prose).toContain("Hand every request that changes code to `conductor:coder` first");
     expect(prose).toContain("Do not route a request to PM or to a prototype on your own judgment");
-    expect(prose).toContain("`needs: pm` — create a `conductor:pm` Job carrying the coder's question and code findings");
-    expect(prose).toContain("`needs: prototype-review` — pass the prototype's handoff to the person");
-    expect(prose).toContain("`needs: person` — ask the person the coder's question");
+    // Routing is a responsibility, not a case table.
+    expect(prose).toContain("A coder's `needs` detail names who must act before it can continue");
+    expect(prose).toContain("Bring that party in with the coder's report cited so no one repeats its research");
+    expect(prose).not.toContain("`needs: pm` —");
     // The lead says what to route; the coder's own prompt says how to prototype.
     expect(prose).not.toContain("feasibility-prototype");
     const coder = read("coder.yaml").replace(/\s+/g, " ");
@@ -84,7 +85,7 @@ describe("Conductor agent boundaries", () => {
     expect(coder).toContain("`pnpm dev:all`) on the `devbox` remote computer through `rome-node device run`");
     const integration = readFileSync(path.resolve(here, "../skills/feasibility-prototype/INTEGRATION.md"), "utf8");
     expect(integration).toContain("never borrow its cloud identity, tokens, or relay");
-    expect(read("pm.yaml").replace(/\s+/g, " ")).toContain("When a Job carries a coder's question and code findings, start from them");
+    expect(read("pm.yaml").replace(/\s+/g, " ")).toContain("When a Job cites a coder's report, read it at the cited commit");
     expect(prose).toContain("until their reply before starting production implementation");
     expect(prose).toContain("do not create polling or periodic check-in Jobs");
     expect(prose).toContain("A prototype is not a production delivery");
@@ -319,8 +320,16 @@ describe("Conductor worker Agents", () => {
     expect(lead).toContain("End every wake with exactly one decision action.");
     for (const agent of ["conductor:pm", "conductor:coder", "conductor:assistant"]) expect(lead).toContain(`\`${agent}\``);
     expect(lead).toContain("do not tell it where to work or how to reply");
-    expect(lead).toContain("cite its path and commit instead of restating it");
     expect(lead).not.toContain("write it to the work repo first");
+    // Handoffs carry references, not content.
+    expect(lead).toContain("Hand work over by reference, never by restating it");
+    expect(lead).toContain("Read that report only when the summary and detail do not settle your decision");
+    expect(lead).toContain("give a one-line summary and cite its path and commit");
+    const coder = flat(read("coder.yaml"));
+    expect(coder).toContain("Read what a Job cites (a product spec, a report, a brief) at the cited commit");
+    expect(coder).toContain("pr: <URL of the pull request this Job opened or updated>");
+    const agentsDoc = flat(readFileSync(path.resolve(here, "../../../AGENTS.md"), "utf8"));
+    expect(agentsDoc).toContain("Handoffs carry references, not content");
     const replay = flat(read("engineer-lead-replay-v1.yaml"));
     expect(replay).toContain("The source ledger was deliberately not copied");
     expect(replay).not.toContain("assistant:assistant");

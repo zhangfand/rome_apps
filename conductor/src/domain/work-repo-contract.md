@@ -33,7 +33,9 @@ Tasks or Jobs contribute to it:
 │   ├── technical-spec.md # optional: durable engineering knowledge
 │   └── artifacts/    # optional supporting evidence that merits its own file
 ├── _conductor/           # runtime-owned Task context
-│   └── tasks/<task-id>/snapshot.md
+│   └── tasks/<task-id>/
+│       ├── snapshot.md
+│       └── reports/<worker-id>.md
 ├── _experiments/         # isolated, non-canonical replay/prompt experiments
 │   └── replays/<task-id>/technical-spec.md
 └── _evidence/        # runtime-owned snapshots of external payloads
@@ -65,6 +67,10 @@ Tasks or Jobs contribute to it:
   Snapshot fact cites its exact repository commit and remains authoritative for
   identity, ordering, and ledger coverage; this pinned file contains the
   compacted state body. Agents may read this file but must not edit it.
+- `_conductor/tasks/<task-id>/reports/<worker-id>.md` is runtime-owned. It
+  holds one worker run's full report; that run's Returned fact cites it by
+  exact commit instead of carrying the text. Agents read it at the cited
+  commit and must not edit it.
 - `_experiments/replays/<task-id>/technical-spec.md` is used only by a Task replay that
   explicitly names that path. It isolates prompt/decomposition experiments
   from the canonical workstream `technical-spec.md`. A replay may update its own file,

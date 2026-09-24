@@ -1,6 +1,7 @@
 import type { RomeAppContext } from "@rome-os/app-runtime";
 import type { SourceAdapter } from "./adapters.js";
 import type { ConfigParser, ConductorConfig } from "./config.js";
+import type { PinnedArtifactRef, WorkerStatus } from "./facts.js";
 import type { TaskView } from "./fold.js";
 import type { ProjectConfig } from "./projects.js";
 import type { WorkspaceKind, WorkspaceProvider } from "./workspaces.js";
@@ -18,6 +19,17 @@ export interface TaskSnapshotMirrorRef {
   sha256: string;
   bytes: number;
   url: string;
+}
+
+export interface WorkerReportInput {
+  jobId?: string;
+  workerId: string;
+  agent: string;
+  status: WorkerStatus;
+  summary: string;
+  detail?: Record<string, string>;
+  report: string;
+  returnedAt: Date;
 }
 
 /** An app-owned, guardian-only read attached beneath one task. */
@@ -49,6 +61,12 @@ export interface CoreComposition {
     generatedAt: Date;
     summary: string;
   }): Promise<TaskSnapshotMirrorRef | undefined>;
+  /**
+   * Optional domain-owned store for a worker's full report. When it returns a
+   * reference, the Returned fact carries that reference instead of the text,
+   * so later prompts cite the report rather than repeat it.
+   */
+  archiveWorkerReport?(task: TaskView, input: WorkerReportInput): Promise<PinnedArtifactRef | undefined>;
   /** Read and verify the body of a previously archived reference-only Snapshot. */
   readTaskSnapshot?(task: TaskView, ref: TaskSnapshotMirrorRef): Promise<string>;
   projectPresentation?(project: ProjectConfig | TaskView["project"] | undefined, config?: ConductorConfig): { repo?: string; subtitle?: string; workRepo?: { repo: string; url: string }; sourceEnabled?: boolean; sourceLabel?: string; sourceValue?: string; emptySubtitle?: string };

@@ -9,6 +9,7 @@ import { workRepoPromptNote } from "../domain/work-repo.js";
 import { createWorkRepoConfigRoute, setupWorkRepoConfigRoute } from "../domain/config/work-repo.js";
 import { githubRepositoriesConfigRoute } from "../domain/config/github-repositories.js";
 import { archiveTaskSnapshot, readArchivedTaskSnapshot } from "../domain/task-snapshot-artifact.js";
+import { archiveWorkerReport } from "../domain/worker-report-artifact.js";
 
 export const APP_COMPOSITION: CoreComposition = {
   parseConfig: parseAppConfig,
@@ -20,6 +21,7 @@ export const APP_COMPOSITION: CoreComposition = {
   projectPromptNote: (task, audience) => `${githubPromptNote(task, audience)}${workRepoPromptNote(task, audience)}`,
   archiveTaskSnapshot,
   readTaskSnapshot: readArchivedTaskSnapshot,
+  archiveWorkerReport,
   projectPresentation: githubPresentation,
   mergeConfig: mergeAppConfig,
   initialConfig: initialAppConfig,

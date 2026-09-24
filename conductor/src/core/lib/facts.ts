@@ -251,13 +251,28 @@ export type DispatchedFact = FactOf<"Dispatched", {
 }>;
 export type JobFailedFact = FactOf<"JobFailed", { jobId: string; agent: string; error: string }>;
 export type OpenedFact = FactOf<"Opened", { jobId?: string; workerId: string; romeSessionId: string; sessionType: string }>;
+/** An immutable file in a work repository, pinned to the commit that wrote it. */
+export interface PinnedArtifactRef {
+  repo: string;
+  path: string;
+  commit: string;
+  sha256: string;
+  bytes: number;
+  url: string;
+}
+
 export type ReturnedFact = FactOf<"Returned", {
   jobId?: string;
   workerId: string;
   status: WorkerStatus;
   summary: string;
-  /** The worker's free-form report: everything it said before the reply block. */
+  /**
+   * The worker's free-form report: everything it said before the reply block.
+   * Kept inline only when the runtime could not move it to `reportRef`.
+   */
   report?: string;
+  /** Where the runtime stored the worker's full report instead of the ledger. */
+  reportRef?: PinnedArtifactRef;
   /**
    * Job-specific structured result from the reply block's `detail:` section,
    * e.g. `{ needs: "pm" }`. Facts written before `report` existed carry the
@@ -383,7 +398,10 @@ export function describeFact(fact: Fact, opts: { full?: boolean } = {}): string 
         const detail = returnedDetail(fact.payload);
         const detailText = detail ? `\ndetail:\n${formatReturnedDetail(detail, "  ")}` : "";
         const report = returnedReport(fact.payload);
-        const reportText = report ? `\n${opts.full ? report : clip(report, 1500)}` : "";
+        const reportRef = describeArtifactRef(fact.payload.reportRef);
+        const reportText = report
+          ? `\n${opts.full ? report : clip(report, 1500)}`
+          : reportRef ? `\nFull report: ${reportRef}` : "";
         return `worker ${fact.payload.workerId} ${fact.payload.status}: ${fact.payload.summary}${detailText}${reportText}`;
       }
       case "Failed":

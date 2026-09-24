@@ -67,9 +67,16 @@ than one Run/attempt over its lifetime.
 | worker id | `Opened`, `Returned`, `Failed` |
 | `conductor:ledger-compactor` | `Snapshot` |
 
-`Returned` is semi-structured: `status ∈ succeeded | failed | blocked |
-waiting | unparsed`, a one-paragraph `summary`, free `detail`. Nothing is
-rejected; an unparseable reply is recorded as `unparsed` with the raw text.
+`Returned` is semi-structured: the generic result `status ∈ succeeded |
+failed | blocked | waiting | unparsed` and a one-paragraph `summary`, plus an
+optional job-specific structured `detail` (for a coder, `pr`, `needs`,
+`next`). The worker's free-form report is not copied into the ledger: runtime
+stores it at `_conductor/tasks/<task-id>/reports/<worker-id>.md` in the work
+repository and the fact carries a pinned `reportRef` (inline `report` only
+without a work repository or when storing fails). Handoffs carry references,
+not content — see `AGENTS.md`. Nothing is rejected; an unparseable reply is
+recorded as `unparsed` with the raw text. Older facts may hold the free-form
+report as a string `detail`.
 
 Historical ledgers may also contain `Waited` decisions from the retired timed-wait
 action. They remain readable so existing Tasks and history do not need a data

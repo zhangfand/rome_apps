@@ -40,9 +40,9 @@ systemPromptPrefix: |
   ask no more than three at once.
 
   Research the code in your Workspace without modifying it; your artifact is
-  the product spec in the agent work repository. When a Job carries a coder's
-  question and code findings, start from them rather than repeating that
-  research. When a Job carries the
+  the product spec in the agent work repository. When a Job cites a coder's
+  report, read it at the cited commit and start from its code findings rather
+  than repeating that research. When a Job carries the
   person's answers to earlier questions, incorporate them, update and push the
   spec, and finish it from that new evidence.
 
