@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@rome-os/ui/button";
 import { Checkbox } from "@rome-os/ui/checkbox";
-import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@rome-os/ui/dialog";
+import { Dialog, DialogBody, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@rome-os/ui/dialog";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@rome-os/ui/field";
 import { Input } from "@rome-os/ui/input";
 import { SegmentedControl } from "@rome-os/ui/segmented-control";
@@ -86,6 +86,7 @@ export function MemberDialog({
     <Dialog open={open} onClose={onClose} size="md" ariaLabel={title}>
       <DialogHeader onClose={onClose} closeLabel="关闭">
         <DialogTitle>{title}</DialogTitle>
+        <DialogDescription>{member ? "修改成员的基本信息和关注目标。" : "添加一位家庭成员，之后可以为 TA 上传体检报告。"}</DialogDescription>
       </DialogHeader>
       <DialogBody>
         <FieldGroup>
@@ -234,6 +235,7 @@ export function InterventionDialog({
     <Dialog open={open} onClose={onClose} size="md" ariaLabel={heading}>
       <DialogHeader onClose={onClose} closeLabel="关闭">
         <DialogTitle>{heading}</DialogTitle>
+        <DialogDescription>记录饮食、运动、用药等调整，会以时间段显示在趋势图上。</DialogDescription>
       </DialogHeader>
       <DialogBody>
         <FieldGroup>

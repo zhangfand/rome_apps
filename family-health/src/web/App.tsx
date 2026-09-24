@@ -1,4 +1,5 @@
 import "./styles.css";
+import { useRef } from "react";
 import type { RomeAppBootstrap } from "@rome-os/app-web-sdk";
 import { Page, PageNav, PageNavLink } from "@rome-os/ui/page";
 import { Toaster } from "@rome-os/ui/sonner";
@@ -7,6 +8,7 @@ import { TooltipProvider } from "@rome-os/ui/tooltip";
 import { Disclaimer } from "./components/common";
 import { useApi } from "./lib/hooks";
 import { MetaContext } from "./lib/meta";
+import { useRadixShadowIdShim } from "./lib/shadow-id-shim";
 import { Link, paths, useRoute, type Route } from "./lib/router";
 import { ThemeColorsProvider } from "./lib/theme";
 import type { Meta } from "./lib/types";
@@ -62,12 +64,14 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
   const route = useRoute();
   const meta = useApi<Meta>("meta");
   const active = section(route);
+  const anchor = useRef<HTMLDivElement>(null);
+  useRadixShadowIdShim(anchor);
   return (
     <ThemeColorsProvider>
       <TimestampProvider locale="zh-CN">
       <TooltipProvider>
         <MetaContext.Provider value={meta.data}>
-          <Page className="min-h-full bg-[var(--app-canvas)]">
+          <Page ref={anchor} className="min-h-full bg-[var(--app-canvas)]">
             <PageNav aria-label="家庭体检助手导航" className="mb-2 overflow-x-auto">
               <PageNavLink asChild active={active === "overview"}>
                 <Link to={paths.overview()}>家庭总览</Link>
