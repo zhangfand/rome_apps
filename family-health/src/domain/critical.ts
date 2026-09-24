@@ -118,6 +118,10 @@ export interface CriticalAlert {
   value: number;
   unit: string;
   message: string;
+  /** Where the value came from: a checkup report (default) or a home measurement. */
+  source?: "report" | "measurement";
+  /** Measurement date for home-measurement alerts. */
+  date?: string;
 }
 
 function hit(rule: Rule, value: number): boolean {

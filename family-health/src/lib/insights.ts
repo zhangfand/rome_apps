@@ -364,7 +364,7 @@ export function coerceTrendInsight(raw: unknown): TrendInsight {
 
 /** Causal phrasing we never allow about interventions and indicator changes. */
 const CAUSAL_RE =
-  /导致|致使|使得|造成了?|归功于|得益于|多亏|因为[^。；;]{0,30}所以|由于[^。；;]{0,30}(下降|升高|改善|好转|降低|回落|变好|变差)|(饮食|运动|快走|跑步|控制|调整|干预|用药|服药|药物|减重|减肥|戒酒|戒烟)[^。；;]{0,15}(降低了|改善了|使其|让[^。；;]{0,6}(下降|降低|改善))|有效(地)?(降低|改善|控制|逆转)|起到了?[^。；;]{0,6}作用|证明了?|说明[^。；;]{0,10}(有效|起效|见效)/;
+  /导致|致使|使得|造成了?|归功于|得益于|多亏|因为[^。；;]{0,30}所以|由于[^。；;]{0,30}(下降|升高|改善|好转|降低|回落|变好|变差)|(饮食|运动|快走|跑步|控制|调整|干预|用药|服药|药物|减重|减肥|戒酒|戒烟)[^。；;]{0,15}(降低了|改善了|使其|让[^。；;]{0,6}(下降|降低|改善))|有效(地)?(降低|改善|控制|逆转)|起(到|了)了?[^。；;]{0,6}(作用|效果)|发挥了?[^。；;]{0,6}作用|奏效|见成效|收到了?[^。；;]{0,4}效果|证明了?|说明[^。；;]{0,20}(有效|起效|见效|作用|奏效|成效|效果)/;
 
 export function findCausalPhrases(text: string): string[] {
   const out: string[] = [];
@@ -479,3 +479,23 @@ export function reportAlerts(store: FamilyHealthStore, reportId: string) {
   return built ? { alerts: built.alerts, findingAlerts: built.findingAlerts } : { alerts: [], findingAlerts: [] };
 }
 
+
+/**
+ * Apply the causal-language guard to a stored insight as it is served, so
+ * interpretations generated before a guard improvement (or edited in the DB)
+ * never show causal claims about interventions.
+ */
+export function guardStoredInsight<T extends { scope: string; status: string; content: unknown; markdown: string | null }>(row: T | undefined | null): T | null {
+  if (!row) return null;
+  if (row.status !== "ready" || !row.content || typeof row.content !== "object") return row;
+  if (row.scope === "report") {
+    const content = stripReportCausal(row.content as ReportInsight);
+    return { ...row, content, markdown: reportMarkdown(content) };
+  }
+  const t = row.content as TrendInsight;
+  if (Array.isArray(t.observations) && hasCausalLanguage(t)) {
+    const content = stripCausal(t);
+    return { ...row, content, markdown: null };
+  }
+  return row;
+}

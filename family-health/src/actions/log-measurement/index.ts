@@ -18,10 +18,24 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
     schema,
     execute: async (input) =>
       run(deps, () => {
-        const { member, measurements } = logMeasurement(storeFrom(deps), { ...input, createdVia: "chat" });
+        const { member, measurements, alerts } = logMeasurement(storeFrom(deps), { ...input, createdVia: "chat" });
+        const urgent = alerts.some((a) => a.level === "urgent");
         return {
           member: { id: member.id, name: member.name, relation: member.relation },
           logged: measurements.map((m) => ({ id: m.id, indicator: getIndicator(m.indicatorCode)?.zh ?? m.indicatorCode, value: m.value, unit: m.unit, date: m.measuredAt })),
+          // Deterministic red flags (same rules as checkup reports). Must be relayed to the user verbatim.
+          alerts: alerts.map((a) => ({
+            level: a.level === "urgent" ? "建议尽快就医" : "建议近期就诊",
+            indicator: a.name,
+            value: a.value,
+            unit: a.unit,
+            message: a.message,
+          })),
+          ...(alerts.length
+            ? {
+                relay: `${urgent ? "【建议尽快就医】" : "【建议近期就诊】"}${alerts.map((a) => a.message).join(" ")} 请原样告诉用户，不要自行诊断；仅供参考，不能替代医生诊断。`,
+              }
+            : {}),
         };
       }),
   });

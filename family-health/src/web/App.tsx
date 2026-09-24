@@ -86,7 +86,7 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
             <main className="flex flex-col gap-6">
               <View route={route} />
             </main>
-            <footer className="mt-10 border-t border-border pt-4">
+            <footer className="mt-10 mb-20 border-t border-border pt-4 sm:mb-0">
               <Disclaimer />
             </footer>
           </Page>

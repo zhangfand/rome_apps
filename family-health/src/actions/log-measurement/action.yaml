@@ -8,6 +8,8 @@ description: >-
   例：“老婆今天称了62.5” → {"member":"老婆","indicator":"体重","value":62.5,"unit":"kg"}；
   “我爸早上血压135/85” → {"member":"爸爸","indicator":"血压","value":"135/85"}。
   单位不明确（如只说“血糖7.8”但不确定单位）时先问用户。
+  返回结果里如有 alerts（如血压 ≥180/110 时的“建议尽快就医”），必须把 message 原样告诉用户，不要自行诊断。
+  数值超出生理可能范围（如体重 7000 kg）会返回错误 value_out_of_range 并给出可接受范围，请向用户确认数值和单位后重试。
 entry: ./index.ts
 complexity: simple
 speed: fast

@@ -141,6 +141,17 @@ function rowTone(row: ResultRow) {
   return { lowConfidence, tone: !row.indicatorCode ? "bg-warning-bg" : lowConfidence ? "bg-info-bg" : "" };
 }
 
+/** Marks rows a reviewer changed, with the value as first extracted for provenance. */
+function EditedNote({ row }: { row: ResultRow }) {
+  if (!row.edited) return null;
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+      <Badge variant="outline">已修改</Badge>
+      {row.originalRawValue != null && row.originalRawValue !== row.rawValue ? <span>识别原文：{row.originalRawValue}</span> : null}
+    </div>
+  );
+}
+
 function MappingCell({ row, patch }: { row: ResultRow; patch: (b: Record<string, unknown>) => Promise<void> }) {
   const { lowConfidence } = rowTone(row);
   return (
@@ -167,10 +178,11 @@ function ResultEditRow({ row, mutate, onJump }: { row: ResultRow; mutate: Mutate
           {row.page ? `第 ${row.page} 页` : "手动添加"}
           {row.section ? ` · ${row.section}` : ""}
         </div>
+        <EditedNote row={row} />
       </TableCell>
       <TableCell className="align-top px-2">
         <div className="flex items-center gap-1.5">
-          <EditableCell value={row.rawValue} label={`${row.rawName} 结果`} onSave={(v) => patch({ rawValue: v })} />
+          <EditableCell value={row.displayValue} label={`${row.rawName} 结果`} onSave={(v) => patch({ rawValue: v })} />
           <FlagBadge flag={row.flag} direction={row.direction} className="shrink-0" />
         </div>
       </TableCell>
@@ -202,6 +214,7 @@ function ResultEditCard({ row, mutate, onJump }: { row: ResultRow; mutate: Mutat
             {row.page ? `第 ${row.page} 页（点击查看）` : "手动添加"}
             {row.section ? ` · ${row.section}` : ""}
           </div>
+          <EditedNote row={row} />
         </button>
         <div className="flex shrink-0 items-center gap-1">
           <FlagBadge flag={row.flag} direction={row.direction} />
@@ -209,7 +222,7 @@ function ResultEditCard({ row, mutate, onJump }: { row: ResultRow; mutate: Mutat
         </div>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <EditableCell value={row.rawValue} label={`${row.rawName} 结果`} onSave={(v) => patch({ rawValue: v })} />
+        <EditableCell value={row.displayValue} label={`${row.rawName} 结果`} onSave={(v) => patch({ rawValue: v })} />
         <EditableCell value={row.rawUnit} label={`${row.rawName} 单位`} onSave={(v) => patch({ rawUnit: v })} />
         <EditableCell value={row.refText ?? ""} label={`${row.rawName} 参考范围`} onSave={(v) => patch({ refText: v })} />
       </div>
@@ -372,7 +385,7 @@ function InsightSection({ detail, mutate }: { detail: ReportDetail; mutate: Muta
             </SectionDescription>
           ) : null}
         </SectionHeading>
-        <SectionActions>
+        <SectionActions className="w-full sm:w-auto">
           {ins?.status === "ready" || ins?.status === "failed" ? (
             <Button variant="outline" size="sm" onClick={() => void regenerate(true)}>
               <RefreshCw /> 重新生成
@@ -616,7 +629,7 @@ export function ReportDetailView({ reportId }: { reportId: string }) {
             </SectionHeader>
             <FindingsEditor detail={data} mutate={mutate} meta={meta} activePage={page} />
           </Section>
-          <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 border-t border-border bg-[var(--app-canvas)] py-3 pr-16">
+          <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 border-t border-border bg-[var(--app-canvas)] py-3 pr-16 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {confirmBlocked ? <span className="text-sm text-warning-fg">{confirmBlocked}</span> : <span className="text-sm text-muted-foreground">确认后数据会计入趋势，并自动生成 AI 解读。</span>}
             <Button onClick={() => void confirm()} disabled={!!confirmBlocked || busy}>
               {busy ? <Spinner size="sm" /> : <CheckCircle2 />} 确认报告

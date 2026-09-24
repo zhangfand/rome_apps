@@ -15,6 +15,7 @@
 import { detectFindings, isNormalConclusion, parseSeverity, severityLabel } from "../domain/findings.js";
 import { INDICATORS, getIndicator } from "../domain/indicators.js";
 import { normalizeRow, splitCompoundRow, type NormalizedRow } from "../domain/normalize.js";
+import { checkPlausible } from "../domain/plausibility.js";
 import type { Sex } from "../domain/types.js";
 import type { FamilyHealthStore, FindingInsert, ResultInsert } from "../db/repositories/store.js";
 import type { PageImage } from "../db/schema.js";
@@ -267,7 +268,8 @@ export async function runExtraction(reportId: string, deps: ExtractionDeps): Pro
       flag: c.norm.flag,
       section: c.row.section,
       page: c.row.page,
-      confidence: c.norm.match ? CONFIDENCE[c.norm.match] ?? null : null,
+      // A physiologically impossible value (misread digit / unit) is marked for review.
+      confidence: c.norm.match ? (checkPlausible(c.norm.indicatorCode, c.norm.valueNum) ? 0.5 : CONFIDENCE[c.norm.match] ?? null) : null,
       source: "extracted",
       confirmed: false,
       sortOrder: resultRows.length,

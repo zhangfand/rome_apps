@@ -49,7 +49,7 @@ function TrendInsightView({ memberId, code, initial }: { memberId: string; code:
         <SectionHeading>
           <SectionTitle>AI 趋势解读</SectionTitle>
         </SectionHeading>
-        <SectionActions>
+        <SectionActions className="w-full sm:w-auto">
           {content && insight?.status === "ready" ? (
             <Button variant="outline" size="sm" onClick={() => void generate(true)} disabled={starting || pending}>
               <RefreshCw /> 重新生成

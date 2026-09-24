@@ -199,6 +199,11 @@ export interface ResultRow {
   direction: string | null;
   rawName: string;
   rawValue: string;
+  /** Printed value without its ↑/↓/H/L marker. */
+  displayValue: string;
+  edited: boolean;
+  /** Value as first extracted, kept once a reviewer edits the row. */
+  originalRawValue: string | null;
   valueNum: number | null;
   valueText: string | null;
   rawUnit: string;

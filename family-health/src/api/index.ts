@@ -12,11 +12,13 @@ import { FINDINGS, getFinding } from "../domain/findings.js";
 import { CATEGORIES, INDICATORS, getIndicator } from "../domain/indicators.js";
 import { mapIndicator, searchIndicators } from "../domain/mapping.js";
 import { GOAL_PANELS, getPanel, sanitizeGoals } from "../domain/panels.js";
+import { checkPlausible } from "../domain/plausibility.js";
 import { RELATIONS } from "../domain/types.js";
+import { stripValueMarker } from "../domain/values.js";
 import { FamilyHealthStore, type FindingRow, type ReportRow, type ResultRow } from "../db/repositories/store.js";
 import { normalizeExamDate, resolveDate, todayIso } from "../lib/dates.js";
 import { STALE_EXTRACTION_MS, isStaleExtraction, renormalizeResult } from "../lib/extraction.js";
-import { reportAlerts } from "../lib/insights.js";
+import { guardStoredInsight, reportAlerts } from "../lib/insights.js";
 import { processUploadIsolated } from "../lib/media-runner.js";
 import { clearDemoData, seedDemoData } from "../lib/seed.js";
 import {
@@ -97,6 +99,10 @@ function publicResult(r: ResultRow) {
     direction: def?.direction ?? null,
     rawName: r.rawName,
     rawValue: r.rawValue,
+    /** The printed value without its ↑/↓/H/L marker, for the editable field. */
+    displayValue: stripValueMarker(r.rawValue),
+    edited: r.edited,
+    originalRawValue: r.originalRawValue,
     valueNum: r.valueNum,
     valueText: r.valueText,
     rawUnit: r.rawUnit,
@@ -127,7 +133,7 @@ function reportDetail(store: FamilyHealthStore, r: ReportRow) {
     findings: store.listReportFindings(r.id).map(publicFinding),
     alerts,
     findingAlerts,
-    insight: store.getInsight("report", r.id) ?? null,
+    insight: guardStoredInsight(store.getInsight("report", r.id)),
     disclaimer: DISCLAIMER,
   };
 }
@@ -162,11 +168,21 @@ class FamilyHealthApi implements RomeAppApiHandler {
   async handle(request: RomeAppApiRequest): Promise<Response> {
     await syncGuardianTimeZone(this.ctx);
     const path = request.path.filter(Boolean);
+    const caller = request.caller;
     if (request.method === "GET" && path.join("/") === "status") {
-      return json({ appId: this.ctx.app.id, version: this.ctx.app.version, status: "ok" });
+      return json({
+        appId: this.ctx.app.id,
+        version: this.ctx.app.version,
+        status: "ok",
+        // Identity as resolved by the Rome host (never from request headers).
+        caller: caller ? { kind: caller.kind, ...(caller.kind === "guardian" ? { via: caller.via } : {}) } : null,
+      });
     }
-    if (request.caller && request.caller.kind !== "guardian") {
-      return fail(403, "forbidden", "家庭健康数据仅限主人访问");
+    // Owner-only app: the host resolves the caller before we run. Fail closed
+    // if it is missing or anything other than the guardian (dashboard session
+    // or trusted in-container loopback caller).
+    if (!caller || caller.kind !== "guardian") {
+      return fail(401, "guardian_only", "家庭健康数据仅限本机主人访问，请从 Rome 仪表盘打开。");
     }
     for (const route of this.routes) {
       if (route.method !== request.method || route.parts.length !== path.length) continue;
@@ -365,7 +381,7 @@ class FamilyHealthApi implements RomeAppApiHandler {
     });
     this.on("POST", "members/:id/measurements", (req, p) => {
       const b = readJson(req);
-      const { measurements } = logMeasurement(s(), {
+      const { measurements, alerts } = logMeasurement(s(), {
         member: this.member(p.id).id,
         indicator: optStr(b.indicator) ?? "",
         value: typeof b.value === "number" ? b.value : optStr(b.value) ?? "",
@@ -374,7 +390,7 @@ class FamilyHealthApi implements RomeAppApiHandler {
         note: optStr(b.note) ?? "",
         createdVia: "ui",
       });
-      return json({ measurements }, 201);
+      return json({ measurements, alerts }, 201);
     });
     this.on("DELETE", "measurements/:id", (_req, p) => json({ deleted: s().deleteMeasurement(p.id) }));
 
@@ -502,6 +518,7 @@ class FamilyHealthApi implements RomeAppApiHandler {
       if (!rawName || rawValue == null) throw new UserFacingError("请填写项目名称和结果", "missing_fields");
       const sex = this.memberSex(r.memberId);
       const norm = renormalizeResult({ rawName, rawValue, rawUnit: optStr(b.rawUnit) ?? "", refText: optStr(b.refText), indicatorCode: optStr(b.indicatorCode) ?? mapOnly(rawName) }, sex);
+      assertPlausible(norm.indicatorCode, norm.valueNum);
       const existing = s().listReportResults(r.id);
       s().insertResults([
         {
@@ -536,7 +553,18 @@ class FamilyHealthApi implements RomeAppApiHandler {
       };
       if (next.indicatorCode && !getIndicator(next.indicatorCode)) throw new UserFacingError("未知指标代码", "indicator_not_found");
       const norm = renormalizeResult(next, this.memberSex(row.memberId));
-      s().updateResult(p.id, { rawName: next.rawName, rawValue: next.rawValue, rawUnit: next.rawUnit, refText: next.refText, ...norm, confidence: "indicatorCode" in b ? 1 : row.confidence });
+      assertPlausible(norm.indicatorCode, norm.valueNum);
+      const changed =
+        next.rawName !== row.rawName || next.rawValue !== row.rawValue || next.rawUnit !== row.rawUnit || (next.refText ?? null) !== (row.refText ?? null) || next.indicatorCode !== row.indicatorCode;
+      s().updateResult(p.id, {
+        rawName: next.rawName,
+        rawValue: next.rawValue,
+        rawUnit: next.rawUnit,
+        refText: next.refText,
+        ...norm,
+        confidence: "indicatorCode" in b ? 1 : row.confidence,
+        ...(changed ? { edited: true, originalRawValue: row.originalRawValue ?? row.rawValue } : {}),
+      });
       return json(reportDetail(s(), this.report(row.reportId)));
     });
     this.on("DELETE", "results/:id", (_req, p) => {
@@ -588,7 +616,7 @@ class FamilyHealthApi implements RomeAppApiHandler {
     this.on("GET", "insights", (req) => {
       const scope = req.query.get("scope") ?? "";
       const id = req.query.get("id") ?? "";
-      return json({ insight: s().getInsight(scope, id) ?? null });
+      return json({ insight: guardStoredInsight(s().getInsight(scope, id)) });
     });
     this.on("POST", "insights", async (req) => {
       const b = readJson(req);
@@ -636,6 +664,12 @@ export function statusFor(code: string): number {
   if (code.endsWith("_not_found")) return 404;
   if (["busy", "report_confirmed", "invalid_status", "not_confirmed", "duplicate_member"].includes(code)) return 409;
   return 400;
+}
+
+/** Reject reviewer-entered values outside hard physiological limits (typos / unit mix-ups). */
+function assertPlausible(code: string | null, valueNum: number | null) {
+  const issue = checkPlausible(code, valueNum);
+  if (issue) throw new UserFacingError(issue.message, "value_out_of_range", { accepted: { min: issue.min, max: issue.max, unit: issue.unit } });
 }
 
 /** For manual rows without an explicit code, use the deterministic mapping by name. */

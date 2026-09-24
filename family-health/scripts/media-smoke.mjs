@@ -5,7 +5,8 @@
  * Imports dist/lib/media.js exactly the way the Rome daemon loads app code
  * (native import() with a cache-busting query), generates a synthetic
  * multi-page PDF (and a HEIC photo when ImageMagick is available), and
- * renders them into ./spike-out (git-ignored). Nothing leaves the machine.
+ * renders them into a scratch dir OUTSIDE the repo (FH_SCRATCH_DIR, default
+ * ../../default/family-health-verification/scratch/spike-out). Nothing leaves the machine.
  *
  *   node scripts/media-smoke.mjs [pages=12]
  */
@@ -15,7 +16,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), "..");
-const out = join(appDir, "spike-out");
+const out = process.env.FH_SCRATCH_DIR ?? join(appDir, "../../default/family-health-verification/scratch/spike-out");
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 process.env.FAMILY_HEALTH_DATA_DIR = join(out, "data");

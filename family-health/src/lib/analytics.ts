@@ -10,10 +10,11 @@ import { checkCritical, checkFindingRedFlags, type CriticalAlert, type FindingAl
 import { ageAt, computeDerived } from "../domain/derived.js";
 import { getFinding, parseSeverity, severityLabel } from "../domain/findings.js";
 import { computeFlag, isConcerning } from "../domain/flags.js";
-import { CATEGORIES, defaultRange, getIndicator } from "../domain/indicators.js";
+import { CATEGORIES, INDICATORS, defaultRange, getIndicator } from "../domain/indicators.js";
 import { getPanel, panelIndicators } from "../domain/panels.js";
 import type { Flag, IndicatorDef, NumericRange, Sex } from "../domain/types.js";
 import type { DatedResult, FindingRow, InterventionRow, MeasurementRow, MemberRow } from "../db/repositories/store.js";
+import { daysBetween } from "./dates.js";
 
 export interface MemberCtx {
   sex: Sex | null;
@@ -283,11 +284,50 @@ export interface MemberOverview {
   findingAlerts: FindingAlert[];
 }
 
-export function memberOverview(member: MemberCtx & { goals: string[] }, snaps: ExamSnapshot[], findings: FindingRow[]): MemberOverview {
+/** Home measurements older than this no longer raise a red flag. */
+export const MEASUREMENT_ALERT_DAYS = 30;
+
+/**
+ * Deterministic red flags for home measurements (e.g. 血压 185/115 logged from
+ * chat): the latest measurement per indicator, if recent and not superseded
+ * by a checkup on the same day or later, goes through the same critical rules
+ * as report values.
+ */
+export function measurementAlerts(measurements: MeasurementRow[], snaps: ExamSnapshot[], sex: Sex | null, today: string): CriticalAlert[] {
+  const latestByCode = new Map<string, MeasurementRow>();
+  for (const m of measurements) {
+    const cur = latestByCode.get(m.indicatorCode);
+    const date = m.measuredAt.slice(0, 10);
+    if (!cur || date > cur.measuredAt.slice(0, 10) || (date === cur.measuredAt.slice(0, 10) && m.createdAt > cur.createdAt)) latestByCode.set(m.indicatorCode, m);
+  }
+  const out: CriticalAlert[] = [];
+  for (const m of latestByCode.values()) {
+    const date = m.measuredAt.slice(0, 10);
+    if (daysBetween(date, today) > MEASUREMENT_ALERT_DAYS) continue;
+    if (snaps.some((s) => s.examDate >= date && s.values.get(m.indicatorCode)?.value != null)) continue;
+    for (const a of checkCritical([{ code: m.indicatorCode, value: m.value }], { sex })) {
+      out.push({ ...a, source: "measurement", date, message: `家庭自测（${date}）${a.name} ${+a.value.toFixed(2)} ${a.unit}：${a.message}` });
+    }
+  }
+  // Stable, dictionary order (收缩压 before 舒张压).
+  const order = (code: string) => INDICATORS.findIndex((d) => d.code === code);
+  return out.sort((a, b) => order(a.code) - order(b.code));
+}
+
+const byLevel = (a: CriticalAlert, b: CriticalAlert) => (a.level === b.level ? 0 : a.level === "urgent" ? -1 : 1);
+
+export function memberOverview(
+  member: MemberCtx & { goals: string[] },
+  snaps: ExamSnapshot[],
+  findings: FindingRow[],
+  measurements: MeasurementRow[] = [],
+  today?: string,
+): MemberOverview {
   const latest = snaps.at(-1);
   const prev = snaps.at(-2);
+  const homeAlerts = today ? measurementAlerts(measurements, snaps, member.sex, today) : [];
   if (!latest) {
-    return { latestExamDate: null, latestReportId: null, examCount: 0, abnormalCount: 0, abnormal: [], topChanges: [], alerts: [], findingAlerts: [] };
+    return { latestExamDate: null, latestReportId: null, examCount: 0, abnormalCount: 0, abnormal: [], topChanges: [], alerts: homeAlerts, findingAlerts: [] };
   }
   const abnormal: MemberOverview["abnormal"] = [];
   for (const v of latest.values.values()) {
@@ -317,7 +357,8 @@ export function memberOverview(member: MemberCtx & { goals: string[] }, snaps: E
   }
   // Goal-panel indicators first, then biggest relative change.
   changes.sort((a, b) => Number(panelCodes.has(b.code)) - Number(panelCodes.has(a.code)) || Math.abs(b.pct) - Math.abs(a.pct));
-  const alerts = checkCritical([...latest.values.values()].map((v) => ({ code: v.code, value: v.value })), { sex: member.sex });
+  const reportAlerts = checkCritical([...latest.values.values()].map((v) => ({ code: v.code, value: v.value })), { sex: member.sex }).map((a) => ({ ...a, source: "report" as const }));
+  const alerts = [...reportAlerts, ...homeAlerts].sort(byLevel);
   const findingAlerts = findings
     .filter((f) => f.reportId === latest.reportId)
     .map((f) => checkFindingRedFlags({ findingKey: f.findingKey, severity: f.severity, rawText: f.rawText }))

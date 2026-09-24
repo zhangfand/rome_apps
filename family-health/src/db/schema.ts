@@ -116,6 +116,10 @@ export function createAppDbSchema(tablePrefix: string = "family_health") {
       page: integer("page"),
       confidence: real("confidence"),
       source: text("source").notNull().default("extracted"), // extracted | manual | derived
+      /** Set when a reviewer changed the value, unit, range or mapping of the row. */
+      edited: integer("edited", { mode: "boolean" }).notNull().default(false),
+      /** The value exactly as first extracted, kept for provenance once a reviewer edits it. */
+      originalRawValue: text("original_raw_value"),
       confirmed: integer("confirmed", { mode: "boolean" }).notNull().default(false),
       sortOrder: integer("sort_order").notNull().default(0),
       createdAt: integer("created_at", { mode: "timestamp" }).notNull(),

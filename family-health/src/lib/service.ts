@@ -4,7 +4,9 @@
  * compact query used by the chat agent, and dashboard read models.
  */
 import { rmSync } from "node:fs";
+import { checkCritical, type CriticalAlert } from "../domain/critical.js";
 import { ageAt } from "../domain/derived.js";
+import { checkPlausible } from "../domain/plausibility.js";
 import { getFinding } from "../domain/findings.js";
 import { isConcerning } from "../domain/flags.js";
 import { getIndicator } from "../domain/indicators.js";
@@ -163,8 +165,14 @@ export function endIntervention(
 export function logMeasurement(
   store: FamilyHealthStore,
   input: { member: string; indicator: string; value: string | number; unit?: string | null; date?: string; note?: string; createdVia?: string },
-): { member: MemberRow; measurements: MeasurementRow[] } {
+): { member: MemberRow; measurements: MeasurementRow[]; alerts: CriticalAlert[] } {
   const member = resolveMemberOrThrow(store, input.member);
+  const sex = member.sex === "male" || member.sex === "female" ? member.sex : null;
+  const withAlerts = (rows: MeasurementRow[]) => ({
+    member,
+    measurements: rows,
+    alerts: checkCritical(rows.map((r) => ({ code: r.indicatorCode, value: r.value })), { sex }).map((a) => ({ ...a, source: "measurement" as const, date: measuredAt })),
+  });
   const measuredAt = dateOrThrow(input.date, "date", true);
   const note = (input.note ?? "").trim();
   const via = input.createdVia ?? "chat";
@@ -172,13 +180,22 @@ export function logMeasurement(
   if (!raw) throw new UserFacingError("请提供测量数值。", "missing_value");
 
   // Blood pressure pairs: "128/82" with indicator 血压 / BP.
+  const isBp = /血压|bp|blood\s*pressure/i.test(input.indicator) && !/收缩|舒张|高压|低压/.test(input.indicator);
   const bp = splitBloodPressure(raw);
-  if (bp && /血压|bp|blood\s*pressure|收缩|舒张/i.test(input.indicator)) {
+  if (isBp && !bp) {
+    if (/\d+\s*\/\s*\d+/.test(raw)) {
+      throw new UserFacingError(`血压“${raw}”超出合理范围（收缩压 50–300、舒张压 20–200 mmHg，且收缩压应高于舒张压），请检查数值是否填错。`, "value_out_of_range", {
+        accepted: { SBP: [50, 300], DBP: [20, 200], unit: "mmHg" },
+      });
+    }
+    throw new UserFacingError(`血压请写成“收缩压/舒张压”，例如 128/82。`, "invalid_value");
+  }
+  if (bp && (isBp || /收缩|舒张/.test(input.indicator))) {
     const rows = [
       store.createMeasurement({ memberId: member.id, indicatorCode: "SBP", value: bp.sbp, unit: "mmHg", rawValue: raw, rawUnit: input.unit ?? "mmHg", measuredAt, note, createdVia: via }),
       store.createMeasurement({ memberId: member.id, indicatorCode: "DBP", value: bp.dbp, unit: "mmHg", rawValue: raw, rawUnit: input.unit ?? "mmHg", measuredAt, note, createdVia: via }),
     ];
-    return { member, measurements: rows };
+    return withAlerts(rows);
   }
 
   const def = resolveIndicatorOrThrow(input.indicator, input.unit);
@@ -191,6 +208,10 @@ export function logMeasurement(
   if (conv.status === "incompatible") {
     throw new UserFacingError(`单位“${unit}”无法换算为${def.zh}的标准单位 ${def.unit}。`, "incompatible_unit", { expectedUnit: def.unit });
   }
+  const implausible = checkPlausible(def.code, conv.value);
+  if (implausible) {
+    throw new UserFacingError(implausible.message, "value_out_of_range", { accepted: { min: implausible.min, max: implausible.max, unit: implausible.unit } });
+  }
   const row = store.createMeasurement({
     memberId: member.id,
     indicatorCode: def.code,
@@ -202,7 +223,7 @@ export function logMeasurement(
     note,
     createdVia: via,
   });
-  return { member, measurements: [row] };
+  return withAlerts([row]);
 }
 
 // ------------------------------------------------------------------ read models
@@ -215,7 +236,7 @@ export function loadMemberData(store: FamilyHealthStore, member: MemberRow) {
 
 export function memberCard(store: FamilyHealthStore, member: MemberRow, today = todayIso()) {
   const d = loadMemberData(store, member);
-  const overview = memberOverview({ ...d.ctx, goals: member.goals }, d.snaps, d.findings);
+  const overview = memberOverview({ ...d.ctx, goals: member.goals }, d.snaps, d.findings, d.measurements, todayIso());
   const pending = store.listReports({ memberId: member.id }).filter((r) => r.status !== "confirmed").length;
   return {
     member: publicMember(member, today),
@@ -260,7 +281,7 @@ export function queryMember(store: FamilyHealthStore, input: { member: string; i
   const from = input.from ? resolveDate(input.from) : null;
   const to = input.to ? resolveDate(input.to) : null;
   const inRange = (date: string) => (!from || date >= from) && (!to || date <= to);
-  const overview = memberOverview({ ...d.ctx, goals: member.goals }, d.snaps, d.findings);
+  const overview = memberOverview({ ...d.ctx, goals: member.goals }, d.snaps, d.findings, d.measurements, todayIso());
   const latest = d.snaps.at(-1);
 
   const out: Record<string, unknown> = {

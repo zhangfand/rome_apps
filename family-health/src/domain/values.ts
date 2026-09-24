@@ -48,6 +48,18 @@ function extractMarker(text: string): { rest: string; marker: ReportMarker | nul
 }
 
 /**
+ * The printed value without its flag marker (`6.4↑` → `6.4`, `↓0.92` → `0.92`,
+ * `阳性(+)*` → `阳性(+)`), for showing in an editable field. The raw text is
+ * kept separately for provenance.
+ */
+export function stripValueMarker(raw: string | number | null | undefined): string {
+  if (raw == null) return "";
+  const text = String(raw).trim();
+  const { rest } = extractMarker(text);
+  return rest || text;
+}
+
+/**
  * Normalize a qualitative result to one of 阴性 / 阳性 / 弱阳性 / 正常, keeping
  * the grade for `+` results. Returns null when the text is not qualitative.
  */
