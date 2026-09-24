@@ -16,7 +16,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
     config,
     schema,
     execute: async (input) =>
-      run(() => {
+      run(deps, () => {
         const { member, intervention } = logIntervention(storeFrom(deps), {
           member: input.member,
           title: input.title,

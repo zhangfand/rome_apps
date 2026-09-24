@@ -11,7 +11,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
     config,
     schema,
     execute: async (input) =>
-      run(() => {
+      run(deps, () => {
         const store = storeFrom(deps);
         if (input.clear_only) return { cleared: clearDemoData(store) };
         return { seeded: seedDemoData(store), link: "/apps/family-health" };

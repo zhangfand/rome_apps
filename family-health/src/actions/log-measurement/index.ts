@@ -17,7 +17,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
     config,
     schema,
     execute: async (input) =>
-      run(() => {
+      run(deps, () => {
         const { member, measurements } = logMeasurement(storeFrom(deps), { ...input, createdVia: "chat" });
         return {
           member: { id: member.id, name: member.name, relation: member.relation },

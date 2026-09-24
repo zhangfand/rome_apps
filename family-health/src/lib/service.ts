@@ -141,7 +141,9 @@ export function endIntervention(
     const member = resolveMemberOrThrow(store, input.member);
     const active = store.listActiveInterventions(member.id, todayIso());
     const q = (input.title ?? "").trim();
-    const matches = q ? active.filter((iv) => iv.title.includes(q) || q.includes(iv.title) || iv.category === normalizeCategory(q)) : active;
+    // Title matches win; fall back to the category only when no title matches.
+    const byTitle = q ? active.filter((iv) => iv.title.includes(q) || q.includes(iv.title)) : [];
+    const matches = !q ? active : byTitle.length ? byTitle : active.filter((iv) => iv.category === normalizeCategory(q));
     if (matches.length !== 1) {
       throw new UserFacingError(
         matches.length === 0 ? "没有找到匹配的进行中干预措施。" : "有多条进行中的干预措施，请说明要结束哪一条。",

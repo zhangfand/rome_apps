@@ -18,7 +18,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
     config,
     schema,
     execute: async (input) =>
-      run(() => {
+      run(deps, () => {
         const store = storeFrom(deps);
         const name = input.name.trim();
         if (!name) throw new UserFacingError("请提供成员姓名。", "missing_name");

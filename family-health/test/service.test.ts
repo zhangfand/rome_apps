@@ -208,3 +208,27 @@ describe("dates", () => {
     expect(resolveDate("2026-02-30", now)).toBeNull();
   });
 });
+
+describe("guardian timezone", () => {
+  it("computes today in the guardian's zone, not the host clock", async () => {
+    const { setTimeZone, todayIso, resolveDate: rd } = await import("../src/lib/dates.js");
+    const instant = new Date("2026-09-24T03:30:00Z"); // 20:30 on the 23rd in Los Angeles
+    setTimeZone("America/Los_Angeles");
+    try {
+      expect(todayIso(instant)).toBe("2026-09-23");
+      expect(rd("昨天", instant)).toBe("2026-09-22");
+      setTimeZone("Asia/Shanghai");
+      expect(todayIso(instant)).toBe("2026-09-24");
+      setTimeZone("Not/AZone");
+      expect(todayIso(new Date(2026, 8, 23, 12))).toBe("2026-09-23");
+    } finally {
+      setTimeZone(null);
+    }
+  });
+
+  it("prefers a title match over the category fallback when ending interventions", () => {
+    seedDemoData(store);
+    logIntervention(store, { member: "我", title: "每天跑步5公里", startDate: "2026-09-14" });
+    expect(endIntervention(store, { member: "我", title: "跑步", endDate: "2026-09-23" }).title).toBe("每天跑步5公里");
+  });
+});

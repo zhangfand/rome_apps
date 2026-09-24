@@ -14,7 +14,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
     config,
     schema,
     execute: async (input) =>
-      run(() => ({
+      run(deps, () => ({
         intervention: publicIntervention(
           endIntervention(storeFrom(deps), { interventionId: input.intervention_id, member: input.member, title: input.title, endDate: input.end_date }),
         ),

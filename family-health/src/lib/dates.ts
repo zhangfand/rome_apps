@@ -7,12 +7,44 @@ import { normalizeWidth } from "../domain/text.js";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+/**
+ * The guardian's timezone. The daemon itself usually runs in UTC, so "today"
+ * must be computed in the guardian's zone (set from Rome's `guardianTimezone`
+ * setting at request time; see lib/timezone.ts). Unset → process local time.
+ */
+let zone: string | undefined;
+
+export function setTimeZone(tz: string | null | undefined): void {
+  if (!tz) {
+    zone = undefined;
+    return;
+  }
+  try {
+    new Intl.DateTimeFormat("en-CA", { timeZone: tz });
+    zone = tz;
+  } catch {
+    zone = undefined;
+  }
+}
+
+export function currentTimeZone(): string | undefined {
+  return zone;
+}
+
 export function toIsoDate(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** Local-midnight Date carrying the calendar date of `now` in the guardian's zone. */
+function zonedToday(now: Date): Date {
+  if (!zone) return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  return new Date(get("year"), get("month") - 1, get("day"));
+}
+
 export function todayIso(now: Date = new Date()): string {
-  return toIsoDate(now);
+  return toIsoDate(zonedToday(now));
 }
 
 function addDays(d: Date, days: number): Date {
@@ -43,8 +75,9 @@ function parseCount(s: string): number | null {
  * understood. Month/day without a year means the most recent such date that
  * is not in the future.
  */
-export function resolveDate(input: string | null | undefined, now: Date = new Date()): string | null {
+export function resolveDate(input: string | null | undefined, clock: Date = new Date()): string | null {
   if (input == null) return null;
+  const now = zonedToday(clock);
   const s = normalizeWidth(String(input)).trim().replace(/\s+/g, "");
   if (!s) return null;
 
@@ -84,10 +117,10 @@ export function resolveDate(input: string | null | undefined, now: Date = new Da
 }
 
 /** Normalize an exam date from a report (`2024年3月5日`, `2024/03/05`); rejects implausible dates. */
-export function normalizeExamDate(input: string | null | undefined, now: Date = new Date()): string | null {
-  const iso = resolveDate(input, now);
+export function normalizeExamDate(input: string | null | undefined, clock: Date = new Date()): string | null {
+  const iso = resolveDate(input, clock);
   if (!iso) return null;
-  if (iso < "1990-01-01" || iso > todayIso(addDays(now, 1))) return null;
+  if (iso < "1990-01-01" || iso > toIsoDate(addDays(zonedToday(clock), 1))) return null;
   return iso;
 }
 

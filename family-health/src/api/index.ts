@@ -39,6 +39,7 @@ import {
   publicMember,
 } from "../lib/service.js";
 import { reportDir, resolveStoredPath } from "../lib/storage.js";
+import { syncGuardianTimeZone } from "../lib/timezone.js";
 
 const APP = "family-health";
 /** Hard cap per uploaded file (the host's own body limit may be lower). */
@@ -159,6 +160,7 @@ class FamilyHealthApi implements RomeAppApiHandler {
   }
 
   async handle(request: RomeAppApiRequest): Promise<Response> {
+    await syncGuardianTimeZone(this.ctx);
     const path = request.path.filter(Boolean);
     if (request.method === "GET" && path.join("/") === "status") {
       return json({ appId: this.ctx.app.id, version: this.ctx.app.version, status: "ok" });

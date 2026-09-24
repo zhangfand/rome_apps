@@ -13,6 +13,6 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
   return defineAction({
     config,
     schema,
-    execute: async (input) => run(() => queryMember(storeFrom(deps), input)),
+    execute: async (input) => run(deps, () => queryMember(storeFrom(deps), input)),
   });
 }

@@ -7,7 +7,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
     config,
     schema: z.object({}),
     execute: async () =>
-      run(() => {
+      run(deps, () => {
         const store = storeFrom(deps);
         return {
           members: store.listMembers().map((m) => {
