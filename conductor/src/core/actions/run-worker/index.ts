@@ -224,12 +224,18 @@ async function summon(
   }
 }
 
+/**
+ * True only when the session manager explicitly refused to resume the session.
+ * A run that ends before starting a session ("did not provide a durable Rome
+ * session") is not such a refusal: a usage limit, rate limit or provider outage
+ * ends the run the same way, and the session is still resumable once it clears.
+ * Those failures are recorded and retried; they never retire the session.
+ */
 export function isResumeRejection(error: string): boolean {
   return (
     /was not found or cannot be resumed/i.test(error) ||
     /does not match this session key/i.test(error) ||
-    /cannot resume by (explicit )?session id/i.test(error) ||
-    /did not provide a durable Rome session/i.test(error)
+    /cannot resume by (explicit )?session id/i.test(error)
   );
 }
 

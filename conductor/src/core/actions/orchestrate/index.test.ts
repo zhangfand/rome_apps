@@ -79,13 +79,13 @@ describe("coordinator wake observations", () => {
 
     let ledger: LedgerRepository;
     const summons: Array<Record<string, unknown>> = [];
-    let rejectResume = false;
+    let failWith: string | undefined;
     const appContext = {
       db: { connection: drizzle(sqlite), tablePrefix: "conductor", tableName: (name: string) => `conductor__${name}` },
       runAction: async (name: string, args: Record<string, unknown>) => {
         expect(name).toBe("system:summon");
         summons.push(args);
-        if (rejectResume) return { status: "error" as const, error: "Session was not found or cannot be resumed" };
+        if (failWith) return { status: "error" as const, error: failWith };
         ledger.append({
           taskId: "t-1",
           kind: "Noted",
@@ -146,11 +146,26 @@ describe("coordinator wake observations", () => {
       status: "active",
     });
 
-    rejectResume = true;
+    // A usage limit ends the run before any session starts. That is transient:
+    // the failure is recorded for retry and the Instance stays resumable.
+    failWith = 'Summoned agent "conductor:engineer-lead" did not provide a durable Rome session';
+    ledger.append({ taskId: "t-1", kind: "Reply", by: "guardian", source: "LIMITED_REPLY", payload: { text: "LIMITED_REPLY" } });
+    const limited = await action.execute({ taskId: "t-1" });
+    expect(limited.status).toBe("ok");
+    expect(summons[2].sessionId).toBe("agent-session-1");
+    expect(limited.data).toMatchObject({ decided: false, error: failWith });
+    expect(ledger.factsFor("t-1").at(-1)).toMatchObject({ kind: "Event", by: "runtime", payload: { type: "coordinator_wake_failed" } });
+    expect(createAgentInstanceRepository(appContext.db as never).forTaskCoordinator("t-1")).toMatchObject({
+      id: instances[0].id,
+      sessionId: "agent-session-1",
+      status: "active",
+    });
+
+    failWith = 'Agent session "agent-session-1" was not found or cannot be resumed';
     ledger.append({ taskId: "t-1", kind: "Reply", by: "guardian", source: "FINAL_REPLY", payload: { text: "FINAL_REPLY" } });
     const rejected = await action.execute({ taskId: "t-1" });
     expect(rejected.status).toBe("ok");
-    expect(summons[2].sessionId).toBe("agent-session-1");
+    expect(summons[3].sessionId).toBe("agent-session-1");
     expect(rejected.data).toMatchObject({
       agentInstanceId: instances[0].id,
       decided: false,

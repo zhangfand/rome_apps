@@ -94,9 +94,12 @@ Session returned by `system:summon`. Later wakes resume that exact Session and
 send only facts after the Task binding's delivered cursor.
 
 This first experiment is deliberately one-to-one: one Agent Instance owns one
-Agent Session. Conductor does not rotate or silently replace that Session. A
-resume rejection marks the Instance broken so the failure is visible instead
-of creating a second Session under the same identity. Per-invocation Rome trace
+Agent Session. Conductor does not rotate or silently replace that Session. An
+explicit resume rejection from the session manager marks the Instance broken
+so the failure is visible instead of creating a second Session under the same
+identity. A transient failure (a usage or rate limit, or a run that ends
+before starting a session) only records a `coordinator_wake_failed` Event; the
+Instance stays active and the next tick retries. Per-invocation Rome trace
 sessions remain separate accounting records and are grouped beneath the Task's
 stable coordinator Instance in the Usage UI.
 
