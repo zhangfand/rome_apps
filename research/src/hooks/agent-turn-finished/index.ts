@@ -100,9 +100,17 @@ export class ArchiveTurnFinishedHook implements AgentTurnFinishedHook {
     // 2) Running summary, from a forked turn that sees the whole conversation.
     if (event.status !== "completed" || event.output.state !== "final") return;
     const summary = await this.summarize(event, await readConversationSummaryBody(slug, id));
-    if (summary) {
-      await writeConversation(slug, { sessionId, title, started, turns, transcript: markdown, summary });
-    }
+    // Re-read: the final assistant message can be persisted after this hook fires,
+    // so the first transcript write may miss it. The fork above gives it time to land.
+    const latest = renderTranscript(title, await this.deps.repo.getMessages(sessionId));
+    await writeConversation(slug, {
+      sessionId,
+      title,
+      started,
+      turns: latest.turns,
+      transcript: latest.markdown,
+      summary: summary ?? undefined,
+    });
     this.deps.logger.info("research: archived conversation", { slug, conversation: id, turns });
   }
 
