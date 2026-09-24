@@ -105,6 +105,12 @@ export function formatDelta(delta: number | null | undefined): string {
   return delta > 0 ? `↑ ${s}` : delta < 0 ? `↓ ${s}` : "→ 0";
 }
 
+/** Display form of a unit: `10^9/L` → `10⁹/L`. */
+export function formatUnit(u: string | null | undefined): string {
+  if (!u) return "";
+  return u.replace("10^12", "10¹²").replace("10^9", "10⁹");
+}
+
 export function formatBytes(n: number): string {
   if (n >= 1048576) return `${(n / 1048576).toFixed(1)} MB`;
   if (n >= 1024) return `${Math.round(n / 1024)} KB`;

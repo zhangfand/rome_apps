@@ -49,9 +49,7 @@ export function ReportsView({ memberId }: { memberId: string | null }) {
       </PageHeader>
 
       {members.data && members.data.members.length > 1 ? (
-        <div className="overflow-x-auto">
-          <FilterChipGroup aria-label="按成员筛选" options={options} value={memberId ?? "all"} onValueChange={(v) => go(paths.reports(v === "all" ? null : v), { replace: true })} />
-        </div>
+        <FilterChipGroup aria-label="按成员筛选" options={options} value={memberId ?? "all"} onValueChange={(v) => go(paths.reports(v === "all" ? null : v), { replace: true })} />
       ) : null}
 
       {reports.error ? <ErrorState message={reports.error} onRetry={() => void reports.reload()} /> : null}

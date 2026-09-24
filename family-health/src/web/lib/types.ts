@@ -185,6 +185,7 @@ export interface IndicatorDetail {
   valueType: string;
   band: NumericRange | null;
   bandSource: "report" | "default" | null;
+  bandText: string | null;
   points: SeriesPoint[];
   interventions: Array<{ id: string; category: string; title: string; description: string; startDate: string; endDate: string | null }>;
   insight: Insight | null;

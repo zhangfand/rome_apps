@@ -38,6 +38,7 @@ export interface SnapshotValue {
   rawUnit?: string;
   refLow?: number | null;
   refHigh?: number | null;
+  refText?: string | null;
 }
 
 export interface ExamSnapshot {
@@ -73,6 +74,7 @@ export function buildSnapshots(results: DatedResult[], member: MemberCtx): ExamS
       rawUnit: r.rawUnit,
       refLow: r.refLow,
       refHigh: r.refHigh,
+      refText: r.refText,
     });
   }
   const snaps = [...byReport.values()].sort((a, b) => a.examDate.localeCompare(b.examDate));
@@ -387,6 +389,8 @@ export function indicatorDetail(code: string, member: MemberCtx, snaps: ExamSnap
     valueType: def.valueType,
     band,
     bandSource: printed ? "report" : band ? "default" : null,
+    /** The range exactly as printed on the most recent report (e.g. `<1.7`). */
+    bandText: printed?.refText ?? null,
     points,
     interventions: overlapping.map((iv) => ({
       id: iv.id,

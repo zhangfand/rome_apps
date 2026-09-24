@@ -116,14 +116,12 @@ export function InterventionsView({ memberId }: { memberId: string | null }) {
       </Alert>
 
       {members.data && members.data.members.length > 1 ? (
-        <div className="overflow-x-auto">
-          <FilterChipGroup
-            aria-label="选择成员"
-            options={members.data.members.map((m) => ({ value: m.id, label: m.name }))}
-            value={selected ?? ""}
-            onValueChange={(v) => go(paths.interventions(v), { replace: true })}
-          />
-        </div>
+        <FilterChipGroup
+          aria-label="选择成员"
+          options={members.data.members.map((m) => ({ value: m.id, label: m.name }))}
+          value={selected ?? ""}
+          onValueChange={(v) => go(paths.interventions(v), { replace: true })}
+        />
       ) : null}
 
       {list.error ? <ErrorState message={list.error} onRetry={() => void list.reload()} /> : null}

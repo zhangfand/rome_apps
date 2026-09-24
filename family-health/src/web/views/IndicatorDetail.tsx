@@ -12,7 +12,7 @@ import { Timestamp } from "@rome-os/ui/timestamp";
 import { Disclaimer, ErrorState, FlagBadge, LoadingRows } from "../components/common";
 import { TrendChart } from "../components/charts";
 import { apiGet, apiSend, errorMessage } from "../lib/api";
-import { formatNumber, formatRange } from "../lib/format";
+import { formatNumber, formatRange, formatUnit } from "../lib/format";
 import { useApi, usePolling } from "../lib/hooks";
 import { Link, paths } from "../lib/router";
 import type { IndicatorDetail, Insight, Member, TrendInsightContent } from "../lib/types";
@@ -171,12 +171,12 @@ export function IndicatorDetailView({ memberId, code }: { memberId: string; code
           <PageDescription>
             {latest ? (
               <>
-                最新 {latest.value != null ? formatNumber(latest.value) : latest.valueText} {d.unit}（{latest.date}）
+                最新 {latest.value != null ? formatNumber(latest.value) : latest.valueText} {formatUnit(d.unit)}（{latest.date}）
               </>
             ) : (
               "暂无数据"
             )}
-            {d.band ? ` · 参考范围 ${formatRange(d.band)} ${d.unit}${d.bandSource === "report" ? "（报告标注）" : ""}` : ""}
+            {d.band ? ` · 参考范围 ${d.bandSource === "report" && d.bandText ? d.bandText : formatRange(d.band)} ${formatUnit(d.unit)}${d.bandSource === "report" ? "（报告标注）" : ""}` : ""}
           </PageDescription>
         </PageHeading>
       </PageHeader>
@@ -189,7 +189,7 @@ export function IndicatorDetailView({ memberId, code }: { memberId: string; code
             <SectionTitle>变化趋势</SectionTitle>
           </SectionHeading>
         </SectionHeader>
-        <TrendChart points={d.points} band={d.band} interventions={d.interventions} unit={d.unit} direction={d.direction} />
+        <TrendChart points={d.points} band={d.band} interventions={d.interventions} unit={formatUnit(d.unit)} direction={d.direction} />
       </Section>
 
       <TrendInsightView memberId={memberId} code={d.code} initial={d.insight} />
@@ -216,7 +216,7 @@ export function IndicatorDetailView({ memberId, code }: { memberId: string; code
                 <TableRow key={`${p.source}-${p.resultId ?? p.measurementId ?? p.date}`}>
                   <TableCell className="tabular-nums">{p.date}</TableCell>
                   <TableCell className="text-right tabular-nums">{p.value != null ? formatNumber(p.value) : p.valueText ?? "—"}</TableCell>
-                  <TableCell>{p.unit}</TableCell>
+                  <TableCell>{formatUnit(p.unit)}</TableCell>
                   <TableCell>
                     <FlagBadge flag={p.flag} direction={d.direction} />
                   </TableCell>

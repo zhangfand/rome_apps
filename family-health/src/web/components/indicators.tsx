@@ -1,6 +1,6 @@
 import { Badge } from "@rome-os/ui/badge";
 import { List, ListRow } from "@rome-os/ui/list-row";
-import { formatNumber, formatRange } from "../lib/format";
+import { formatNumber, formatRange, formatUnit } from "../lib/format";
 import { Link, paths } from "../lib/router";
 import type { FindingTimeline, IndicatorSummary } from "../lib/types";
 import { Delta, FlagBadge } from "./common";
@@ -19,13 +19,13 @@ export function IndicatorRow({ item, memberId }: { item: IndicatorSummary; membe
               {item.derived ? <Badge variant="outline">计算值</Badge> : null}
             </div>
             <div className="truncate text-xs text-muted-foreground">
-              {item.ref ? `参考 ${formatRange(item.ref)}${item.unit ? ` ${item.unit}` : ""}` : item.unit || " "}
+              {item.ref ? `参考 ${formatRange(item.ref)}${item.unit ? ` ${formatUnit(item.unit)}` : ""}` : formatUnit(item.unit) || " "}
             </div>
           </div>
           <div className="flex items-center justify-end gap-2 sm:justify-start">
             <span className="tabular-nums text-foreground">
               {value}
-              {latest?.value != null && item.unit ? <span className="ml-1 text-xs text-muted-foreground">{item.unit}</span> : null}
+              {latest?.value != null && item.unit ? <span className="ml-1 text-xs text-muted-foreground">{formatUnit(item.unit)}</span> : null}
             </span>
             {latest?.source === "measurement" ? (
               <Badge variant="muted" title="最新值来自聊天/自测记录">自测</Badge>

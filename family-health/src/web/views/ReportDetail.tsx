@@ -17,7 +17,7 @@ import { ConfirmDialog, DemoBadge, ErrorState, FlagBadge, LoadingRows, RedFlagBa
 import { ReportInsightView } from "../components/insight";
 import { EditableCell, IndicatorPicker, PageViewer } from "../components/review";
 import { apiSend, errorMessage } from "../lib/api";
-import { formatDateLong, formatNumber } from "../lib/format";
+import { formatDateLong, formatNumber, formatUnit } from "../lib/format";
 import { useApi, usePolling } from "../lib/hooks";
 import { useMeta } from "../lib/meta";
 import { Link, go, paths } from "../lib/router";
@@ -79,18 +79,25 @@ function ResultsEditor({ detail, mutate, onJump, activePage }: { detail: ReportD
           <AlertDescription>有 {unmapped} 行没有匹配到标准指标（高亮显示）。请在“标准指标”列选择，或删除无关的行；未匹配的行不会计入趋势。</AlertDescription>
         </Alert>
       ) : null}
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <Table>
+      {/* Desktop: compact table */}
+      <div className="hidden rounded-lg border border-border md:block">
+        <Table className="table-fixed">
+          <colgroup>
+            <col className="w-[26%]" />
+            <col className="w-[20%]" />
+            <col className="w-[13%]" />
+            <col className="w-[14%]" />
+            <col className="w-[22%]" />
+            <col className="w-[5%]" />
+          </colgroup>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12">页</TableHead>
               <TableHead>报告原文</TableHead>
               <TableHead>结果</TableHead>
               <TableHead>单位</TableHead>
               <TableHead>参考范围</TableHead>
               <TableHead>标准指标</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead className="w-10">
+              <TableHead>
                 <span className="sr-only">操作</span>
               </TableHead>
             </TableRow>
@@ -101,7 +108,7 @@ function ResultsEditor({ detail, mutate, onJump, activePage }: { detail: ReportD
             ))}
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
                   没有识别到检验结果，可以在下方手动添加。
                 </TableCell>
               </TableRow>
@@ -109,6 +116,13 @@ function ResultsEditor({ detail, mutate, onJump, activePage }: { detail: ReportD
           </TableBody>
         </Table>
       </div>
+      {/* Mobile: one card per row */}
+      <ul className="flex flex-col gap-2 md:hidden" aria-label="识别结果">
+        {rows.map((r) => (
+          <ResultEditCard key={r.id} row={r} mutate={mutate} onJump={onJump} />
+        ))}
+        {rows.length === 0 ? <li className="text-sm text-muted-foreground">没有识别到检验结果，可以在下方手动添加。</li> : null}
+      </ul>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1.4fr_1fr_0.8fr_1fr_auto]" aria-label="添加一行结果">
         <Input size="sm" placeholder="项目名称" aria-label="项目名称" value={draft.rawName} onChange={(e) => setDraft({ ...draft, rawName: e.target.value })} />
         <Input size="sm" placeholder="结果" aria-label="结果" value={draft.rawValue} onChange={(e) => setDraft({ ...draft, rawValue: e.target.value })} />
@@ -122,44 +136,85 @@ function ResultsEditor({ detail, mutate, onJump, activePage }: { detail: ReportD
   );
 }
 
+function rowTone(row: ResultRow) {
+  const lowConfidence = !!row.indicatorCode && row.confidence != null && row.confidence < 0.8;
+  return { lowConfidence, tone: !row.indicatorCode ? "bg-warning-bg" : lowConfidence ? "bg-info-bg" : "" };
+}
+
+function MappingCell({ row, patch }: { row: ResultRow; patch: (b: Record<string, unknown>) => Promise<void> }) {
+  const { lowConfidence } = rowTone(row);
+  return (
+    <div className="flex flex-col gap-1">
+      <IndicatorPicker value={row.indicatorCode} label={row.name} onSelect={(code) => void patch({ indicatorCode: code })} />
+      {lowConfidence ? <span className="text-xs text-info-fg">自动匹配，请核对</span> : null}
+      {row.indicatorCode && row.unit && row.unit !== row.rawUnit && row.valueNum != null ? (
+        <span className="text-xs text-muted-foreground">
+          换算：{formatNumber(row.valueNum)} {formatUnit(row.unit)}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function ResultEditRow({ row, mutate, onJump }: { row: ResultRow; mutate: Mutate; onJump: (p: number) => void }) {
-  const lowConfidence = row.indicatorCode && row.confidence != null && row.confidence < 0.8;
-  const tone = !row.indicatorCode ? "bg-warning-bg" : lowConfidence ? "bg-info-bg" : "";
+  const { tone } = rowTone(row);
   const patch = (body: Record<string, unknown>) => mutate("PATCH", `results/${row.id}`, body);
   return (
     <TableRow className={tone} onClick={() => row.page && onJump(row.page)}>
-      <TableCell className="tabular-nums text-muted-foreground">{row.page ?? "—"}</TableCell>
-      <TableCell className="min-w-[8rem]">
-        <div className="text-sm text-foreground">{row.rawName}</div>
-        {row.section ? <div className="text-xs text-muted-foreground">{row.section}</div> : null}
-      </TableCell>
-      <TableCell className="min-w-[6rem]">
-        <EditableCell value={row.rawValue} label={`${row.rawName} 结果`} onSave={(v) => patch({ rawValue: v })} />
-      </TableCell>
-      <TableCell className="min-w-[5rem]">
-        <EditableCell value={row.rawUnit} label={`${row.rawName} 单位`} onSave={(v) => patch({ rawUnit: v })} />
-      </TableCell>
-      <TableCell className="min-w-[6rem]">
-        <EditableCell value={row.refText ?? ""} label={`${row.rawName} 参考范围`} onSave={(v) => patch({ refText: v })} />
-      </TableCell>
-      <TableCell>
-        <div className="flex flex-col gap-1">
-          <IndicatorPicker value={row.indicatorCode} label={row.name} onSelect={(code) => void patch({ indicatorCode: code })} />
-          {lowConfidence ? <span className="text-xs text-info-fg">自动匹配，请核对</span> : null}
-          {row.indicatorCode && row.unit && row.unit !== row.rawUnit && row.valueNum != null ? (
-            <span className="text-xs text-muted-foreground">
-              换算：{formatNumber(row.valueNum)} {row.unit}
-            </span>
-          ) : null}
+      <TableCell className="align-top">
+        <div className="break-words text-sm text-foreground">{row.rawName}</div>
+        <div className="text-xs text-muted-foreground">
+          {row.page ? `第 ${row.page} 页` : "手动添加"}
+          {row.section ? ` · ${row.section}` : ""}
         </div>
       </TableCell>
-      <TableCell>
-        <FlagBadge flag={row.flag} direction={row.direction} />
+      <TableCell className="align-top">
+        <div className="flex items-center gap-1.5">
+          <EditableCell value={row.rawValue} label={`${row.rawName} 结果`} onSave={(v) => patch({ rawValue: v })} />
+          <FlagBadge flag={row.flag} direction={row.direction} className="shrink-0" />
+        </div>
       </TableCell>
-      <TableCell>
+      <TableCell className="align-top">
+        <EditableCell value={row.rawUnit} label={`${row.rawName} 单位`} onSave={(v) => patch({ rawUnit: v })} />
+      </TableCell>
+      <TableCell className="align-top">
+        <EditableCell value={row.refText ?? ""} label={`${row.rawName} 参考范围`} onSave={(v) => patch({ refText: v })} />
+      </TableCell>
+      <TableCell className="align-top">
+        <MappingCell row={row} patch={patch} />
+      </TableCell>
+      <TableCell className="align-top">
         <IconButton label={`删除 ${row.rawName}`} icon={<Trash2 />} size="sm" onClick={(e) => (e.stopPropagation(), void mutate("DELETE", `results/${row.id}`, undefined, "已删除"))} />
       </TableCell>
     </TableRow>
+  );
+}
+
+function ResultEditCard({ row, mutate, onJump }: { row: ResultRow; mutate: Mutate; onJump: (p: number) => void }) {
+  const { tone } = rowTone(row);
+  const patch = (body: Record<string, unknown>) => mutate("PATCH", `results/${row.id}`, body);
+  return (
+    <li className={`flex flex-col gap-2 rounded-lg border border-border p-3 ${tone}`}>
+      <div className="flex items-start justify-between gap-2">
+        <button type="button" className="min-w-0 text-left" onClick={() => row.page && onJump(row.page)}>
+          <div className="break-words text-sm font-medium text-foreground">{row.rawName}</div>
+          <div className="text-xs text-muted-foreground">
+            {row.page ? `第 ${row.page} 页（点击查看）` : "手动添加"}
+            {row.section ? ` · ${row.section}` : ""}
+          </div>
+        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <FlagBadge flag={row.flag} direction={row.direction} />
+          <IconButton label={`删除 ${row.rawName}`} icon={<Trash2 />} size="sm" onClick={() => void mutate("DELETE", `results/${row.id}`, undefined, "已删除")} />
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <EditableCell value={row.rawValue} label={`${row.rawName} 结果`} onSave={(v) => patch({ rawValue: v })} />
+        <EditableCell value={row.rawUnit} label={`${row.rawName} 单位`} onSave={(v) => patch({ rawUnit: v })} />
+        <EditableCell value={row.refText ?? ""} label={`${row.rawName} 参考范围`} onSave={(v) => patch({ refText: v })} />
+      </div>
+      <MappingCell row={row} patch={patch} />
+    </li>
   );
 }
 
@@ -256,7 +311,14 @@ function ResultsByCategory({ detail, meta }: { detail: ReportDetail; meta: Meta 
             {g.name} <span className="text-sm font-normal text-muted-foreground">{g.rows.length} 项</span>
           </h4>
           <div className="overflow-x-auto rounded-lg border border-border">
-            <Table>
+            <Table className="min-w-[32rem] table-fixed">
+              <colgroup>
+                <col className="w-[34%]" />
+                <col className="w-[16%]" />
+                <col className="w-[16%]" />
+                <col className="w-[20%]" />
+                <col className="w-[14%]" />
+              </colgroup>
               <TableHeader>
                 <TableRow>
                   <TableHead>项目</TableHead>
@@ -279,7 +341,7 @@ function ResultsByCategory({ detail, meta }: { detail: ReportDetail; meta: Meta 
                       )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{r.valueNum != null ? formatNumber(r.valueNum) : r.valueText ?? r.rawValue}</TableCell>
-                    <TableCell>{r.unit || r.rawUnit}</TableCell>
+                    <TableCell>{formatUnit(r.unit || r.rawUnit)}</TableCell>
                     <TableCell className="text-muted-foreground">{r.refText ?? "—"}</TableCell>
                     <TableCell>
                       <FlagBadge flag={r.flag} direction={r.direction} />
@@ -516,7 +578,7 @@ export function ReportDetailView({ reportId }: { reportId: string }) {
 
       {reviewing ? (
         <>
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,4fr)_minmax(0,7fr)]">
             {r.pagesTotal ? (
               <Section className="xl:sticky xl:top-2 xl:self-start">
                 <SectionHeader>

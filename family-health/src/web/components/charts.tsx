@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { dateToTs, flagVariant, formatNumber, formatRange, todayIso, tsToIso } from "../lib/format";
+import { niceScale } from "../lib/scale";
 import { useThemeColors, type ThemeColors } from "../lib/theme";
 import type { Flag, NumericRange, SeriesPoint } from "../lib/types";
 
@@ -141,12 +142,11 @@ export function TrendChart({
     const xMax = lastT + pad;
 
     const values = all.map((p) => p.value);
-    let yMin = Math.min(...values, band?.low ?? Infinity);
-    let yMax = Math.max(...values, band?.high ?? -Infinity);
-    const ypad = Math.max((yMax - yMin) * 0.15, Math.abs(yMax) * 0.05, 0.1);
-    yMin = yMin - ypad;
-    yMax = yMax + ypad;
-    if (Math.min(...values) >= 0 && yMin < 0) yMin = 0;
+    const rawMin = Math.min(...values, band?.low ?? Infinity);
+    const rawMax = Math.max(...values, band?.high ?? -Infinity);
+    const ypad = Math.max((rawMax - rawMin) * 0.1, Math.abs(rawMax) * 0.03, 0.05);
+    const { min: yMin0, max: yMax, ticks: yTicks } = niceScale(rawMin - ypad, rawMax + ypad);
+    const yMin = Math.min(...values) >= 0 && yMin0 < 0 ? 0 : yMin0;
 
     const spans = assignLanes(
       interventions
@@ -157,7 +157,7 @@ export function TrendChart({
         })
         .filter((s) => s.x2 > s.x1),
     );
-    return { reports, measures, xMin, xMax, yMin, yMax, spans };
+    return { reports, measures, xMin, xMax, yMin, yMax, yTicks: yTicks.filter((t) => t >= yMin), spans };
   }, [points, band, interventions]);
 
   if (!model) return <p className="py-10 text-center text-sm text-muted-foreground">还没有可以绘制的数值数据。</p>;
@@ -186,7 +186,8 @@ export function TrendChart({
             <YAxis
               type="number"
               domain={[model.yMin, model.yMax]}
-              tickFormatter={(v: number) => formatNumber(v, 2)}
+              ticks={model.yTicks}
+              tickFormatter={(v: number) => formatNumber(v, 3)}
               stroke={c.border}
               tick={{ fill: c.muted, fontSize: 12 }}
               width={48}
@@ -200,10 +201,11 @@ export function TrendChart({
                 key={s.id}
                 x1={s.x1}
                 x2={s.x2}
-                fill={c.info}
-                fillOpacity={0.1}
-                stroke={c.info}
-                strokeOpacity={0.35}
+                fill={c.foreground}
+                fillOpacity={c.dark ? 0.08 : 0.05}
+                stroke={c.muted}
+                strokeOpacity={0.5}
+                strokeDasharray="4 3"
                 ifOverflow="hidden"
                 label={(props: { viewBox?: { x?: number; y?: number; width?: number } }) => {
                   const vb = props.viewBox ?? {};
@@ -307,7 +309,7 @@ function ChartLegend({ colors: c, hasMeasures, hasBand, band, hasSpans, unit }: 
       ) : null}
       {hasSpans ? (
         <li className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-3.5 rounded-sm" style={{ background: c.info, opacity: 0.3 }} />
+          <span className="inline-block h-2.5 w-3.5 rounded-sm border border-dashed" style={{ background: c.foreground, opacity: 0.25, borderColor: c.muted }} />
           干预时段
         </li>
       ) : null}
