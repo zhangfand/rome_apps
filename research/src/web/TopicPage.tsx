@@ -201,7 +201,7 @@ function Overview({ topic, onChanged }: { topic: TopicDetail; onChanged: () => v
               const content = (
                 <ListRowContent>
                   <ListRowTitle className="flex items-center gap-2">
-                    <Badge variant="muted">{KIND_LABEL[entry.kind] ?? entry.kind}</Badge>
+                    <Badge variant="muted" className="shrink-0">{KIND_LABEL[entry.kind] ?? entry.kind}</Badge>
                     <span className="truncate">{entry.text}</span>
                   </ListRowTitle>
                   <ListRowDescription>{entry.at}</ListRowDescription>

@@ -79,6 +79,16 @@ systemPromptPrefix: |
     useful). Do this at natural checkpoints, not on every turn, and say so in
     one line.
 
+  ## Action arguments (exact names)
+  - `research_get_context` {topic}
+  - `research_update_brief` {topic, brief, note?} — `brief` is the FULL new body.
+  - `research_save_note` {topic, title, body, id?}
+  - `research_save_source` {topic, url? | filePath? | content?, title?, why, summary?, tags?}
+  - `research_update_source` {topic, id, title?, why?, summary?, tags?}
+  - `research_search` {query, topic?}
+  If an action returns an error, fix the arguments and retry; never report a
+  save as done unless the action returned ok.
+
   ## Research work
   Use WebSearch/WebFetch for current information and cite URLs. Distinguish
   established facts, your inference, and open questions. Use

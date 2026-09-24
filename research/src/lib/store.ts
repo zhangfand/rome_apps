@@ -1,4 +1,4 @@
-import { appendFile, copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { appendFile, copyFile, mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { basename, extname, join, relative } from "node:path";
@@ -111,6 +111,45 @@ async function readText(path: string): Promise<string | null> {
   }
 }
 
+/** Write via temp file + rename so readers never observe a truncated file. */
+async function writeAtomic(path: string, data: string | Uint8Array): Promise<void> {
+  const tmp = `${path}.tmp-${randomUUID()}`;
+  await writeFile(tmp, data);
+  await rename(tmp, path);
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Cross-process per-topic lock (API handler, actions and the archive hook may run in
+ * different workers). A `.lock` directory is created exclusively; stale locks (>30s) are
+ * broken. Not re-entrant — never call a locked function from inside another.
+ */
+async function withTopicLock<T>(slug: string, fn: () => Promise<T>): Promise<T> {
+  const lock = join(topicDir(slug), ".lock");
+  const deadline = Date.now() + 15_000;
+  for (;;) {
+    try {
+      await mkdir(lock);
+      break;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+      const info = await stat(lock).catch(() => null);
+      if (info && Date.now() - info.mtimeMs > 30_000) {
+        await rmdir(lock).catch(() => undefined);
+        continue;
+      }
+      if (Date.now() > deadline) throw new Error(`Topic is busy: ${slug}`);
+      await sleep(20 + Math.random() * 30);
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    await rmdir(lock).catch(() => undefined);
+  }
+}
+
 async function listDirs(path: string): Promise<string[]> {
   try {
     const entries = await readdir(path, { withFileTypes: true });
@@ -216,11 +255,15 @@ async function readTopicSummary(slug: string): Promise<TopicSummary | null> {
   const text = await readText(join(dir, TOPIC_FILE));
   if (text === null) return null;
   const { data, body } = parseFrontmatter(text);
+  const logInfo = await stat(join(dir, LOG_FILE)).catch(() => null);
+  const logUpdated = logInfo ? new Date(logInfo.mtimeMs).toISOString() : undefined;
+  const fmUpdated = str(data.updated);
+  const updated = [fmUpdated, logUpdated].filter((v): v is string => Boolean(v)).sort().pop();
   return {
     slug,
     title: str(data.title) ?? slug,
     created: str(data.created),
-    updated: str(data.updated),
+    updated,
     excerpt: excerpt(body),
     counts: await counts(dir),
   };
@@ -263,7 +306,7 @@ export async function createTopic(input: CreateTopicInput): Promise<TopicDetail>
     const base = slug;
     while (existsSync(topicDir(slug))) slug = `${base}-${n++}`;
   } else if (existsSync(topicDir(slug))) {
-    throw new Error(`Topic already exists: ${slug}`);
+    throw new Error(`课题 ID 已存在：${slug}`);
   }
   const dir = topicDir(slug);
   await mkdir(dir, { recursive: true });
@@ -284,39 +327,35 @@ export async function createTopic(input: CreateTopicInput): Promise<TopicDetail>
     "- ",
     "",
   ].join("\n");
-  await writeFile(join(dir, TOPIC_FILE), stringifyFrontmatter({ title, created: now, updated: now }, body));
-  await writeFile(join(dir, LOG_FILE), `# ${title} · 时间线\n\n`);
+  await writeAtomic(join(dir, TOPIC_FILE), stringifyFrontmatter({ title, created: now, updated: now }, body));
+  await writeAtomic(join(dir, LOG_FILE), `# ${title} · 时间线\n\n`);
   await appendLog(slug, "topic", "创建课题");
   const topic = await getTopic(slug);
   if (!topic) throw new Error("Failed to create topic");
   return topic;
 }
 
-export async function touchTopic(slug: string): Promise<void> {
-  const path = join(topicDir(slug), TOPIC_FILE);
-  const text = await readText(path);
-  if (text === null) return;
-  const { data, body } = parseFrontmatter(text);
-  data.updated = nowIso();
-  await writeFile(path, stringifyFrontmatter(data, body));
-}
-
 export async function updateBrief(slug: string, brief: string, note?: string): Promise<void> {
+  if (!brief.trim()) throw new Error("Brief is required and must be non-empty");
   const dir = await requireTopic(slug);
   const path = join(dir, TOPIC_FILE);
-  const { data } = parseFrontmatter((await readText(path)) ?? "");
-  data.updated = nowIso();
-  await writeFile(path, stringifyFrontmatter(data, brief));
+  await withTopicLock(slug, async () => {
+    const { data } = parseFrontmatter((await readText(path)) ?? "");
+    data.updated = nowIso();
+    await writeAtomic(path, stringifyFrontmatter(data, brief));
+  });
   await appendLog(slug, "brief", note?.trim() || "更新了课题状态", "TOPIC.md");
 }
 
 export async function renameTopic(slug: string, title: string): Promise<void> {
   const dir = await requireTopic(slug);
   const path = join(dir, TOPIC_FILE);
-  const { data, body } = parseFrontmatter((await readText(path)) ?? "");
-  data.title = title.trim();
-  data.updated = nowIso();
-  await writeFile(path, stringifyFrontmatter(data, body));
+  await withTopicLock(slug, async () => {
+    const { data, body } = parseFrontmatter((await readText(path)) ?? "");
+    data.title = title.trim();
+    data.updated = nowIso();
+    await writeAtomic(path, stringifyFrontmatter(data, body));
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -331,7 +370,6 @@ export async function appendLog(slug: string, kind: LogKind, text: string, link?
     ? `- ${localStamp()} · ${kind} · [${clean}](${link.replace(/ /g, "%20")})\n`
     : `- ${localStamp()} · ${kind} · ${clean}\n`;
   await appendFile(join(dir, LOG_FILE), line);
-  await touchTopic(slug);
 }
 
 export async function readLog(slug: string, limit = 50): Promise<LogEntry[]> {
@@ -412,34 +450,32 @@ export interface WriteConversationInput {
 /** Creates or refreshes the conversation folder for a webchat session. */
 export async function writeConversation(slug: string, input: WriteConversationInput): Promise<string> {
   await requireTopic(slug);
-  let id = await findConversationId(slug, input.sessionId);
-  const isNew = id === null;
-  if (!id) id = `${localDate(new Date(input.started))}-${input.sessionId.slice(0, 8)}`;
-  const dir = join(conversationsDir(slug), id);
-  await mkdir(dir, { recursive: true });
-
-  const summaryPath = join(dir, "summary.md");
-  const existing = parseFrontmatter((await readText(summaryPath)) ?? "");
-  const body = input.summary ?? (existing.body.trim() ? existing.body : "（摘要生成中…）");
-  await writeFile(
-    summaryPath,
-    stringifyFrontmatter(
-      {
-        title: input.title,
-        sessionId: input.sessionId,
-        started: input.started,
-        updated: nowIso(),
-        turns: input.turns,
-      },
-      body,
-    ),
-  );
-  await writeFile(join(dir, "transcript.md"), input.transcript);
-  if (isNew) {
-    await appendLog(slug, "conversation", input.title, `conversations/${id}/summary.md`);
-  } else {
-    await touchTopic(slug);
-  }
+  const { id, isNew } = await withTopicLock(slug, async () => {
+    let id = await findConversationId(slug, input.sessionId);
+    const isNew = id === null;
+    if (!id) id = `${localDate(new Date(input.started))}-${input.sessionId.slice(0, 8)}`;
+    const dir = join(conversationsDir(slug), id);
+    await mkdir(dir, { recursive: true });
+    const summaryPath = join(dir, "summary.md");
+    const existing = parseFrontmatter((await readText(summaryPath)) ?? "");
+    const body = input.summary ?? (existing.body.trim() ? existing.body : "（摘要生成中…）");
+    await writeAtomic(
+      summaryPath,
+      stringifyFrontmatter(
+        {
+          title: input.title,
+          sessionId: input.sessionId,
+          started: input.started,
+          updated: nowIso(),
+          turns: input.turns,
+        },
+        body,
+      ),
+    );
+    await writeAtomic(join(dir, "transcript.md"), input.transcript);
+    return { id, isNew };
+  });
+  if (isNew) await appendLog(slug, "conversation", input.title, `conversations/${id}/summary.md`);
   return id;
 }
 
@@ -689,8 +725,11 @@ async function fillSource(
       bodyParts.join("\n"),
     ),
   );
-  const id = nextNumberedId(await listDirs(dir0), title, "source");
-  await rename(dir, join(dir0, id));
+  const id = await withTopicLock(slug, async () => {
+    const next = nextNumberedId(await listDirs(dir0), title, "source");
+    await rename(dir, join(dir0, next));
+    return next;
+  });
   await appendLog(slug, "source", title, `sources/${id}/${META_FILE}`);
   const saved = await readSource(slug, id, false);
   if (!saved) throw new Error("Failed to save source");
@@ -705,6 +744,7 @@ export async function updateSourceMeta(
   await requireTopic(slug);
   assertChildId(id);
   const path = join(sourcesDir(slug), id, META_FILE);
+  await withTopicLock(slug, async () => {
   const text = await readText(path);
   if (text === null) throw new Error(`Source not found: ${id}`);
   const { data, body } = parseFrontmatter(text);
@@ -718,8 +758,8 @@ export async function updateSourceMeta(
       .concat(summary.trim() ? ["## 摘要", "", summary.trim(), ""] : [])
       .join("\n");
   }
-  await writeFile(path, stringifyFrontmatter(data, nextBody));
-  await touchTopic(slug);
+  await writeAtomic(path, stringifyFrontmatter(data, nextBody));
+  });
   const saved = await readSource(slug, id, true);
   if (!saved) throw new Error("Failed to update source");
   return saved;
@@ -776,22 +816,24 @@ export async function saveNote(
   const dir = notesDir(slug);
   await mkdir(dir, { recursive: true });
   const title = input.title.trim() || "Untitled";
-  const now = nowIso();
-  let id = input.id ? assertChildId(input.id) : undefined;
-  let created = now;
-  if (id) {
-    const existing = await readNote(slug, `${id}.md`);
-    if (!existing) throw new Error(`Note not found: ${id}`);
-    created = existing.created ?? now;
-  } else {
-    const base = `${localDate()}-${slugify(title, "note", true)}`;
-    id = base;
-    let n = 2;
-    while (existsSync(join(dir, `${id}.md`))) id = `${base}-${n++}`;
-  }
-  await writeFile(join(dir, `${id}.md`), stringifyFrontmatter({ title, created, updated: now }, input.body));
-  if (input.id) await touchTopic(slug);
-  else await appendLog(slug, "note", title, `notes/${id}.md`);
+  const id = await withTopicLock(slug, async () => {
+    const now = nowIso();
+    let id = input.id ? assertChildId(input.id) : undefined;
+    let created = now;
+    if (id) {
+      const existing = await readNote(slug, `${id}.md`);
+      if (!existing) throw new Error(`Note not found: ${id}`);
+      created = existing.created ?? now;
+    } else {
+      const base = `${localDate()}-${slugify(title, "note", true)}`;
+      id = base;
+      let n = 2;
+      while (existsSync(join(dir, `${id}.md`))) id = `${base}-${n++}`;
+    }
+    await writeAtomic(join(dir, `${id}.md`), stringifyFrontmatter({ title, created, updated: now }, input.body));
+    return id;
+  });
+  if (!input.id) await appendLog(slug, "note", title, `notes/${id}.md`);
   const note = await readNote(slug, `${id}.md`);
   if (!note) throw new Error("Failed to save note");
   return note;

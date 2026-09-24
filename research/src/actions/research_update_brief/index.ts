@@ -31,7 +31,9 @@ export function createAction(config: ActionConfig, _deps: AppActionRuntimeDeps):
       },
     async execute(args): Promise<ActionResult> {
       try {
-      await updateBrief(String(args.topic ?? ""), String(args.brief ?? ""), opt(args.note));
+      const brief = [args.brief, args.body, args.content].find((v): v is string => typeof v === "string" && v.trim().length > 0);
+      if (!brief) return { status: "error", error: "`brief` (the full new Markdown body of TOPIC.md) is required and must be non-empty" };
+      await updateBrief(String(args.topic ?? ""), brief, opt(args.note));
       return { status: "ok", data: { updated: true } };
       } catch (err) {
         return { status: "error", error: err instanceof Error ? err.message : String(err) };

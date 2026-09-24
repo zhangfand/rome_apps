@@ -73,7 +73,13 @@ class ResearchApi implements RomeAppApiHandler {
       return await this.route(request);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      const status = /not found/i.test(message) ? 404 : /invalid|required|needs/i.test(message) ? 400 : 500;
+      const status = /not found/i.test(message)
+        ? 404
+        : /已存在|busy/i.test(message)
+          ? 409
+          : /invalid|required|needs/i.test(message)
+            ? 400
+            : 500;
       if (status === 500) this.ctx.log.error("research api error", { error: message, path: request.path.join("/") });
       return json({ error: message }, { status });
     }
@@ -121,7 +127,7 @@ class ResearchApi implements RomeAppApiHandler {
 
     if (p.length === 3 && p[2] === "brief" && m === "PUT") {
       const body = readJson(request);
-      if (!body || typeof body.brief !== "string") return json({ error: "brief required" }, { status: 400 });
+      if (!body || typeof body.brief !== "string" || !body.brief.trim()) return json({ error: "brief required" }, { status: 400 });
       await updateBrief(slug, body.brief, "手动编辑了课题状态");
       return json({ ok: true });
     }

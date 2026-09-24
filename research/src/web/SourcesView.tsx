@@ -74,7 +74,7 @@ function SourceList({ slug, onChanged }: { slug: string; onChanged: () => void }
               <AppLink to={[slug, "sources", s.id]}>
                 <ListRowContent>
                   <ListRowTitle className="flex items-center gap-2">
-                    <Badge variant="muted">{KIND_LABEL[s.kind] ?? s.kind}</Badge>
+                    <Badge variant="muted" className="shrink-0">{KIND_LABEL[s.kind] ?? s.kind}</Badge>
                     <span className="truncate">{s.title}</span>
                   </ListRowTitle>
                   <ListRowDescription className="line-clamp-1">
@@ -279,7 +279,7 @@ function SourceDetailView({ slug, id }: { slug: string; id: string }) {
           <SectionHeader>
             <SectionHeading>
               <SectionTitle className="flex items-center gap-2">
-                <Badge variant="muted">{KIND_LABEL[s.kind] ?? s.kind}</Badge>
+                <Badge variant="muted" className="shrink-0">{KIND_LABEL[s.kind] ?? s.kind}</Badge>
                 {s.title}
               </SectionTitle>
               <SectionDescription>

@@ -24,4 +24,15 @@
    predates the named `bg-app-canvas` utility. To override a host token (e.g. pin
    a corner radius), re-declare it in a `:root` block here. */
 
-@import "@rome-os/ui/markdown.css";
+/* Markdown prose: the parts of `@rome-os/ui/markdown.css` minus KaTeX's stylesheet. KaTeX ships
+   fonts via relative url(./fonts/...) that the host's app-stylesheet loader cannot resolve
+   ("Failed to construct 'URL'"), which blocks the whole app from mounting. Research notes rarely
+   use math, so we skip it. */
+@import "streamdown/styles.css";
+@source "../../node_modules/streamdown/dist/*.js";
+@source "../../node_modules/@streamdown/code/dist/*.js";
+@source "../../node_modules/@streamdown/math/dist/*.js";
+@source "../../node_modules/@streamdown/mermaid/dist/*.js";
+@source not inline("py-0.5");
+@source not inline("p-1.5");
+@source not inline("px-1.5");
