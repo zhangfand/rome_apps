@@ -22,9 +22,9 @@ describe("app config composition", () => {
     if (!parsed.ok) return;
     expect(parsed.config.workerAgents).toEqual(DEFAULT_WORKER_AGENTS);
     expect(Object.keys(parsed.config.workerAgents)).toEqual(["conductor:pm", "conductor:coder", "conductor:assistant"]);
-    expect(parsed.config.workerAgents["conductor:assistant"]).toContain("respond-to-review skill");
-    expect(parsed.config.workerAgents["conductor:assistant"]).toContain("does not independently review code");
-    expect(parsed.config.workerAgents["conductor:assistant"]).toContain("or process prototype review feedback");
+    expect(parsed.config.workerAgents["conductor:coder"]).toContain("responds to online review");
+    expect(parsed.config.workerAgents["conductor:assistant"]).not.toContain("respond-to-review");
+    expect(parsed.config.workerAgents["conductor:assistant"]).toContain("does not change code for a delivery or handle review feedback");
     expect(parsed.config.orchestratorAgent).toBe(DEFAULT_ORCHESTRATOR_AGENT);
     expect(parsed.config.github).toEqual({ intakeLabel: DEFAULT_INTAKE_LABEL, reviewAuthors: [...DEFAULT_REVIEW_AUTHORS] });
     expect(parsed.config.frontdeskShadow).toEqual({ enabled: true, model: "jev-latest" });
@@ -79,14 +79,24 @@ describe("app config composition", () => {
     expect(migrated.ok).toBe(true);
     if (migrated.ok) expect(migrated.config.workerAgents).toEqual(DEFAULT_WORKER_AGENTS);
 
+    const previousPm = "Product manager for broad or ambiguous feature requests. Researches the codebase and product precedents, decides defaults, and writes a bounded, implementation-ready spec in the project's agent work repo. Use before coding when scope or user-visible behavior is not clear; if it returns questions, ask the person and resume the same worker.";
     const previous = {
-      "conductor:pm": DEFAULT_WORKER_AGENTS["conductor:pm"],
+      "conductor:pm": previousPm,
       ...legacy,
       "assistant:assistant": "General assistant with web and shell access. Good for research, reading external state (e.g. a PR's review/CI status), handling production review feedback through the repository's respond-to-review skill, and writing summaries. It does not independently review code or process prototype review feedback.",
     };
     const moved = parseAppConfig({ ...base, workerAgents: previous });
     expect(moved.ok).toBe(true);
     if (moved.ok) expect(moved.config.workerAgents).toEqual(DEFAULT_WORKER_AGENTS);
+
+    const preCoderTriage = {
+      "conductor:pm": previousPm,
+      "conductor:coder": "Software engineer for prototypes, production increments, and fixes in the Task's worktree: implements, verifies, commits, pushes, opens pull requests.",
+      "conductor:assistant": "Research and operations assistant: researches, reads external state (e.g. a PR's review/CI status), handles production review feedback through the repository's respond-to-review skill, and writes summaries. It does not independently review code or process prototype review feedback.",
+    };
+    const triaged = parseAppConfig({ ...base, workerAgents: preCoderTriage });
+    expect(triaged.ok).toBe(true);
+    if (triaged.ok) expect(triaged.config.workerAgents).toEqual(DEFAULT_WORKER_AGENTS);
 
     const custom = parseAppConfig({ ...base, workerAgents: { "coding:coding": "Only this worker" } });
     expect(custom.ok).toBe(true);

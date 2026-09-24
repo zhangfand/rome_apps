@@ -1,4 +1,4 @@
-import type { Fact } from "../../../core/lib/facts.js";
+import { type Fact, formatReturnedDetail, returnedDetail, returnedReport } from "../../../core/lib/facts.js";
 import type { LedgerSnapshot, TaskView } from "../../../core/lib/fold.js";
 import type { PushEventRequest } from "../../../core/lib/ingest.js";
 import type { JsonArtifactDraft } from "../../work-repo-artifacts.js";
@@ -39,7 +39,10 @@ export function pullRefsIn(task: TaskView): PullRef[] {
 
 function textOf(fact: Fact): string {
   switch (fact.kind) {
-    case "Returned": return `${fact.payload.summary}\n${fact.payload.detail ?? ""}`;
+    case "Returned": {
+      const detail = returnedDetail(fact.payload);
+      return [fact.payload.summary, detail ? formatReturnedDetail(detail) : "", returnedReport(fact.payload) ?? ""].join("\n");
+    }
     case "Reported": return fact.payload.report;
     case "Reply": return fact.payload.text;
     case "ACK": return fact.payload.summary;

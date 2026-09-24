@@ -29,7 +29,7 @@ const log = createAppLogger("conductor:run_job");
  * detached and the action holds the blocking summon. It writes the worker's
  * own facts — Opened, Returned, Failed — because the worker agent has no
  * tools on this ledger and should not need any. It interprets nothing: the
- * reply is parsed into status + summary + detail and handed to the ledger for
+ * reply is parsed into status + summary + structured detail + free-form report and handed to the ledger for
  * the orchestrator to read.
  */
 export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, composition: CoreComposition): Action {

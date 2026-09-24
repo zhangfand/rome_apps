@@ -35,4 +35,16 @@ describe("fact prompt rendering", () => {
     expect(rendered).toContain("sha256 digest");
     expect(rendered).not.toContain("commentIds");
   });
+
+  it("renders a worker's structured detail and report, and reads a legacy string detail as the report", () => {
+    const returned = (payload: Record<string, unknown>): Fact => ({
+      seq: 20, id: "f20", taskId: "t1", kind: "Returned", by: "w-1",
+      createdAt: new Date("2026-09-24T03:00:00Z"),
+      payload: { workerId: "w-1", status: "blocked", summary: "Two readings.", ...payload },
+    } as Fact);
+    const current = describeFact(returned({ report: "Read settings.ts.", detail: { needs: "pm" } }), { full: true });
+    expect(current).toContain("worker w-1 blocked: Two readings.\ndetail:\n  needs: pm\nRead settings.ts.");
+    const legacy = describeFact(returned({ detail: "Old free-form text." }), { full: true });
+    expect(legacy).toContain("worker w-1 blocked: Two readings.\nOld free-form text.");
+  });
 });

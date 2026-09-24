@@ -211,7 +211,18 @@ export function factBody(fact: FactJson): FactContent {
     case "Noted": return { title: "", body: s("note") };
     case "JobFailed": return { title: `Job ${s("jobId")} could not start`, body: s("error") };
     case "Opened": return { title: value(p, "romeSessionId") ? `Session ${value(p, "romeSessionId")}` : "Session opened", body: "" };
-    case "Returned": return { title: sentenceCase(value(p, "status")), body: s("summary"), extra: s("detail") || undefined };
+    case "Returned": {
+      // `detail` is the structured job result; facts written before `report`
+      // existed stored the free-form report there as a string.
+      const detail = p.detail && typeof p.detail === "object" && !Array.isArray(p.detail)
+        ? Object.entries(p.detail as Record<string, unknown>)
+          .filter(([, v]) => typeof v === "string")
+          .map(([k, v]) => `${k}: ${safeText(v as string)}`)
+          .join("\n")
+        : "";
+      const report = s("report") || s("detail");
+      return { title: sentenceCase(value(p, "status")), body: s("summary"), extra: [detail, report].filter(Boolean).join("\n\n") || undefined };
+    }
     case "Failed": return { title: "Work failed", body: s("error") };
     case "Lost": return { title: "Work stopped", body: s("why") };
     case "Event": return { title: eventTitle(fact), body: s("summary") };

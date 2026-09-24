@@ -18,6 +18,7 @@ Examples:
 
 ## Safety
 
+- Never run a prototype as, beside, or against the person's production instance, and never borrow its cloud identity, tokens, or relay. Start a running system only in the project's development environment.
 - Never print, log, commit, or persist credentials, tokens, or secrets. Redact them from traces. If the design needs a credential to stay owned by another system, check that and report it as evidence.
 - Use test workspaces, sandbox accounts, and side-effect-free calls. Never message real people or change shared production state to answer a prototype question.
 - When a test account or credential is missing, stop, answer `not run`, and name exactly what access would let the prototype run. The Lead can ask the person for it.

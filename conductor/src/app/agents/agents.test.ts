@@ -32,13 +32,16 @@ describe("Conductor agent boundaries", () => {
     expect(prose).toContain("Rely on the repository's online review bots");
     expect(prose).toContain("never create an independent code-review Job");
     expect(prose).toContain("`code-review` skill or action");
-    expect(prose).toContain("create a bounded `conductor:assistant` Job to respond to the findings on that head");
+    // The coder that wrote the PR answers its review, so its session can be resumed.
+    expect(prose).toContain("create a bounded `conductor:coder` Job to respond to the findings on that head");
+    expect(prose).not.toContain("`conductor:assistant` Job to respond");
     expect(prose).not.toContain("loads and follows the repository's `respond-to-review` skill");
     expect(prose).toContain("bot review of that exact head arrives as a new fact");
-    // How to respond is the assistant's own protocol, not the lead's instruction.
-    const assistant = read("assistant.yaml").replace(/\s+/g, " ");
-    expect(assistant).toContain("load and follow the repository's `respond-to-review` skill");
-    expect(assistant).toContain("make only earned in-scope fixes, and record a reasoned disposition for the rest");
+    // How to respond is the coder's own protocol, not the lead's instruction.
+    const coder = read("coder.yaml").replace(/\s+/g, " ");
+    expect(coder).toContain("load and follow the repository's `respond-to-review` skill");
+    expect(coder).toContain("make only earned in-scope fixes, and record a reasoned disposition for the rest");
+    expect(read("assistant.yaml")).not.toContain("respond-to-review");
     expect(lead).not.toContain("Independently verify claims");
     expect(lead).not.toContain("`.claude/skills/babysit-pr`");
     expect(lead).not.toContain("Someone other than the author checks");
@@ -56,18 +59,32 @@ describe("Conductor agent boundaries", () => {
     expect(lead).toContain("person explicitly authorizes a bounded exception");
   });
 
-  it("prototypes medium and large work before production implementation", () => {
+  it("lets the coder decide whether a request needs product definition or a prototype", () => {
     const lead = read("engineer-lead.yaml");
     const prose = lead.replace(/\s+/g, " ");
-    expect(prose).toContain("Size: medium or Size: large");
-    expect(prose).toContain("begin with a bounded prototype before production implementation");
-    expect(prose).toContain("Write a prototype brief for the riskiest open question to `<slug>/prototype-brief.md` in the work repo");
-    expect(prose).toContain("create a `conductor:coder` Job that cites the brief's commit");
-    // The lead says what to find out; the coder's own prompt says how.
+    // No size gate and no lead-authored brief or technical spec.
+    expect(prose).not.toContain("Size: medium or Size: large");
+    expect(prose).not.toContain("prototype-brief.md");
+    expect(prose).not.toContain("technical-spec.md");
+    expect(prose).toContain("Hand every request that changes code to `conductor:coder` first");
+    expect(prose).toContain("Do not route a request to PM or to a prototype on your own judgment");
+    expect(prose).toContain("`needs: pm` — create a `conductor:pm` Job carrying the coder's question and code findings");
+    expect(prose).toContain("`needs: prototype-review` — pass the prototype's handoff to the person");
+    expect(prose).toContain("`needs: person` — ask the person the coder's question");
+    // The lead says what to route; the coder's own prompt says how to prototype.
     expect(prose).not.toContain("feasibility-prototype");
     const coder = read("coder.yaml").replace(/\s+/g, " ");
-    expect(coder).toContain("When the Job asks for a prototype, load and follow `conductor:feasibility-prototype`");
-    expect(prose).toContain("pass its handoff to the person");
+    expect(coder).toContain("Decide what the request needs after reading the relevant code and before writing any");
+    expect(coder).toContain("Build it directly, without a product spec: load and follow `conductor:feasibility-prototype`");
+    expect(coder).toContain("list every product decision you made in the pull request description");
+    expect(coder).toContain("Evolve the approved prototype where its code fits rather than rewriting it");
+    expect(coder).toContain("needs: pm | prototype-review | person");
+    // A running Rome for a prototype comes from the dev loop on devbox, never the production host.
+    expect(coder).toContain("This host runs the person's production Rome");
+    expect(coder).toContain("`pnpm dev:all`) on the `devbox` remote computer through `rome-node device run`");
+    const integration = readFileSync(path.resolve(here, "../skills/feasibility-prototype/INTEGRATION.md"), "utf8");
+    expect(integration).toContain("never borrow its cloud identity, tokens, or relay");
+    expect(read("pm.yaml").replace(/\s+/g, " ")).toContain("When a Job carries a coder's question and code findings, start from them");
     expect(prose).toContain("until their reply before starting production implementation");
     expect(prose).toContain("do not create polling or periodic check-in Jobs");
     expect(prose).toContain("A prototype is not a production delivery");
@@ -83,9 +100,9 @@ describe("Conductor agent boundaries", () => {
     const skill = readFileSync(path.join(dir, "SKILL.md"), "utf8").replace(/\s+/g, " ");
     expect(manifest).toContain("app/skills/feasibility-prototype");
     expect(skill).toContain("name: feasibility-prototype");
-    expect(skill).toContain("`<slug>/prototype-brief.md`");
-    expect(skill).toContain("you decide how to build the prototype. Do not edit it.");
-    expect(skill).toContain("`prototype-brief-format.md`");
+    expect(skill).toContain("A product spec is not required");
+    expect(skill).toContain("a production Job evolves it into the production change");
+    expect(skill).not.toContain("Never merge the branch");
     const brief = domainDoc("prototype-brief-format.md");
     expect(brief).toContain("# Prototype brief format");
     expect(brief).toContain("Question:");
@@ -99,19 +116,20 @@ describe("Conductor agent boundaries", () => {
     }
   });
 
-  it("loads the approved-prototype PR splitting skill before production work", () => {
+  it("lets the coder split work that exceeds one pull request", () => {
     const manifest = readFileSync(path.resolve(here, "../../../app.yaml"), "utf8");
     const lead = read("engineer-lead.yaml").replace(/\s+/g, " ");
     const skill = readFileSync(
-      path.resolve(here, "../skills/split-approved-prototype/SKILL.md"),
+      path.resolve(here, "../skills/split-into-prs/SKILL.md"),
       "utf8",
     ).replace(/\s+/g, " ");
-    expect(manifest).toContain("app/skills/split-approved-prototype");
-    expect(lead).toContain("After approval, turn the approved prototype into the canonical `<slug>/technical-spec.md`");
-    expect(lead).toContain("Then load and follow the `split-approved-prototype` skill");
-    expect(lead).toContain("Record only the PRs that can open now in the technical spec's Tasks section");
-    expect(lead).toContain("do not plan downstream PRs");
-    expect(lead).toContain("Re-run the split after merged work or new evidence");
+    const coder = read("coder.yaml").replace(/\s+/g, " ");
+    expect(manifest).toContain("app/skills/split-into-prs");
+    expect(manifest).not.toContain("split-approved-prototype");
+    expect(lead).not.toContain("split-approved-prototype");
+    expect(coder).toContain("load and follow `conductor:split-into-prs`, open only the pull requests that can open now");
+    expect(lead).toContain("create the next `conductor:coder` Job when what it waits on has merged");
+    expect(skill).toContain("List every PR that cannot open yet under `next`");
     expect(skill).toContain("Main stays releasable after each PR");
     expect(skill).toContain("Every PR is one of two kinds");
     expect(skill).toContain("pull requests that can open today");
@@ -122,8 +140,8 @@ describe("Conductor agent boundaries", () => {
     expect(skill).toContain("Generated files and lockfiles do not count");
     expect(skill).toContain("smallest coherent part that unlocks the next decision");
     expect(skill).toContain("abstractions needed only by later, unplanned behavior out of this round");
-    expect(skill).toContain("For each PR give the Conventional Commit title, the kind");
-    expect(skill).toContain("every scenario in the spec is already proven on main");
+    expect(skill).toContain("give the Conventional Commit title, the kind");
+    expect(skill).toContain("every scenario of the request is already proven on main");
   });
 
   it("keeps delivery policy in Agent system prompts rather than a runtime SOP", () => {
@@ -228,9 +246,9 @@ describe("Conductor agent boundaries", () => {
     expect(TECHNICAL_SPEC_FORMAT).toContain("### Prototypes");
     expect(TECHNICAL_SPEC_FORMAT).toContain("## Done");
     expect(pm).toContain("`product-spec-format.md`");
-    // Only writers name a format: the lead reads product specs but writes technical specs.
+    // Only writers name a format; the lead writes no work-repo artifacts.
     expect(lead).not.toContain("`product-spec-format.md`");
-    expect(lead).toContain("`technical-spec-format.md`");
+    expect(lead).not.toContain("`technical-spec-format.md`");
     expect(lead).not.toContain("The person's answer does not itself make a draft ready");
   });
 
@@ -245,7 +263,6 @@ describe("Conductor agent boundaries", () => {
     expect(WORK_REPO_CONTRACT).toContain("_conductor/tasks/<task-id>/snapshot.md");
     expect(WORK_REPO_CONTRACT).not.toContain("_conductor/contracts");
     expect(pm).toContain("`work-repo-contract.md`");
-    expect(lead).toContain("`work-repo-contract.md`");
     expect(lead).not.toContain("This repo is shared coordination state");
   });
 
@@ -253,8 +270,7 @@ describe("Conductor agent boundaries", () => {
     const lead = flat(read("engineer-lead.yaml"));
     const pm = flat(read("pm.yaml"));
     expect(pm).toContain(`Before writing or revising a product spec, read \`product-spec-format.md\` and \`work-repo-contract.md\` from the installed Conductor app at \`${INSTALLED_DOCS}\``);
-    expect(lead).toContain(`Before writing to the work repo, read \`work-repo-contract.md\``);
-    expect(lead).toContain(INSTALLED_DOCS);
+    expect(lead).not.toContain("Before writing to the work repo");
     for (const prompt of [lead, pm]) {
       expect(prompt).not.toContain("pinned");
       expect(prompt).not.toContain("supplied");
@@ -293,6 +309,9 @@ describe("Conductor worker Agents", () => {
     const reply = parseWorkerReply("Did it.\n\n```conductor\nstatus: blocked\nsummary: Which default? A or B.\n```");
     expect(reply.status).toBe("blocked");
     expect(reply.summary).toBe("Which default? A or B.");
+    const coderReply = parseWorkerReply("Read the code.\n\n```conductor\nstatus: blocked\nsummary: Two readings.\ndetail:\n  needs: pm\n```");
+    expect(coderReply.detail).toEqual({ needs: "pm" });
+    expect(coderReply.report).toBe("Read the code.");
   });
 
   it("lets the lead hand work over by reference to Conductor's workers", () => {
@@ -301,7 +320,7 @@ describe("Conductor worker Agents", () => {
     for (const agent of ["conductor:pm", "conductor:coder", "conductor:assistant"]) expect(lead).toContain(`\`${agent}\``);
     expect(lead).toContain("do not tell it where to work or how to reply");
     expect(lead).toContain("cite its path and commit instead of restating it");
-    expect(lead).toContain("when the work is complex, write it to the work repo first and cite it");
+    expect(lead).not.toContain("write it to the work repo first");
     const replay = flat(read("engineer-lead-replay-v1.yaml"));
     expect(replay).toContain("The source ledger was deliberately not copied");
     expect(replay).not.toContain("assistant:assistant");

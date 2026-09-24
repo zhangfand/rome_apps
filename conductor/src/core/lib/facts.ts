@@ -256,15 +256,37 @@ export type ReturnedFact = FactOf<"Returned", {
   workerId: string;
   status: WorkerStatus;
   summary: string;
-  /** Everything else the worker said. */
-  detail?: string;
+  /** The worker's free-form report: everything it said before the reply block. */
+  report?: string;
+  /**
+   * Job-specific structured result from the reply block's `detail:` section,
+   * e.g. `{ needs: "pm" }`. Facts written before `report` existed carry the
+   * free-form report here as a string; read both through `returnedReport` and
+   * `returnedDetail`.
+   */
+  detail?: Record<string, string> | string;
   /** The verbatim reply, kept when parsing was lossy. */
   raw?: string;
   sessionId?: string;
   /** The requested session could not be resumed; the worker ran fresh. */
   restarted?: boolean;
 }>;
-export type FailedFact = FactOf<"Failed", { jobId?: string; workerId: string; error: string; sessionId?: string; restarted?: boolean }>;
+/** The worker's free-form report, including one stored under legacy `detail`. */
+export function returnedReport(payload: ReturnedFact["payload"]): string | undefined {
+  return payload.report ?? (typeof payload.detail === "string" ? payload.detail : undefined);
+}
+
+/** The worker's job-specific structured result, if it gave one. */
+export function returnedDetail(payload: ReturnedFact["payload"]): Record<string, string> | undefined {
+  const detail = payload.detail;
+  return detail && typeof detail === "object" && Object.keys(detail).length ? detail : undefined;
+}
+
+export function formatReturnedDetail(detail: Record<string, string>, indent = ""): string {
+  return Object.entries(detail).map(([key, value]) => `${indent}${key}: ${value}`).join("\n");
+}
+
+export type FailedFact = FactOf<"Failed",{ jobId?: string; workerId: string; error: string; sessionId?: string; restarted?: boolean }>;
 export type LostFact = FactOf<"Lost", { jobId?: string; workerId: string; why: string }>;
 /** Something outside the ledger happened. The orchestrator decides what it means. */
 export type EventFact = FactOf<"Event", {
@@ -358,8 +380,11 @@ export function describeFact(fact: Fact, opts: { full?: boolean } = {}): string 
       case "Opened":
         return `worker ${fact.payload.workerId} runs in session ${fact.payload.romeSessionId}`;
       case "Returned": {
-        const detail = fact.payload.detail ? `\n${opts.full ? fact.payload.detail : clip(fact.payload.detail, 1500)}` : "";
-        return `worker ${fact.payload.workerId} ${fact.payload.status}: ${fact.payload.summary}${detail}`;
+        const detail = returnedDetail(fact.payload);
+        const detailText = detail ? `\ndetail:\n${formatReturnedDetail(detail, "  ")}` : "";
+        const report = returnedReport(fact.payload);
+        const reportText = report ? `\n${opts.full ? report : clip(report, 1500)}` : "";
+        return `worker ${fact.payload.workerId} ${fact.payload.status}: ${fact.payload.summary}${detailText}${reportText}`;
       }
       case "Failed":
         return `worker ${fact.payload.workerId}: ${fact.payload.error}`;

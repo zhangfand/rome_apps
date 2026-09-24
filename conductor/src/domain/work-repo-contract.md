@@ -29,8 +29,8 @@ Tasks or Jobs contribute to it:
 .
 ├── <workstream-slug>/
 │   ├── product-spec.md   # product contract; PM-owned when PM is involved
-│   ├── prototype-brief.md # questions the prototype must answer; lead-owned
-│   ├── technical-spec.md # approved prototype distilled into production design
+│   ├── prototype-brief.md # optional: questions a prototype must answer
+│   ├── technical-spec.md # optional: durable engineering knowledge
 │   └── artifacts/    # optional supporting evidence that merits its own file
 ├── _conductor/           # runtime-owned Task context
 │   └── tasks/<task-id>/snapshot.md
@@ -43,15 +43,15 @@ Tasks or Jobs contribute to it:
   the repository by Agent, Worker, Run, or transient Task id.
 - `product-spec.md` follows `product-spec-format.md`. Do not encode its format again
   here.
-- `prototype-brief.md` follows `prototype-brief-format.md`. The engineering
-  lead writes it before creating a prototype Job; the prototype worker reads it
-  at the commit the Job cites.
-- `technical-spec.md` follows `technical-spec-format.md`. The engineering lead
-  creates it after a prototype is approved. It holds only durable knowledge
-  needed to continue the delivery: current architecture understanding,
-  executable and future work, actual outcomes, discoveries that changed the
-  plan, and important review dispositions. It is not required for a change
-  whose engineering handoff is already self-contained.
+- `prototype-brief.md` follows `prototype-brief-format.md`. It is optional:
+  a prototype normally states its questions in its own handoff. When a Job
+  cites one, the prototype worker reads it at the cited commit.
+- `technical-spec.md` follows `technical-spec-format.md`. It is optional and
+  holds only durable knowledge needed to continue a delivery that spans
+  several pull requests: current architecture understanding, executable and
+  future work, actual outcomes, discoveries that changed the plan, and
+  important review dispositions. It is not required for a change whose
+  engineering handoff is already self-contained.
 - `artifacts/` is optional. Add narrowly named files only when evidence or a
   decision is too substantial for the canonical spec or design. A Job's routine
   transcript and scratch notes do not belong here.

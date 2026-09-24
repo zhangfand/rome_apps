@@ -1,17 +1,15 @@
 ---
 name: feasibility-prototype
-description: Build a throwaway prototype that answers the riskiest open question in an engineering approach before production work starts. Branches for state logic, UI shape, and real integration boundaries (SDKs, APIs, auth, runtimes).
+description: Build a prototype that answers the riskiest open question in an engineering approach before production work starts. Branches for state logic, UI shape, and real integration boundaries (SDKs, APIs, auth, runtimes).
 ---
 
 # Feasibility prototype
 
-A prototype is throwaway code that answers one question the approach depends on. The question decides the artifact. A prototype that answers "no" has done its job.
+A prototype is the smallest code that answers one question the approach depends on. The question decides the artifact. A prototype that answers "no" has done its job.
 
 ## Input
 
-The Job cites a prototype brief, `<slug>/prototype-brief.md` in the work repo at a commit. Read it at that commit: it says what to find out and how to tell the answer; you decide how to build the prototype. Do not edit it.
-
-If the Job cites no brief, write one following `prototype-brief-format.md` from `~/.rome/*/apps/installed/conductor/active/src/domain/` and put it at the top of your handoff, so the lead and the person can check you answered the right question.
+The question comes from your own reading of the code, or from the Job. A product spec is not required. When the Job cites a prototype brief, read it at the cited commit and do not edit it. Otherwise state the questions and how to tell each answer at the top of your handoff, so the person can check you answered the right question.
 
 ## Pick the branch
 
@@ -25,7 +23,7 @@ Choose by what a wrong assumption would break, and state the choice in the hando
 
 ## Rules for every branch
 
-1. **Throwaway and marked.** Work on a `prototype/<slug>` branch, as a draft PR when a PR is needed to share it. Put files next to what they prototype and put `prototype` in their names. Never merge the branch. What happens to it after approval is recorded in the technical spec, not decided here.
+1. **Marked until approved.** Work on a `prototype/<slug>` branch, as a draft PR when a PR is needed to share it. Put `prototype` in the names of files that exist only to demonstrate. Do not merge it as a prototype. After the person approves it, a production Job evolves it into the production change: keep what fits, rewrite what does not, and remove what exists only to demonstrate.
 2. **One command to try.** A person starts it with one command, or by opening one file. Put the command first in the handoff.
 3. **Surface the state.** After every action, variant switch, or boundary call, show the full relevant state or the event it produced. The person has to see the evidence, not take the worker's word for it.
 4. **No polish.** No test suite, no error handling beyond what keeps it runnable, no abstractions for later cases. Don't hold the handoff for CI or review bots.
@@ -37,7 +35,7 @@ Choose by what a wrong assumption would break, and state the choice in the hando
 Keep it short, in this order:
 
 1. **Try it:** the branch or draft PR, the one command, and any one-time setup.
-2. **Answer:** one row per question, ready to copy into the technical spec's Prototypes table.
+2. **Answer:** one row per question.
 
    | Question | Answer | Evidence |
    | --- | --- | --- |
@@ -45,4 +43,4 @@ Keep it short, in this order:
 
 3. **Problems found:** what the prototype revealed that the approach or spec must absorb.
 4. **Design demonstrated:** the architecture or mechanism the prototype shows, including any part worth reusing in production and any part that must be rewritten.
-5. **Estimate:** what the production work now looks like, compared with the estimate before the prototype.
+5. **Estimate:** what the production work now looks like, and how it splits into pull requests when it exceeds one.

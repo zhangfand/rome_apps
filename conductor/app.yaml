@@ -35,7 +35,7 @@ agents:
 
 skills:
   - app/skills/feasibility-prototype
-  - app/skills/split-approved-prototype
+  - app/skills/split-into-prs
 
 hooks:
   - app/hooks/frontdesk-shadow

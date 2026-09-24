@@ -12,7 +12,8 @@ import { DEFAULT_INTAKE_LABEL, DEFAULT_REVIEW_AUTHORS, githubConfigExtensions, g
 import { defaultWorkRepo, workRepoFor } from "../domain/work-repo.js";
 import type { ConfigExtensions } from "../core/lib/config.js";
 
-const PM_AGENT_DESCRIPTION = "Product manager for broad or ambiguous feature requests. Researches the codebase and product precedents, decides defaults, and writes a bounded, implementation-ready spec in the project's agent work repo. Use before coding when scope or user-visible behavior is not clear; if it returns questions, ask the person and resume the same worker.";
+const PREVIOUS_PM_AGENT_DESCRIPTION = "Product manager for broad or ambiguous feature requests. Researches the codebase and product precedents, decides defaults, and writes a bounded, implementation-ready spec in the project's agent work repo. Use before coding when scope or user-visible behavior is not clear; if it returns questions, ask the person and resume the same worker.";
+const PM_AGENT_DESCRIPTION = "Product manager for requests a coder found ambiguous. Starts from the coder's question and code findings, decides defaults, and writes a bounded, implementation-ready spec in the project's agent work repo; if it returns questions, ask the person and resume the same worker.";
 const LEGACY_ORCHESTRATOR_AGENT = "conductor:orchestrator";
 
 export interface FrontdeskShadowConfig {
@@ -32,7 +33,7 @@ const LEGACY_DEFAULT_WORKER_AGENTS: Record<string, string> = {
 
 /** Defaults before Conductor shipped its own worker Agents. */
 const PREVIOUS_DEFAULT_WORKER_AGENTS: Record<string, string> = {
-  "conductor:pm": PM_AGENT_DESCRIPTION,
+  "conductor:pm": PREVIOUS_PM_AGENT_DESCRIPTION,
   ...LEGACY_DEFAULT_WORKER_AGENTS,
   "assistant:assistant": "General assistant with web and shell access. Good for research, reading external state (e.g. a PR's review/CI status), handling production review feedback through the repository's respond-to-review skill, and writing summaries. It does not independently review code or process prototype review feedback.",
 };
@@ -41,10 +42,17 @@ const PREVIOUS_DEFAULT_WORKER_AGENTS: Record<string, string> = {
  * Conductor's own worker Agents carry the worker protocol in their system
  * prompts, so a Job prompt needs only what is specific to that Job.
  */
-export const DEFAULT_WORKER_AGENTS: Record<string, string> = {
-  "conductor:pm": PM_AGENT_DESCRIPTION,
+/** Conductor's own workers before the coder took over triage and review response. */
+const PRE_CODER_TRIAGE_WORKER_AGENTS: Record<string, string> = {
+  "conductor:pm": PREVIOUS_PM_AGENT_DESCRIPTION,
   "conductor:coder": "Software engineer for prototypes, production increments, and fixes in the Task's worktree: implements, verifies, commits, pushes, opens pull requests.",
   "conductor:assistant": "Research and operations assistant: researches, reads external state (e.g. a PR's review/CI status), handles production review feedback through the repository's respond-to-review skill, and writes summaries. It does not independently review code or process prototype review feedback.",
+};
+
+export const DEFAULT_WORKER_AGENTS: Record<string, string> = {
+  "conductor:pm": PM_AGENT_DESCRIPTION,
+  "conductor:coder": "Software engineer and first reader of every code request: decides whether it needs product definition or a prototype, then implements, verifies, commits, pushes, opens pull requests, and responds to online review on them.",
+  "conductor:assistant": "Research and operations assistant: researches, reads external state (e.g. a PR's review/CI status), and writes summaries. It does not change code for a delivery or handle review feedback.",
 };
 
 const parseConfig = createConfigParser(
@@ -59,7 +67,7 @@ export function parseAppConfig(raw: unknown) {
   const workers = value.workerAgents;
   const migrated = { ...value };
   if (workers && typeof workers === "object" && !Array.isArray(workers)
-    && [LEGACY_DEFAULT_WORKER_AGENTS, PREVIOUS_DEFAULT_WORKER_AGENTS].some((roster) => sameRecord(workers as Record<string, unknown>, roster))) {
+    && [LEGACY_DEFAULT_WORKER_AGENTS, PREVIOUS_DEFAULT_WORKER_AGENTS, PRE_CODER_TRIAGE_WORKER_AGENTS].some((roster) => sameRecord(workers as Record<string, unknown>, roster))) {
     migrated.workerAgents = DEFAULT_WORKER_AGENTS;
   }
   if (migrated.orchestratorAgent === LEGACY_ORCHESTRATOR_AGENT) {

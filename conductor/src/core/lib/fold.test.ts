@@ -168,7 +168,32 @@ describe("parseWorkerReply", () => {
     const r = parseWorkerReply("I did things.\n\nPR: https://x\n\n```conductor\nstatus: succeeded\nsummary: Opened PR https://x with tests.\n```\n");
     expect(r.status).toBe("succeeded");
     expect(r.summary).toBe("Opened PR https://x with tests.");
-    expect(r.detail).toContain("I did things");
+    expect(r.report).toContain("I did things");
+    expect(r.detail).toBeUndefined();
+  });
+  it("reads a structured detail section without folding it into the summary", () => {
+    const r = parseWorkerReply([
+      "Read the settings code.",
+      "",
+      "```conductor",
+      "status: blocked",
+      "summary: The request has two plausible readings",
+      "  with different user-visible outcomes.",
+      "detail:",
+      "  needs: pm",
+      "  status: not a top-level field here",
+      "  question: Should the default apply to",
+      "    existing chats?",
+      "```",
+    ].join("\n"));
+    expect(r.status).toBe("blocked");
+    expect(r.summary).toBe("The request has two plausible readings with different user-visible outcomes.");
+    expect(r.detail).toEqual({
+      needs: "pm",
+      status: "not a top-level field here",
+      question: "Should the default apply to existing chats?",
+    });
+    expect(r.report).toBe("Read the settings code.");
   });
   it("falls back to unparsed without losing text", () => {
     const r = parseWorkerReply("just prose");
