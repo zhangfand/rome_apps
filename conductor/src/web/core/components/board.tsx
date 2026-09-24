@@ -147,9 +147,9 @@ export function Board({
              >
                 {freshIds.has(task.id) && <FreshEdge />}
                 <CardHeader>
-                  <CardTitle className="flex flex-wrap items-center gap-2.5">
+                  <CardTitle className="flex min-w-0 flex-wrap items-center gap-2.5">
                     <StateChip label={label} tone={tone} />
-                    {taskTitle(task)}
+                    <span className="clamp-two min-w-0 break-anywhere" title={taskTitle(task)}>{taskTitle(task)}</span>
                     {/* The project is a tag on the task, not a description
                         of it: it names where the task runs, so it reads as a
                         chip beside the title rather than as prose under it. */}
@@ -249,7 +249,7 @@ export function Board({
                 {rowIndex > 0 && <Separator />}
                 <CardContent className="relative flex flex-wrap items-center gap-2.5 py-4">
                   {freshIds.has(task.id) && <FreshEdge />}
-                  <Button variant="link" size="xs" className="px-0 text-foreground" onClick={() => navigateToApp(`/${task.id}`)}>{taskTitle(task)}</Button>
+                  <TaskTitleLink task={task} />
                   {task.liveWorker?.romeSession && (
                     <WorkerLink
                       workerId={task.liveWorker.workerId}
@@ -285,7 +285,7 @@ export function Board({
               {rowIndex > 0 && <Separator />}
               <CardContent className="relative flex flex-wrap items-center gap-2.5 py-4">
                 {freshIds.has(task.id) && <FreshEdge />}
-                <Button variant="link" size="xs" className="px-0 text-foreground" onClick={() => navigateToApp(`/${task.id}`)}>{taskTitle(task)}</Button>
+                <TaskTitleLink task={task} />
                 <span className="max-w-[56ch] truncate text-aux text-muted-foreground">{safeText(task.waiting?.reason ?? latestRestingText(task))}</span>
                 <span className="ml-auto text-aux text-muted-foreground">{restingWhen(task, now)}</span>
               </CardContent>
@@ -315,6 +315,29 @@ function ReplyError({ message }: { message: string }) {
 
 export function FreshEdge() {
   return <span aria-hidden="true" className="afterglow-edge absolute inset-y-0 left-0 w-0.5 bg-ring" />;
+}
+
+/**
+ * A task title as a link to its detail page. Titles are the first line of a
+ * free-form brief, so they can run to hundreds of characters: the link keeps
+ * to one line, ellipsises what does not fit, and carries the full title as a
+ * tooltip. The button itself is a non-shrinking `nowrap` flex box, so the
+ * ellipsis lives on an inner span and the button is allowed to shrink.
+ */
+export function TaskTitleLink({ task, className }: { task: TaskSummary; className?: string }) {
+  const title = taskTitle(task);
+  return (
+    <Button
+      variant="link"
+      size="xs"
+      align="start"
+      title={title}
+      className={cn("min-w-0 max-w-full shrink px-0 text-foreground", className)}
+      onClick={() => navigateToApp(`/${task.id}`)}
+    >
+      <span className="min-w-0 truncate">{title}</span>
+    </Button>
+  );
 }
 
 export function taskTitle(task: TaskSummary): string {

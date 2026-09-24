@@ -38,6 +38,20 @@
   -webkit-line-clamp: 4;
 }
 
+.clamp-two,
+.clamp-three {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+}
+.clamp-two { -webkit-line-clamp: 2; }
+.clamp-three { -webkit-line-clamp: 3; }
+
+/* Titles come from the first line of a brief, so they can be arbitrarily long
+   and may contain unbroken runs (URLs, paths, hashes). Let them break anywhere
+   rather than push the layout sideways. */
+.break-anywhere { overflow-wrap: anywhere; }
+
 @media (prefers-reduced-motion: no-preference) {
   .afterglow-edge { animation: afterglow 60s var(--ease-classical) forwards; }
   .loading-dot { animation: dot 1.4s var(--ease-classical) infinite; }

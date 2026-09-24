@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { navigateToApp } from "@rome-os/app-web-sdk";
-import { Button } from "@rome-os/ui/button";
 import { Card } from "@rome-os/ui/card";
 import { cn } from "@rome-os/ui/cn";
 import { EmptyState, EmptyStateDescription, EmptyStateTitle } from "@rome-os/ui/empty-state";
@@ -11,7 +10,7 @@ import { formatRelative } from "../lib/format";
 import type { TaskSummary } from "../lib/types";
 import { formatCost, formatTokens, type TaskTokenUsage } from "../lib/task-usage";
 import { useTaskUsage } from "../lib/use-task-usage";
-import { FreshEdge, taskTitle } from "./board";
+import { FreshEdge, TaskTitleLink } from "./board";
 
 type Filter = "All" | "Needs you" | "Running" | "Resting" | "Closed";
 const FILTER_BUCKET: Partial<Record<Filter, TaskBucket>> = {
@@ -73,15 +72,7 @@ export function TaskList({ tasks, now, freshIds }: { tasks: TaskSummary[]; now: 
                     {task.id}
                   </TableCell>
                   <TableCell className="max-w-0 whitespace-normal">
-                    <Button
-                      variant="link"
-                      size="xs"
-                      align="start"
-                      className="max-w-full truncate px-0 text-foreground"
-                      onClick={() => navigateToApp(`/${task.id}`)}
-                    >
-                      {taskTitle(task)}
-                    </Button>
+                    <TaskTitleLink task={task} className="flex" />
                     <span className="block truncate text-aux text-muted-foreground">{latestText(task)}</span>
                   </TableCell>
                   <TableCell className="text-aux text-muted-foreground">{safeText(task.projectId ?? "—")}</TableCell>

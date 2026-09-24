@@ -69,6 +69,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
   const [historyView, setHistoryView] = useState<HistoryView>(readView);
   const [activityOrder, setActivityOrder] = useState<ActivityOrder>(readActivityOrder);
   const [hideRoutine, setHideRoutine] = useState(true);
+  const [titleExpanded, setTitleExpanded] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const composerInitialized = useRef(false);
   const usage = useTaskUsageAnalysis(task, detailTab === "Usage");
@@ -208,6 +209,10 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
       : undefined;
   const originLabel = originSource ? ` · ${safeText(originSource)}${originNumber !== undefined ? ` #${originNumber}` : ""}` : "";
   const from = origin ? task.createdBy : "you";
+  const title = taskTitle(task);
+  // Past roughly three lines at the heading size the title is clamped, with a
+  // toggle to read the rest; shorter titles never show the toggle.
+  const longTitle = title.length > 160;
   const openComposer = () => {
     setDetailTab("Overview");
     setComposerOpen(true);
@@ -223,11 +228,22 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
 
       <section className="flex flex-col gap-4 border-b border-border pb-5">
         <div className="flex flex-col gap-2">
-          <h1 className="flex flex-wrap items-center gap-2.5 text-title">
+          <h1 className="flex min-w-0 flex-wrap items-center gap-2.5 text-title">
             <StateChip label={task.state} tone={task.state === "open" ? "info" : taskTone(task)} />
-            {taskTitle(task)}
+            <span className={cn("min-w-0 break-anywhere", longTitle && !titleExpanded && "clamp-three")} title={title}>{title}</span>
             <Badge variant="outline">{task.id}</Badge>
           </h1>
+          {longTitle && (
+            <Button
+              variant="link"
+              size="xs"
+              className="w-fit px-0 text-muted-foreground hover:text-foreground"
+              aria-expanded={titleExpanded}
+              onClick={() => setTitleExpanded((open) => !open)}
+            >
+              {titleExpanded ? "show less" : "show full title"}
+            </Button>
+          )}
           <div className="flex flex-wrap gap-3.5 text-aux text-muted-foreground">
           <span>{safeText(task.projectId ?? "no project")}{task.projectSubtitle ? ` · ${safeText(task.projectSubtitle)}` : ""}</span>
           <span>from {safeText(from)}{originLabel}</span>
