@@ -4,3 +4,20 @@ dist/
 *.log
 .DS_Store
 20[0-9][0-9]/[0-9][0-9]/
+
+# Never commit family medical data: uploads, rendered pages, local DBs,
+# fixture/spike output, or coverage artifacts.
+data/
+uploads/
+pages/
+fixtures-out/
+spike-out/
+tmp/
+coverage/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.pdf
+*.heic
+*.HEIC

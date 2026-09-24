@@ -1,55 +1,28 @@
 formatVersion: 2
 id: family-health
-name: Family Health
+name: 家庭体检助手
 version: 0.1.0
-description: Family Health app
-# Shown on the app's social share card and as the preview text beside it.
-# One sentence, at most 80 characters (40 for CJK): lead with what the user
-# gets, no jargon — write it like an App Store subtitle. Without it the card
-# shows no description at all, so fill it in and update it when the app's
-# purpose changes.
-# tagline: One sentence for the share card
+description: >-
+  Family health-checkup tracker (UI in Simplified Chinese). Stores family
+  members, uploaded checkup reports (PDF/photo), AI-extracted lab results and
+  imaging findings, lifestyle interventions and home measurements; shows
+  per-indicator trends and plain-language interpretations. Use its actions to
+  list members, log an intervention or a home measurement (weight, blood
+  pressure) from chat, end an intervention, or query a member's indicator
+  history and abnormal results. All data stays on this machine.
+tagline: 全家体检报告自动整理，指标趋势一目了然
 icon: assets/icon.svg
 appRoot: dist
 includeSource: true
 
 web:
   manifest: web/manifest.json
-  displayName: Family Health
-  navLabel: Family Health
+  displayName: 家庭体检助手
+  navLabel: 家庭体检助手
 
 api:
   entry: api/index
-  # By default every `/api/app-api/<appId>/*` route is gated by the dashboard
-  # session cookie. To expose endpoints to the public internet (third-party
-  # webhooks, public callbacks), opt them out of the session check below.
-  # `true` opens every sub-path of this app; an array opens only the listed
-  # sub-paths (a trailing `/*` makes the entry a prefix match).
-  # noAuth: true
-  # noAuth:
-  #   - /webhooks/stripe
-  #   - /public/*
 
-# Uncomment the block below to enable a per-app SQLite database (Drizzle ORM).
-# After uncommenting, run `pnpm db:generate` to produce migrations from
-# src/db/schema.ts. If you don't need a DB, delete the src/db/ directory and
-# drizzle.config.ts. See src/db/README.md for details.
-# db:
-#   migrations: db/migrations
-#   tablePrefix: family_health
-
-actions:
-  - actions/hello
-  # Uncomment to enable the ask-agent example, which calls the platform
-  # `system:summon` action to run the demo agent and return its final result. Requires
-  # the `agents:` block below so the `family-health:demo` agent is registered. The API
-  # route `POST /ask` in src/api/index.ts calls this action through `runAction`.
-  # - actions/ask-agent
-
-# Uncomment the block below to register app-owned agents. Each entry points at
-# a YAML file under src/agents/. The demo agent in src/agents/demo.yaml
-# is a sensible template — edit its tools, model, and systemPromptPrefix to fit
-# the app, then list it here. If you don't need an agent, delete the
-# src/agents/ directory.
-# agents:
-#   - agents/demo.yaml
+db:
+  migrations: db/migrations
+  tablePrefix: family_health
