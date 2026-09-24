@@ -115,8 +115,10 @@ export function TrendChart({
   interventions,
   unit,
   direction,
+  bandText,
   height = 320,
 }: {
+  bandText?: string | null;
   points: SeriesPoint[];
   band: NumericRange | null;
   interventions: Array<{ id: string; title: string; category: string; startDate: string; endDate: string | null }>;
@@ -272,12 +274,12 @@ export function TrendChart({
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      <ChartLegend colors={c} hasMeasures={model.measures.length > 0} hasBand={!!band && (band.low != null || band.high != null)} band={band} hasSpans={model.spans.length > 0} unit={unit} />
+      <ChartLegend colors={c} hasMeasures={model.measures.length > 0} hasBand={!!band && (band.low != null || band.high != null)} band={band} bandText={bandText} hasSpans={model.spans.length > 0} unit={unit} />
     </div>
   );
 }
 
-function ChartLegend({ colors: c, hasMeasures, hasBand, band, hasSpans, unit }: { colors: ThemeColors; hasMeasures: boolean; hasBand: boolean; band: NumericRange | null; hasSpans: boolean; unit: string }) {
+function ChartLegend({ colors: c, hasMeasures, hasBand, band, bandText, hasSpans, unit }: { colors: ThemeColors; hasMeasures: boolean; hasBand: boolean; band: NumericRange | null; bandText?: string | null; hasSpans: boolean; unit: string }) {
   return (
     <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="图例">
       <li className="flex items-center gap-1.5">
@@ -304,7 +306,7 @@ function ChartLegend({ colors: c, hasMeasures, hasBand, band, hasSpans, unit }: 
       {hasBand ? (
         <li className="flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-3.5 rounded-sm" style={{ background: c.success, opacity: 0.25 }} />
-          参考范围 {formatRange(band)} {unit}
+          参考范围 {bandText || formatRange(band)} {unit}
         </li>
       ) : null}
       {hasSpans ? (

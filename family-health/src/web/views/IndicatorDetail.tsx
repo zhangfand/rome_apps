@@ -189,7 +189,7 @@ export function IndicatorDetailView({ memberId, code }: { memberId: string; code
             <SectionTitle>变化趋势</SectionTitle>
           </SectionHeading>
         </SectionHeader>
-        <TrendChart points={d.points} band={d.band} interventions={d.interventions} unit={formatUnit(d.unit)} direction={d.direction} />
+        <TrendChart points={d.points} band={d.band} interventions={d.interventions} unit={formatUnit(d.unit)} direction={d.direction} bandText={d.bandSource === "report" ? d.bandText : null} />
       </Section>
 
       <TrendInsightView memberId={memberId} code={d.code} initial={d.insight} />

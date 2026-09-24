@@ -2,6 +2,7 @@ import "./styles.css";
 import type { RomeAppBootstrap } from "@rome-os/app-web-sdk";
 import { Page, PageNav, PageNavLink } from "@rome-os/ui/page";
 import { Toaster } from "@rome-os/ui/sonner";
+import { TimestampProvider } from "@rome-os/ui/timestamp";
 import { TooltipProvider } from "@rome-os/ui/tooltip";
 import { Disclaimer } from "./components/common";
 import { useApi } from "./lib/hooks";
@@ -63,6 +64,7 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
   const active = section(route);
   return (
     <ThemeColorsProvider>
+      <TimestampProvider locale="zh-CN">
       <TooltipProvider>
         <MetaContext.Provider value={meta.data}>
           <Page className="min-h-full bg-[var(--app-canvas)]">
@@ -87,6 +89,7 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
           <Toaster position="top-center" />
         </MetaContext.Provider>
       </TooltipProvider>
+      </TimestampProvider>
     </ThemeColorsProvider>
   );
 }

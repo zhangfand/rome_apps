@@ -293,3 +293,20 @@ describe("insights", () => {
     expect(row.markdown).toContain(DISCLAIMER);
   });
 });
+
+describe("report causal guard", () => {
+  it("removes causal sentences from report interpretations", async () => {
+    const { stripReportCausal } = await import("../src/lib/insights.js");
+    const ins = coerceReportInsight({
+      overview: "整体改善。说明减重和控制饮食起到了作用。",
+      groups: { urgent: [], recheck: [], lifestyle: [{ indicator: "脂肪肝", what: "肝脏脂肪偏多。", meaning: "由轻度变为中度后又回到轻度。控制饮食使得脂肪肝好转。", next_step: "一年后复查。" }], watch: [] },
+      comparison: { improved: ["甘油三酯下降", "得益于快走，体重下降"], worsened: [], new_findings: [] },
+      lifestyle_advice: ["继续快走"],
+    });
+    const out = stripReportCausal(ins);
+    expect(out.overview).toBe("整体改善。");
+    expect(out.groups.lifestyle[0].meaning).toBe("由轻度变为中度后又回到轻度。");
+    expect(out.comparison.improved).toEqual(["甘油三酯下降"]);
+    expect(out.lifestyle_advice).toEqual(["继续快走"]);
+  });
+});

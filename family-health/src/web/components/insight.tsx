@@ -16,7 +16,7 @@ function Item({ item }: { item: InsightItem }) {
         <h5 className="font-medium text-foreground">{item.indicator}</h5>
         {item.source === "rule" ? <Badge variant="outline">系统规则</Badge> : null}
       </div>
-      <dl className="grid gap-2 text-sm leading-relaxed sm:grid-cols-[7.5rem_1fr]">
+      <dl className="grid gap-2 text-sm leading-relaxed sm:grid-cols-[9.5rem_1fr]">
         {item.what ? (
           <>
             <dt className="text-muted-foreground">这是什么</dt>

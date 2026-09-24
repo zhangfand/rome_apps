@@ -148,7 +148,7 @@ export function IndicatorPicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" align="between" className="w-full min-w-[9rem] max-w-[14rem] font-normal" disabled={disabled} aria-label="匹配的标准指标">
+        <Button variant="outline" size="sm" align="between" className="w-full min-w-0 font-normal" disabled={disabled} aria-label="匹配的标准指标">
           <span className={`truncate ${value ? "text-foreground" : "text-warning-fg"}`}>{value ? label ?? value : "未匹配"}</span>
           <ChevronsUpDown className="opacity-50" />
         </Button>

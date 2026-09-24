@@ -173,6 +173,7 @@ export function buildReportPrompt(payload: ReportPayload): string {
     "- comparison：与上一次体检相比 improved（好转）、worsened（变差）、new_findings（新出现），没有历史数据则都为空数组。",
     "- lifestyle_advice：3–5 条具体可执行的生活方式建议，结合成员的关注目标。",
     "- 不要下诊断，不要推荐具体药物或剂量，不要夸大风险；语气平实、具体。",
+    "- 提到生活方式调整或用药与指标变化时，只能说“时间上同时发生”，不能说导致、起到作用、说明有效等因果结论。",
     "",
     "数据（JSON）：",
     JSON.stringify(payload),
@@ -283,6 +284,28 @@ export function mergeAlerts(insight: ReportInsight, alerts: CriticalAlert[], fin
 }
 
 const GROUP_ZH: Record<(typeof GROUP_KEYS)[number], string> = { urgent: "需尽快就医", recheck: "建议复查", lifestyle: "生活方式关注", watch: "轻微可观察" };
+
+/** Remove causal sentences from every text field of a report interpretation. */
+export function stripReportCausal(ins: ReportInsight): ReportInsight {
+  const clean = (s: string) =>
+    s
+      .split(/(?<=[。！？；;!?])/)
+      .filter((p) => !CAUSAL_RE.test(p))
+      .join("")
+      .trim();
+  const items = (xs: InsightItem[]) => xs.map((i) => ({ ...i, what: clean(i.what), meaning: clean(i.meaning), next_step: clean(i.next_step) }));
+  return {
+    ...ins,
+    overview: clean(ins.overview),
+    groups: { urgent: items(ins.groups.urgent), recheck: items(ins.groups.recheck), lifestyle: items(ins.groups.lifestyle), watch: items(ins.groups.watch) },
+    comparison: {
+      improved: ins.comparison.improved.map(clean).filter(Boolean),
+      worsened: ins.comparison.worsened.map(clean).filter(Boolean),
+      new_findings: ins.comparison.new_findings.map(clean).filter(Boolean),
+    },
+    lifestyle_advice: ins.lifestyle_advice.map(clean).filter(Boolean),
+  };
+}
 
 export function reportMarkdown(ins: ReportInsight): string {
   const lines: string[] = ["## 总体概况", ins.overview || "（无）", ""];
@@ -422,7 +445,7 @@ export async function generateReportInsight(store: FamilyHealthStore, reportId: 
   if (!res.ok) {
     return store.upsertInsight({ ...base, status: "failed", content: existing?.content ?? null, markdown: existing?.markdown ?? null, error: `生成解读失败：${res.error}` });
   }
-  const content = mergeAlerts(coerceReportInsight(res.data), built.alerts, built.findingAlerts);
+  const content = mergeAlerts(stripReportCausal(coerceReportInsight(res.data)), built.alerts, built.findingAlerts);
   return store.upsertInsight({ ...base, status: "ready", content, markdown: reportMarkdown(content), error: null });
 }
 

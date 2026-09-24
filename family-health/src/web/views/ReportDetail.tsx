@@ -608,7 +608,7 @@ export function ReportDetailView({ reportId }: { reportId: string }) {
             </SectionHeader>
             <FindingsEditor detail={data} mutate={mutate} meta={meta} activePage={page} />
           </Section>
-          <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 border-t border-border bg-[var(--app-canvas)] py-3">
+          <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 border-t border-border bg-[var(--app-canvas)] py-3 pr-16 sm:pr-0">
             {confirmBlocked ? <span className="text-sm text-warning-fg">{confirmBlocked}</span> : <span className="text-sm text-muted-foreground">确认后数据会计入趋势，并自动生成 AI 解读。</span>}
             <Button onClick={() => void confirm()} disabled={!!confirmBlocked || busy}>
               {busy ? <Spinner size="sm" /> : <CheckCircle2 />} 确认报告
