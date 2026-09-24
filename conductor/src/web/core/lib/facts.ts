@@ -56,6 +56,7 @@ const LABELS: Record<string, string> = {
   Lost: "lost",
   // Notes are quiet implementation detail and are hidden by default. When
   // revealed, this neutral word describes the content rather than its storage.
+  ACK: "acknowledged",
   Noted: "update",
   Snapshot: "snapshot",
 };
@@ -121,6 +122,7 @@ export function factTone(fact: FactJson): Tone {
     case "Returned": return "neutral";
     case "Dispatched":
     case "Opened":
+    case "ACK":
     case "Noted":
     case "Snapshot":
     case "Cancelled": return "quiet";
@@ -167,7 +169,7 @@ export function authorLane(fact: FactJson): 1 | 2 | 3 | 4 {
 }
 
 export function isRoutine(fact: FactJson): boolean {
-  return fact.kind === "Opened" || fact.kind === "Noted" || fact.kind === "Snapshot" || (fact.kind === "Dispatched" && typeof fact.payload.jobId === "string");
+  return fact.kind === "Opened" || fact.kind === "ACK" || fact.kind === "Noted" || fact.kind === "Snapshot" || (fact.kind === "Dispatched" && typeof fact.payload.jobId === "string");
 }
 
 export function expandedTextLabel(fact: FactJson): "instructions" | "detail" {
@@ -205,6 +207,7 @@ export function factBody(fact: FactJson): FactContent {
       title: value(p, "resumeAfter") ? `Waiting until ${formatStamp(value(p, "resumeAfter"))}` : "Waiting",
       body: s("reason"),
     };
+    case "ACK": return { title: "", body: s("summary") };
     case "Noted": return { title: "", body: s("note") };
     case "JobFailed": return { title: `Job ${s("jobId")} could not start`, body: s("error") };
     case "Opened": return { title: value(p, "romeSessionId") ? `Session ${value(p, "romeSessionId")}` : "Session opened", body: "" };
@@ -261,6 +264,7 @@ export function safeText(text: string): string {
     .replace(/\bJobCreated\b/g, "Created job")
     .replace(/\bJobFailed\b/g, "Job failed")
     .replace(/\bReturned\b/g, "Came back")
+    .replace(/\bACK\b/g, "Acknowledged")
     .replace(/\bNoted\b/g, "Updated")
     .replace(/\bLost\b/g, "Stopped");
 }

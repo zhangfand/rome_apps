@@ -42,6 +42,7 @@ function textOf(fact: Fact): string {
     case "Returned": return `${fact.payload.summary}\n${fact.payload.detail ?? ""}`;
     case "Reported": return fact.payload.report;
     case "Reply": return fact.payload.text;
+    case "ACK": return fact.payload.summary;
     case "Noted": return fact.payload.note;
     case "Event": return fact.payload.summary;
     default: return "";

@@ -136,7 +136,7 @@ describe("Conductor agent boundaries", () => {
       expect(description).not.toMatch(/\b(?:use|call|prefer|read) (?:this|it|when|before)\b/i);
     }
     expect(names.sort()).toEqual([
-      "add_task_note",
+      "acknowledge_task_update",
       "ask_person",
       "cancel_task",
       "close_task",
@@ -158,6 +158,8 @@ describe("Conductor agent boundaries", () => {
       "wake_task_coordinator",
     ]);
     const manifest = readFileSync(path.resolve(here, "../../../app.yaml"), "utf8");
+    expect(manifest).not.toContain("app/actions/note");
+    expect(manifest).toContain("app/actions/ack");
     expect(manifest).not.toContain("app/actions/wait");
     expect(read("engineer-lead.yaml")).not.toContain("conductor:wait_for_task_update");
   });

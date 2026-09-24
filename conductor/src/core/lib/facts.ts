@@ -18,8 +18,18 @@ import type { ProjectBinding } from "./projects.js";
 /** Written by a person. */
 export const PERSON_KINDS = ["Created", "Reply", "Completed", "Cancelled"] as const;
 
-/** Written by the orchestrator. Every one of these is a decision. */
-export const DECISION_KINDS = ["JobCreated", "Asked", "Reported", "Waited", "Completed", "Cancelled", "Noted"] as const;
+/** Written by the orchestrator. Every one of these changes the Task's workflow posture. */
+export const DECISION_KINDS = ["JobCreated", "Asked", "Reported", "Waited", "Completed", "Cancelled"] as const;
+
+/**
+ * Written by the orchestrator to close one observation cycle without changing
+ * the Task's workflow posture. `Noted` is the legacy spelling retained only so
+ * append-only ledgers written by older versions remain readable.
+ */
+export const ACK_KINDS = ["ACK", "Noted"] as const;
+
+/** Any orchestrator-authored fact that advances the processed-through cursor. */
+export const COORDINATOR_KINDS = [...DECISION_KINDS, ...ACK_KINDS] as const;
 
 /** Written by the runtime or a worker: things that happened. */
 export const RUNTIME_KINDS = ["Dispatched", "JobFailed", "Opened", "Returned", "Failed", "Lost", "Event"] as const;
@@ -29,7 +39,7 @@ export const CONTEXT_KINDS = ["Snapshot"] as const;
 
 export const FACT_KINDS = [
   "Created", "Reply", "Completed", "Cancelled",
-  "JobCreated", "Dispatched", "Asked", "Reported", "Waited", "Noted",
+  "JobCreated", "Dispatched", "Asked", "Reported", "Waited", "ACK", "Noted",
   "JobFailed", "Opened", "Returned", "Failed", "Lost", "Event",
   "Snapshot",
 ] as const;
@@ -184,6 +194,8 @@ export type JobCreatedFact = FactOf<"JobCreated", {
 export type AskedFact = FactOf<"Asked", { question: string }>;
 export type ReportedFact = FactOf<"Reported", { report: string }>;
 export type WaitedFact = FactOf<"Waited", { reason: string; resumeAfter: string }>;
+export type AckFact = FactOf<"ACK", { summary: string }>;
+/** @deprecated Historical acknowledgement facts written before `ACK`. */
 export type NotedFact = FactOf<"Noted", { note: string }>;
 
 /**
@@ -267,7 +279,7 @@ export type EventFact = FactOf<"Event", {
 
 export type Fact =
   | CreatedFact | ReplyFact | CompletedFact | CancelledFact
-  | JobCreatedFact | AskedFact | ReportedFact | WaitedFact | NotedFact
+  | JobCreatedFact | AskedFact | ReportedFact | WaitedFact | AckFact | NotedFact
   | DispatchedFact | JobFailedFact | OpenedFact | ReturnedFact | FailedFact | LostFact | EventFact
   | SnapshotFact;
 
@@ -337,6 +349,8 @@ export function describeFact(fact: Fact, opts: { full?: boolean } = {}): string 
         return fact.payload.report;
       case "Waited":
         return `until ${fact.payload.resumeAfter}: ${fact.payload.reason}`;
+      case "ACK":
+        return fact.payload.summary;
       case "Noted":
         return fact.payload.note;
       case "JobFailed":

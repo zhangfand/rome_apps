@@ -56,7 +56,7 @@ actions:
   - app/actions/ask
   - app/actions/report
   - app/actions/close
-  - app/actions/note
+  - app/actions/ack
   - app/actions/stop
 
 tagline: "Run long-lived tasks with a flexible playbook you can change anytime."

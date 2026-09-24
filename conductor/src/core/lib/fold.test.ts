@@ -35,19 +35,54 @@ describe("foldTask", () => {
   it("does not treat an orchestrator-authored runtime outcome as a decision", () => {
     const task = foldTask([
       created(),
-      f({ kind: "Noted", by: "orchestrator", payload: { note: "worker is still useful" } }),
+      f({ kind: "ACK", by: "orchestrator", payload: { summary: "worker is still useful" } }),
       f({ kind: "Dispatched", by: "runtime", payload: { jobId: "j-1", workerId: "w-1", agent: "coding:coding", instructions: "x", prompt: "x" } }),
       f({ kind: "Lost", by: "orchestrator", payload: { jobId: "j-1", workerId: "w-1", why: "stopped" } }),
     ]);
-    expect(task.lastDecision?.kind).toBe("Noted");
+    expect(task.lastDecision).toBeUndefined();
+    expect(task.lastProcessedSeq).toBe(task.facts[1].seq);
     expect(task.unseen.map((fact) => fact.kind)).toEqual(["Lost"]);
     expect(needsAttention(task, new Date())).toMatchObject({ wake: true });
+  });
+
+  it("ACK advances processing without replacing workflow state or consuming the decision budget", () => {
+    const facts = [
+      created(),
+      f({ kind: "Reported", by: "orchestrator", payload: { report: "Please verify the prototype." } }),
+      f({ kind: "Event", by: "runtime", payload: { source: "github", type: "comment", summary: "bot chatter" } }),
+      f({ kind: "ACK", by: "orchestrator", payload: { summary: "The comment does not change the handoff." } }),
+    ];
+    const task = foldTask(facts);
+    expect(task.lastDecision?.kind).toBe("Reported");
+    expect(task.lastDecisionSeq).toBe(facts[1].seq);
+    expect(task.lastProcessedSeq).toBe(facts[3].seq);
+    expect(task.decisionsSinceLastPersonFact).toBe(1);
+    expect(task.unseen).toEqual([]);
+    expect(needsAttention(task, new Date()).wake).toBe(false);
+  });
+
+  it("legacy Noted behaves as an acknowledgement, not a workflow state", () => {
+    const facts = [
+      created(),
+      f({ kind: "Asked", by: "orchestrator", payload: { question: "Proceed?" } }),
+      f({ kind: "Noted", by: "orchestrator", payload: { note: "legacy observation" } }),
+    ];
+    const task = foldTask(facts);
+    expect(task.lastDecision?.kind).toBe("Asked");
+    expect(task.lastProcessedSeq).toBe(facts[2].seq);
+    expect(task.decisionsSinceLastPersonFact).toBe(1);
   });
   it("separates a coordinator Job from runtime dispatch and wakes only for its result", () => {
     const facts = [created(),
       f({ kind: "JobCreated", by: "orchestrator", payload: { jobId: "j-1", agent: "coding:coding", instructions: "x" } })];
     let task = foldTask(facts);
     expect(task.pendingJob).toMatchObject({ jobId: "j-1", agent: "coding:coding", instructions: "x" });
+    expect(needsAttention(task, new Date()).wake).toBe(false);
+
+    facts.push(f({ kind: "ACK", by: "orchestrator", payload: { summary: "The queued job remains the current workflow posture." } }));
+    task = foldTask(facts);
+    expect(task.pendingJob).toMatchObject({ jobId: "j-1" });
+    expect(task.lastDecision?.kind).toBe("JobCreated");
     expect(needsAttention(task, new Date()).wake).toBe(false);
 
     facts.push(f({ kind: "Dispatched", by: "runtime", payload: { jobId: "j-1", workerId: "w-1", agent: "coding:coding", instructions: "x", prompt: "x" } }));
@@ -80,10 +115,10 @@ describe("foldTask", () => {
   });
   it("Waited wakes only when due; a person's reply wakes at once and resets the budget", () => {
     const facts = [created(),
-      f({ kind: "Noted", by: "orchestrator", payload: { note: "a" } }),
+      f({ kind: "ACK", by: "orchestrator", payload: { summary: "a" } }),
       f({ kind: "Waited", by: "orchestrator", payload: { reason: "ci", resumeAfter: new Date(t0 + 3_600_000).toISOString() } })];
     let task = foldTask(facts);
-    expect(task.decisionsSinceLastPersonFact).toBe(2);
+    expect(task.decisionsSinceLastPersonFact).toBe(1);
     expect(needsAttention(task, new Date(t0 + 10_000)).wake).toBe(false);
     expect(needsAttention(task, new Date(t0 + 3_700_000)).wake).toBe(true);
     facts.push(f({ kind: "Reply", by: "zhangfan", source: "go", payload: { text: "go" } }));

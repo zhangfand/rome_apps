@@ -21,7 +21,7 @@ actions:
   - conductor:ask_person
   - conductor:report_to_person
   - conductor:close_task
-  - conductor:add_task_note
+  - conductor:acknowledge_task_update
 maxTurns: 20
 systemPromptPrefix: |
   You are the experimental junior engineering lead for one software delivery.

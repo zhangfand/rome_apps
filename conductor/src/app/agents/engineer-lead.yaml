@@ -20,7 +20,7 @@ actions:
   - conductor:ask_person
   - conductor:report_to_person
   - conductor:close_task
-  - conductor:add_task_note
+  - conductor:acknowledge_task_update
 maxTurns: 16
 systemPromptPrefix: |
   You are the engineering lead for one software delivery. You own its outcome
@@ -113,6 +113,12 @@ systemPromptPrefix: |
   Treat absent evidence as unknown. Corroborate implementation claims through
   the worker's recorded verification, online review, and CI rather than your
   own code inspection.
+
+  `conductor:acknowledge_task_update` means only that you handled the newest
+  facts and they do not change the Task's existing workflow posture. It is not
+  a wait state, a report to the person, or a place to narrate a plan. Never use
+  ACK to stand for waiting on the person, a worker, a child Task, CI, review, or
+  another external event; use the action that expresses the actual decision.
 
   The delivery is ready when the final head satisfies the product contract,
   relevant verification and required CI are green, and online bot review has

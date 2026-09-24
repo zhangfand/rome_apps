@@ -3,6 +3,7 @@ import {
   type Fact,
   type JobCreatedFact,
   type WaitedFact,
+  COORDINATOR_KINDS,
   DECISION_KINDS,
   isTerminalKind,
   isWorkerTerminalKind,
@@ -62,6 +63,11 @@ export interface TaskView {
   lastDecisionSeq: number;
   /** The newest orchestrator-authored decision fact, if any. */
   lastDecision?: Fact;
+  /**
+   * Seq of the newest orchestrator decision or acknowledgement. ACK advances
+   * this cursor without replacing the Task's workflow decision.
+   */
+  lastProcessedSeq: number;
   /** Seq of the newest fact a person wrote. */
   lastPersonFactSeq: number;
   /** Orchestrator decisions since a person last spoke. */
@@ -95,6 +101,7 @@ export function foldTask(facts: readonly Fact[]): TaskView {
   let liveWorker: WorkerRef | undefined;
   let lastDecisionSeq = 0;
   let lastDecision: Fact | undefined;
+  let lastProcessedSeq = 0;
   let lastPersonFactSeq = created.seq;
   let decisionsSinceLastPersonFact = 0;
 
@@ -122,10 +129,13 @@ export function foldTask(facts: readonly Fact[]): TaskView {
       if (named === liveWorker.workerId) liveWorker = undefined;
     }
 
-    if (fact.by === ORCHESTRATOR && DECISION_KINDS.some((kind) => kind === fact.kind)) {
-      lastDecisionSeq = fact.seq;
-      lastDecision = fact;
-      decisionsSinceLastPersonFact += 1;
+    if (fact.by === ORCHESTRATOR && COORDINATOR_KINDS.some((kind) => kind === fact.kind)) {
+      lastProcessedSeq = fact.seq;
+      if (DECISION_KINDS.some((kind) => kind === fact.kind)) {
+        lastDecisionSeq = fact.seq;
+        lastDecision = fact;
+        decisionsSinceLastPersonFact += 1;
+      }
     } else if (isPersonFact(fact)) {
       lastPersonFactSeq = fact.seq;
       decisionsSinceLastPersonFact = 0;
@@ -136,11 +146,13 @@ export function foldTask(facts: readonly Fact[]): TaskView {
   // already decided on. Only its outcome (Returned/Failed/Lost) is new input
   // for the next coordination decision.
   const unseen = ordered.filter((f) =>
-    f.seq > lastDecisionSeq && f.kind !== "Dispatched" && f.kind !== "Opened" && f.kind !== "Snapshot",
+    f.seq > lastProcessedSeq && f.kind !== "Dispatched" && f.kind !== "Opened" && f.kind !== "Snapshot",
   );
   // A Snapshot is transparent to operational state: appending one must not
   // hide a Job that is still waiting for runtime dispatch.
-  const pendingJob = jobRef([...ordered].reverse().find((fact) => fact.kind !== "Snapshot"));
+  const pendingJob = jobRef([...ordered].reverse().find((fact) =>
+    fact.kind !== "Snapshot" && fact.kind !== "ACK" && fact.kind !== "Noted",
+  ));
   // A person's reply supersedes a prior wait immediately, before the
   // orchestrator has had time to record its next decision. Keeping the old
   // wait here makes the UI claim that the task is still sleeping after the
@@ -164,6 +176,7 @@ export function foldTask(facts: readonly Fact[]): TaskView {
     pendingJob: state === "open" ? pendingJob : undefined,
     lastDecisionSeq,
     lastDecision,
+    lastProcessedSeq,
     lastPersonFactSeq,
     decisionsSinceLastPersonFact,
     waiting: state === "open" ? waiting : undefined,
@@ -209,7 +222,7 @@ export function isTerminal(state: TaskState): boolean {
 export function needsAttention(task: TaskView, now: Date): { wake: true; why: string } | { wake: false } {
   if (task.state !== "open") return { wake: false };
   if (task.unseen.length > 0) {
-    return { wake: true, why: `new facts since decision #${task.lastDecisionSeq}: ${task.unseen.map((f) => `${f.kind}#${f.seq}`).join(", ")}` };
+    return { wake: true, why: `new facts since processed position #${task.lastProcessedSeq}: ${task.unseen.map((f) => `${f.kind}#${f.seq}`).join(", ")}` };
   }
   if (task.waiting && now.getTime() >= Date.parse(task.waiting.resumeAfter)) {
     return { wake: true, why: `revisit time ${task.waiting.resumeAfter} has come: ${task.waiting.reason}` };

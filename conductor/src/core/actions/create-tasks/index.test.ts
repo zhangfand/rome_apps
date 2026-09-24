@@ -55,7 +55,8 @@ describe("engineering lead task materialization", () => {
     expect(children.map((task) => task.parent?.planItemId).sort()).toEqual(["api", "ui"]);
     expect(children[0].project).toEqual({ workingDir: "/repo" });
     expect(children[0].parent?.coordinatorAgent).toBe("conductor:engineer-lead-replay-v1");
-    expect(parent.lastDecision?.kind).toBe("Noted");
+    expect(parent.lastDecision).toBeUndefined();
+    expect(parent.lastProcessedSeq).toBe(parent.latest.seq);
     expect(runActionCalls).toEqual(["conductor:reconcile_tasks"]);
 
     const second = await action.execute({

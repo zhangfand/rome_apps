@@ -142,8 +142,8 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         }
 
         let after = foldTask(ledger.factsFor(taskId));
-        let decided = after.lastDecisionSeq > task.lastDecisionSeq || after.state !== "open";
-        if (result.status === "ok" && sessionId) rememberSession(result.data, decided ? after.lastDecisionSeq : undefined);
+        let decided = after.lastProcessedSeq > task.lastProcessedSeq || after.state !== "open";
+        if (result.status === "ok" && sessionId) rememberSession(result.data, decided ? after.lastProcessedSeq : undefined);
         if (!decided && !error && sessionId) {
           // It talked instead of acting. Nobody reads its chat; give it one
           // chance, in the same session, to record what it just said.
@@ -160,8 +160,8 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
             error = `Agent Instance ${coordinatorInstance.id} cannot resume its one Agent Session ${sessionId}: ${error}`;
           }
           after = foldTask(ledger.factsFor(taskId));
-          decided = after.lastDecisionSeq > task.lastDecisionSeq || after.state !== "open";
-          if (result.status === "ok" && sessionId) rememberSession(result.data, decided ? after.lastDecisionSeq : undefined);
+          decided = after.lastProcessedSeq > task.lastProcessedSeq || after.state !== "open";
+          if (result.status === "ok" && sessionId) rememberSession(result.data, decided ? after.lastProcessedSeq : undefined);
         }
         if (!decided) {
           // The runtime observed a failed/incomplete wake; it must not turn that
@@ -170,7 +170,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
           ledger.append(coordinatorWakeMissedFact(taskId, { error, reply }));
         }
         log.info("orchestrator wake finished", { taskId, agentInstanceId: coordinatorInstance.id, agentSessionId: sessionId, decided, error });
-        return { status: "ok", data: { taskId, agentInstanceId: coordinatorInstance.id, agentSessionId: sessionId, decided, decision: decided ? after.lastDecision?.kind : undefined, error } };
+        return { status: "ok", data: { taskId, agentInstanceId: coordinatorInstance.id, agentSessionId: sessionId, decided, decision: decided ? after.facts.find((fact) => fact.seq === after.lastProcessedSeq)?.kind : undefined, error } };
       } finally {
         locks.release(orchestrateLock(taskId));
       }

@@ -1,7 +1,7 @@
-name: add_task_note
+name: acknowledge_task_update
 type: custom
 description: >-
-  Append a note to a Task's ledger.
+  Mark the current Task update handled without changing its workflow posture.
 entry: ./index.ts
 complexity: simple
 speed: fast

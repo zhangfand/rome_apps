@@ -1,6 +1,10 @@
 import type { Action, ActionConfig, ActionResult, AppActionRuntimeDeps } from "@rome-os/app-runtime";
 import { readDecisionInput, writeDecision } from "../../lib/decision.js";
 
+/**
+ * Close one coordinator observation cycle without changing the Task's workflow
+ * posture. ACK is a processed-through marker, not a wait or user-facing state.
+ */
 export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): Action {
   const { appContext } = deps;
   return {
@@ -10,17 +14,21 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       properties: {
         taskId: { type: "string" },
         seenSeq: { type: "number", description: "The seq of the newest fact you read." },
-        note: { type: "string" },
+        summary: { type: "string", description: "Why the observed update requires no workflow change." },
       },
-      required: ["taskId", "seenSeq", "note"],
+      required: ["taskId", "seenSeq", "summary"],
       additionalProperties: false,
     },
     async execute(args): Promise<ActionResult> {
       const input = readDecisionInput(args);
       if (!input.ok) return { status: "error", error: input.error };
-      const note = String(args.note ?? "").trim();
-      if (!note) return { status: "error", error: "note is required" };
-      return writeDecision(appContext, { ...input, source: "conductor:add_task_note", fact: { kind: "Noted", payload: { note } } });
+      const summary = String(args.summary ?? "").trim();
+      if (!summary) return { status: "error", error: "summary is required" };
+      return writeDecision(appContext, {
+        ...input,
+        source: "conductor:acknowledge_task_update",
+        fact: { kind: "ACK", payload: { summary } },
+      });
     },
   };
 }

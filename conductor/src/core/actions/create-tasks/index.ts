@@ -110,11 +110,11 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
         .map((item) => ({ taskId: existing.get(item.planItemId)!, planItemId: item.planItemId }));
       const decision: NewFact = {
         taskId: input.taskId,
-        kind: "Noted",
+        kind: "ACK",
         by: ORCHESTRATOR,
         source: "conductor:create_child_tasks",
         payload: {
-          note: `${note}\nRunnable tasks: ${[...already, ...created].map((item) => `${item.planItemId}=${item.taskId}`).join(", ")}`,
+          summary: `${note}\nRunnable tasks: ${[...already, ...created].map((item) => `${item.planItemId}=${item.taskId}`).join(", ")}`,
         },
       };
       const result = ledger.compareAndAppend(input.taskId, input.seenSeq, [...childFacts, decision]);

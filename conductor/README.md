@@ -62,7 +62,7 @@ than one Run/attempt over its lifetime.
 | by | kinds |
 |---|---|
 | person (`<channel user>` or `github:<login>`) | `Created`, `Reply`, `Completed`, `Cancelled` |
-| `orchestrator` | `JobCreated`, `Asked`, `Reported`, `Completed`, `Cancelled`, `Noted` |
+| `orchestrator` | `JobCreated`, `Asked`, `Reported`, `Completed`, `Cancelled`, `ACK` (plus legacy `Noted`) |
 | `runtime` | `Dispatched`, `JobFailed`, `Lost`, `Event` |
 | worker id | `Opened`, `Returned`, `Failed` |
 | `conductor:ledger-compactor` | `Snapshot` |

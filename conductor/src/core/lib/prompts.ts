@@ -147,14 +147,16 @@ export function buildOrchestratorPrompt(input: {
       `Snapshot #${context.snapshot!.seq} has an externalized body. Fetch its pinned commit if needed and read that exact Snapshot artifact before deciding; the commit-pinned file, not the work repository's current branch, replaces the covered facts.`,
       "",
     ] : []),
-    ...deliveredFacts.map((fact) => describeFact(fact, { full: resumed || fact.seq > task.lastDecisionSeq || fact.kind === "Created" })),
+    ...deliveredFacts.map((fact) => describeFact(fact, { full: resumed || fact.seq > task.lastProcessedSeq || fact.kind === "Created" })),
     "",
     "## Now",
     resumed
       ? context.compacted
         ? `This is another turn of the same Agent Instance and Session. Snapshot #${context.snapshot!.seq} replaces its covered raw facts; everything after its covered prefix is included above.`
         : `This is another turn of the same Agent Instance and Session. Earlier Task history remains in your conversation context; only the facts after #${deliveredThroughSeq} are repeated above.`
-      : task.lastDecision ? `Your last decision was #${task.lastDecisionSeq} (${task.lastDecision.kind}); everything after it is new to you.` : "This is the first time you see this task.",
+      : task.lastProcessedSeq > 0
+        ? `You last handled this task through #${task.lastProcessedSeq}${task.lastDecision ? ` (last workflow decision #${task.lastDecisionSeq} ${task.lastDecision.kind})` : ""}; everything after it is new to you.`
+        : "This is the first time you see this task.",
     `Decide the next step and record it with one decision action, citing taskId="${task.id}" and seenSeq=${seenSeq}.`,
   );
   return lines.join("\n");
