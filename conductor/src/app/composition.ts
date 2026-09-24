@@ -8,7 +8,6 @@ import { cloneConfigRoute } from "../domain/config/clone.js";
 import { workRepoPromptNote } from "../domain/work-repo.js";
 import { createWorkRepoConfigRoute, setupWorkRepoConfigRoute } from "../domain/config/work-repo.js";
 import { githubRepositoriesConfigRoute } from "../domain/config/github-repositories.js";
-import { createPromptContractProvider } from "../domain/prompt-contract-artifacts.js";
 import { archiveTaskSnapshot, readArchivedTaskSnapshot } from "../domain/task-snapshot-artifact.js";
 
 export const APP_COMPOSITION: CoreComposition = {
@@ -19,7 +18,6 @@ export const APP_COMPOSITION: CoreComposition = {
   providerFor,
   setupSchema,
   projectPromptNote: (task, audience) => `${githubPromptNote(task, audience)}${workRepoPromptNote(task, audience)}`,
-  promptContracts: createPromptContractProvider(),
   archiveTaskSnapshot,
   readTaskSnapshot: readArchivedTaskSnapshot,
   projectPresentation: githubPresentation,

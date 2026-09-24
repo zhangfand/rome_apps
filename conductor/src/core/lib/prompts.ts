@@ -1,15 +1,14 @@
 import type { ConductorConfig } from "./config.js";
-import type { SharedPromptContract } from "./composition.js";
 import { describeFact } from "./facts.js";
 import type { TaskView } from "./fold.js";
 import { coordinatorFacts } from "./ledger-snapshot.js";
-import { replyInstructions } from "./worker-reply.js";
-import { projectWorkspaceKind, type Workspace, workspaceKind, type WorkspaceProvider } from "./workspaces.js";
+import { type Workspace, workspaceKind, type WorkspaceProvider } from "./workspaces.js";
 
 /**
- * The worker's prompt. The orchestrator writes the instructions; the runtime
- * frames them with what every worker needs regardless of domain: which task
- * it is on, the original request, where to work, and how to reply.
+ * The worker's prompt carries only what is specific to this Job: its identity,
+ * the coordinator's instructions, and where to work. The worker protocol (its
+ * role, how to read cited artifacts, workspace rules, and the reply block) is
+ * part of each worker Agent's system prompt, not repeated here.
  */
 export function buildWorkerPrompt(input: {
   task: TaskView;
@@ -22,63 +21,45 @@ export function buildWorkerPrompt(input: {
   providerFor(kind: string): WorkspaceProvider;
   defaultWorkspaceKind: string;
   projectNote?: string;
-  sharedContracts?: readonly SharedPromptContract[];
 }): string {
   const { task, instructions, workspace, resuming, providerFor } = input;
   const lines: string[] = [];
-  if (resuming) {
-    lines.push(`You are continuing with job ${input.jobId ?? "(legacy)"} on task ${task.id}. New instructions from the task coordinator follow.`, "");
-  } else {
-    lines.push(
-      `You are running job ${input.jobId ?? "(legacy)"} on task ${task.id}${input.projectNote ?? ""}.`,
-      "A lead coordinates the durable Task; it created this bounded Job and will read your result. You do not talk to the requester directly.",
-      "",
-      "## Original request",
-      task.brief,
-      "",
-    );
-  }
-  const contracts = resuming ? [] : contractLines(input.sharedContracts, { allowInline: true });
-  if (contracts.length) lines.push("## Shared artifact contracts", "", ...contracts);
-  lines.push("## Job instructions from the task coordinator", instructions, "");
+  lines.push(
+    resuming
+      ? `Continuing job ${input.jobId ?? "(legacy)"} on task ${task.id} with new instructions.`
+      : `Job ${input.jobId ?? "(legacy)"} on task ${task.id}${input.projectNote ?? ""}.`,
+    "",
+    "## Instructions",
+    instructions,
+    "",
+  );
   // A workspace kind with nothing to say adds no section: a worker on a task
   // that touches no files is never told about checkouts or branches.
   const workspaceBlock = providerFor(workspaceKind(workspace, input.defaultWorkspaceKind)).instructions(workspace);
-  if (workspaceBlock) lines.push(workspaceBlock, "");
-  lines.push(replyInstructions());
-  return lines.join("\n");
-}
-
-/** What this project's workspace kind wants the orchestrator to know, if anything. */
-function workspaceNote(task: TaskView, providerFor: (kind: string) => WorkspaceProvider, defaultWorkspaceKind: string): string {
-  const note = providerFor(projectWorkspaceKind(task.project, defaultWorkspaceKind)).note(task.project);
-  return note ? ` ${note}` : "";
+  if (workspaceBlock) lines.push(workspaceBlock);
+  return lines.join("\n").trimEnd();
 }
 
 /**
- * The orchestrator's prompt for one wake. Everything task-specific it can
- * know: bounded ledger context, what agents it may create Jobs for, and the seq it
- * must cite so a stale decision is refused. Its operating policy lives in the
- * configured Agent's system prompt. Worker scheduling is not exposed.
+ * The orchestrator's prompt for one wake: only what is new or specific to this
+ * wake. Task-level identity is sent on the Session's first turn; operating
+ * policy, the worker roster, and the decision protocol live in the configured
+ * Agent's system prompt. Worker scheduling is not exposed.
  */
 export function buildOrchestratorPrompt(input: {
   task: TaskView;
   /** Tasks this lead materialized; empty for an ordinary execution task. */
   children?: readonly TaskView[];
-  config: ConductorConfig;
   now: Date;
   why: string;
-  providerFor(kind: string): WorkspaceProvider;
-  defaultWorkspaceKind: string;
   projectNote?: string;
-  sharedContracts?: readonly SharedPromptContract[];
   /**
    * Last Task fact already delivered to this Agent Instance's one Session.
    * Absent for the first turn, which receives a complete durable snapshot.
    */
   deliveredThroughSeq?: number;
 }): string {
-  const { task, config, now, why } = input;
+  const { task, now, why } = input;
   const seenSeq = task.latest.seq;
   const resumed = input.deliveredThroughSeq !== undefined;
   const deliveredThroughSeq = input.deliveredThroughSeq ?? 0;
@@ -90,22 +71,14 @@ export function buildOrchestratorPrompt(input: {
     "",
     `Now: ${now.toISOString()}`,
     `Why you were woken: ${why}`,
-    `Project: ${task.projectId ?? "(none)"}${input.projectNote ?? ""}.${workspaceNote(task, input.providerFor, input.defaultWorkspaceKind)}`,
-    `Requested by: ${task.createdBy}`,
+    ...(!resumed ? [
+      `Project: ${task.projectId ?? "(none)"}${input.projectNote ?? ""}.`,
+      `Requested by: ${task.createdBy}`,
+    ] : []),
     `Job execution: ${task.liveWorker ? `${task.liveWorker.jobId ?? "legacy job"} is running as ${task.liveWorker.agent} (worker ${task.liveWorker.workerId}, since ${task.liveWorker.startedAt.toISOString()})` : task.pendingJob ? `${task.pendingJob.jobId} is waiting for runtime dispatch as ${task.pendingJob.agent}` : "none"}`,
     `Decisions you have made since the person last spoke: ${task.decisionsSinceLastPersonFact}`,
-    `seenSeq: ${seenSeq}  ← pass this on every decision action`,
+    `seenSeq: ${seenSeq}`,
     "",
-    ...(!resumed ? [
-      "## Agents you may create a Job for",
-      ...Object.entries(config.workerAgents).map(([agent, description]) => `- \`${agent}\`: ${description}`),
-      "",
-    ] : []),
-    ...(!resumed && input.sharedContracts?.length ? [
-      "## Shared artifact contracts",
-      "",
-      ...contractLines(input.sharedContracts, { allowInline: true }),
-    ] : []),
     ...(!resumed && input.task.parent ? [
       "## Delivery lineage",
       `Parent task: ${input.task.parent.taskId}`,
@@ -119,10 +92,6 @@ export function buildOrchestratorPrompt(input: {
       `Source checkpoint: ${input.task.replay.sourceTaskId} through ledger #${input.task.replay.sourceThroughSeq}`,
       `Pinned coordinator: ${input.task.replay.coordinatorAgent}`,
       `Experimental engineering plan: ${input.task.replay.workRepoPath}`,
-      "This is a fresh execution branch, not a continuation of the source Task's Agent Session.",
-      "The source ledger was intentionally not copied because later facts, stale execution state, and secrets must not leak into this run.",
-      "Treat the seed below as the complete checkpoint state. Do not read or mutate the source Task, its later production branch, or its canonical technical-spec.md.",
-      "Write replay-specific engineering decisions only to the experimental plan path above. Canonical promotion is a separate human decision.",
       "",
       "### Sanitized checkpoint seed",
       input.task.replay.seed,
@@ -157,33 +126,7 @@ export function buildOrchestratorPrompt(input: {
       : task.lastProcessedSeq > 0
         ? `You last handled this task through #${task.lastProcessedSeq}${task.lastDecision ? ` (last workflow decision #${task.lastDecisionSeq} ${task.lastDecision.kind})` : ""}; everything after it is new to you.`
         : "This is the first time you see this task.",
-    `Decide the next step and record it with one decision action, citing taskId="${task.id}" and seenSeq=${seenSeq}.`,
   );
   return lines.join("\n");
 }
 
-function contractLines(
-  contracts: readonly SharedPromptContract[] | undefined,
-  options: { allowInline: boolean },
-): string[] {
-  if (!contracts?.length) return [];
-  const lines = [
-    "Contracts are immutable inputs, not text to copy into another artifact. Read a pinned file only when this Job or decision requires it.",
-    "Use the named work-repository checkout and fetch the pinned commit from origin first if that object is not present locally.",
-    "",
-  ];
-  for (const contract of contracts) {
-    if (contract.artifact) {
-      const ref = contract.artifact;
-      lines.push(
-        `- \`${contract.name}\`: \`${ref.repo}@${ref.commit}:${ref.path}\` (sha256 \`${ref.sha256}\`, ${ref.bytes} bytes)`,
-      );
-    } else if (options.allowInline && contract.content) {
-      // Projects without a work repository retain a correctness-preserving
-      // fallback. Resumed worker Sessions never receive this stable body again.
-      lines.push(`### ${contract.name}`, contract.content.trim(), "");
-    }
-  }
-  lines.push("");
-  return lines;
-}

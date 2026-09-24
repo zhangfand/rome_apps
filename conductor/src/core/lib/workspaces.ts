@@ -44,7 +44,6 @@ export interface WorkspaceProvider {
   prepare(input: PrepareWorkspaceInput): Promise<Workspace>;
   validate(workspace: Workspace): Promise<void>;
   instructions(workspace: Workspace): string;
-  note(project?: WorkspaceProject): string;
 }
 
 /** Read a stored workspace, using the app's legacy default for pre-kind facts. */

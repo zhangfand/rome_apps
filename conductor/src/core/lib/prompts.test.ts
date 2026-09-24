@@ -14,24 +14,10 @@ function task() {
   return foldTask(facts);
 }
 
-const config = {
-  projects: { app: { workspace: "none" as const } },
-  workerAgents: { "coding:coding": "Implementation agent" },
-  orchestratorAgent: "conductor:engineer-lead",
-  maxWorkers: 3,
-  intervalMinutes: 5,
-  reuseSessions: true,
-  maxDecisionsPerTurn: 25,
-};
-
 const prompt = (deliveredThroughSeq?: number) => buildOrchestratorPrompt({
   task: task(),
-  config,
   now: at(4),
   why: "Reply#3",
-  providerFor: () => ({ note: () => "", instructions: () => "", prepare: async () => ({ kind: "none" as const }), validate: async () => undefined }),
-  defaultWorkspaceKind: "none",
-  sharedContracts: [{ name: "contract.md", content: "Durable contract" }],
   ...(deliveredThroughSeq !== undefined ? { deliveredThroughSeq } : {}),
 });
 
@@ -42,7 +28,7 @@ describe("orchestrator Agent Instance prompts", () => {
     expect(value).toContain("Build the feature");
     expect(value).toContain("Initial plan");
     expect(value).toContain("Continue with the narrower scope");
-    expect(value).toContain("Durable contract");
+    expect(value).toContain("Requested by: guardian");
   });
 
   it("sends only new facts when resuming the Instance's one Session", () => {
@@ -51,46 +37,53 @@ describe("orchestrator Agent Instance prompts", () => {
     expect(value).toContain("Continue with the narrower scope");
     expect(value).not.toContain("Build the feature");
     expect(value).not.toContain("Initial plan");
-    expect(value).not.toContain("Durable contract");
-    expect(value).not.toContain("Implementation agent");
+    expect(value).not.toContain("Requested by");
     expect(value).toContain("same Agent Instance and Session");
+  });
+
+  it("carries only wake-specific state, never consensus policy", () => {
+    for (const value of [prompt(), prompt(2)]) {
+      expect(value).toContain("Why you were woken: Reply#3");
+      expect(value).toContain("seenSeq: 3");
+      expect(value).not.toContain("## Agents you may create a Job for");
+      expect(value).not.toContain("Shared artifact contracts");
+      expect(value).not.toContain("Decide the next step");
+      expect(value).not.toContain("pass this on every decision action");
+    }
   });
 });
 
-describe("worker prompt contracts", () => {
+describe("worker Job prompts", () => {
   const providerFor = () => ({
-    note: () => "",
-    instructions: () => "workspace",
+    instructions: () => "## Workspace\nWorking directory: /tree",
     prepare: async () => ({ kind: "none" as const }),
     validate: async () => undefined,
   });
-  const artifact = {
-    repo: "owner/work",
-    path: "_conductor/contracts/product-spec-format.md",
-    commit: "a".repeat(40),
-    sha256: "b".repeat(64),
-    bytes: 123,
-    url: "https://example.test/contract",
-  };
 
-  it("passes fresh workers a pinned reference rather than contract contents", () => {
+  it("carries the Job's identity, instructions, and workspace only", () => {
     const value = buildWorkerPrompt({
-      task: task(), jobId: "j-1", instructions: "do it", workspace: { kind: "none" },
-      resuming: false, providerFor, defaultWorkspaceKind: "none",
-      sharedContracts: [{ name: "product-spec-format.md", artifact }],
+      task: task(), jobId: "j-1", instructions: "Read rome-work@abc:slug/prototype-brief.md and follow it.",
+      workspace: { kind: "none" }, resuming: false, providerFor, defaultWorkspaceKind: "none",
     });
-    expect(value).toContain("owner/work@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:_conductor/contracts/product-spec-format.md");
-    expect(value).not.toContain("Durable contract body");
+    expect(value).toContain("Job j-1 on task t-1");
+    expect(value).toContain("## Instructions");
+    expect(value).toContain("rome-work@abc:slug/prototype-brief.md");
+    expect(value).toContain("Working directory: /tree");
+    // Consensus lives in the worker Agent's system prompt.
+    expect(value).not.toContain("Build the feature");
+    expect(value).not.toContain("## Original request");
+    expect(value).not.toContain("## How to reply");
+    expect(value).not.toContain("```conductor");
+    expect(value).not.toContain("A lead coordinates");
   });
 
-  it("does not repeat stable contract bodies when a worker Session resumes", () => {
+  it("says only that the Job continues when a worker Session resumes", () => {
     const value = buildWorkerPrompt({
       task: task(), jobId: "j-2", instructions: "continue", workspace: { kind: "none" },
       resuming: true, providerFor, defaultWorkspaceKind: "none",
-      sharedContracts: [{ name: "contract.md", content: "Durable contract body" }],
     });
-    expect(value).not.toContain("Shared artifact contracts");
-    expect(value).not.toContain("Durable contract body");
-    expect(value).not.toContain("## Original request");
+    expect(value).toContain("Continuing job j-2 on task t-1");
+    expect(value).toContain("continue");
+    expect(value).not.toContain("## How to reply");
   });
 });

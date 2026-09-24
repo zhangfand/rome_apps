@@ -67,22 +67,12 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
 
         const snapshot = fold(now, ledger.all());
         const children = snapshot.tasks.filter((candidate) => candidate.parent?.taskId === task.id);
-        const resumingCoordinator = Boolean(
-          coordinatorInstance.sessionId && coordinatorInstance.cursorSeq !== undefined,
-        );
-        const contracts = !resumingCoordinator && composition.promptContracts
-          ? await composition.promptContracts.resolve(task, composition.promptContracts.forCoordinator)
-          : [];
         const prompt = buildOrchestratorPrompt({
           task,
           children,
-          config: settings,
           now,
           why: attention.why,
-          providerFor: composition.providerFor,
-          defaultWorkspaceKind: composition.defaultWorkspaceKind,
           projectNote: composition.projectPromptNote?.(task, "orchestrator"),
-          sharedContracts: contracts,
           ...(coordinatorInstance.sessionId && coordinatorInstance.cursorSeq !== undefined
             ? { deliveredThroughSeq: coordinatorInstance.cursorSeq }
             : {}),

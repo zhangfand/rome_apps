@@ -29,10 +29,10 @@ Tasks or Jobs contribute to it:
 .
 ├── <workstream-slug>/
 │   ├── product-spec.md   # product contract; PM-owned when PM is involved
+│   ├── prototype-brief.md # questions the prototype must answer; lead-owned
 │   ├── technical-spec.md # approved prototype distilled into production design
 │   └── artifacts/    # optional supporting evidence that merits its own file
-├── _conductor/           # runtime-owned contracts and Task context
-│   ├── contracts/         # runtime-owned, versioned Agent prompt contracts
+├── _conductor/           # runtime-owned Task context
 │   └── tasks/<task-id>/snapshot.md
 ├── _experiments/         # isolated, non-canonical replay/prompt experiments
 │   └── replays/<task-id>/technical-spec.md
@@ -43,6 +43,9 @@ Tasks or Jobs contribute to it:
   the repository by Agent, Worker, Run, or transient Task id.
 - `product-spec.md` follows `product-spec-format.md`. Do not encode its format again
   here.
+- `prototype-brief.md` follows `prototype-brief-format.md`. The engineering
+  lead writes it before creating a prototype Job; the prototype worker reads it
+  at the commit the Job cites.
 - `technical-spec.md` follows `technical-spec-format.md`. The engineering lead
   creates it after a prototype is approved. It holds only durable knowledge
   needed to continue the delivery: current architecture understanding,
@@ -57,10 +60,6 @@ Tasks or Jobs contribute to it:
   than Task, Agent, or Run id. Agents may read these files but must not edit
   them. Ledger events cite the repository path and the exact Git commit; the
   compact ledger envelope remains authoritative for ordering and deduplication.
-- `_conductor/contracts/` is runtime-owned. It contains the canonical prompt
-  contracts packaged with the installed Conductor version. Prompts cite an
-  exact repository commit; Agents read that pinned file when their role or Job
-  requires it and never edit these files.
 - `_conductor/tasks/<task-id>/snapshot.md` is runtime-owned and overwritten
   whenever Conductor writes a newer ledger `Snapshot` fact. The reference-only
   Snapshot fact cites its exact repository commit and remains authoritative for

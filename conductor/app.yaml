@@ -30,8 +30,11 @@ agents:
   - app/agents/engineer-lead-replay-v1.yaml
   - app/agents/ledger-compactor.yaml
   - app/agents/pm.yaml
+  - app/agents/coder.yaml
+  - app/agents/assistant.yaml
 
 skills:
+  - app/skills/feasibility-prototype
   - app/skills/split-approved-prototype
 
 hooks:

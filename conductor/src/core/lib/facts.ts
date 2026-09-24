@@ -185,7 +185,7 @@ export type JobCreatedFact = FactOf<"JobCreated", {
   agent: string;
   /** The coordinator's self-contained direction to that agent. */
   instructions: string;
-  /** Shared contract ids the worker must be able to read for this Job. */
+  /** Legacy: contract ids from before format docs moved to writer skills. */
   contracts?: string[];
   /** Why this job is the next useful work; shown to people. */
   note?: string;
@@ -236,7 +236,7 @@ export type DispatchedFact = FactOf<"Dispatched", {
   agent: string;
   /** Copied from the Job so a historical run remains self-describing. */
   instructions: string;
-  /** Shared contract ids rendered into this run as immutable references. */
+  /** Legacy: contract ids rendered into runs before format docs moved to writer skills. */
   contracts?: string[];
   /** The full prompt the worker was launched with (instructions + runtime framing). */
   prompt: string;

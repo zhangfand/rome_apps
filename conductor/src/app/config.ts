@@ -30,10 +30,21 @@ const LEGACY_DEFAULT_WORKER_AGENTS: Record<string, string> = {
   "assistant:assistant": "General assistant with web and shell access. Good for research, reading external state (e.g. a PR's review/CI status), reviewing, and writing summaries.",
 };
 
-export const DEFAULT_WORKER_AGENTS: Record<string, string> = {
+/** Defaults before Conductor shipped its own worker Agents. */
+const PREVIOUS_DEFAULT_WORKER_AGENTS: Record<string, string> = {
   "conductor:pm": PM_AGENT_DESCRIPTION,
   ...LEGACY_DEFAULT_WORKER_AGENTS,
   "assistant:assistant": "General assistant with web and shell access. Good for research, reading external state (e.g. a PR's review/CI status), handling production review feedback through the repository's respond-to-review skill, and writing summaries. It does not independently review code or process prototype review feedback.",
+};
+
+/**
+ * Conductor's own worker Agents carry the worker protocol in their system
+ * prompts, so a Job prompt needs only what is specific to that Job.
+ */
+export const DEFAULT_WORKER_AGENTS: Record<string, string> = {
+  "conductor:pm": PM_AGENT_DESCRIPTION,
+  "conductor:coder": "Software engineer for prototypes, production increments, and fixes in the Task's worktree: implements, verifies, commits, pushes, opens pull requests.",
+  "conductor:assistant": "Research and operations assistant: researches, reads external state (e.g. a PR's review/CI status), handles production review feedback through the repository's respond-to-review skill, and writes summaries. It does not independently review code or process prototype review feedback.",
 };
 
 const parseConfig = createConfigParser(
@@ -41,13 +52,14 @@ const parseConfig = createConfigParser(
   appConfigExtensions(),
 );
 
-/** Add the PM worker to installs that still carry the exact pre-PM defaults. */
+/** Move installs that still carry an exact earlier default roster to the current one. */
 export function parseAppConfig(raw: unknown) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return parseConfig(raw);
   const value = raw as Record<string, unknown>;
   const workers = value.workerAgents;
   const migrated = { ...value };
-  if (workers && typeof workers === "object" && !Array.isArray(workers) && sameRecord(workers as Record<string, unknown>, LEGACY_DEFAULT_WORKER_AGENTS)) {
+  if (workers && typeof workers === "object" && !Array.isArray(workers)
+    && [LEGACY_DEFAULT_WORKER_AGENTS, PREVIOUS_DEFAULT_WORKER_AGENTS].some((roster) => sameRecord(workers as Record<string, unknown>, roster))) {
     migrated.workerAgents = DEFAULT_WORKER_AGENTS;
   }
   if (migrated.orchestratorAgent === LEGACY_ORCHESTRATOR_AGENT) {

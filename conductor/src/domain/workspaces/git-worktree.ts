@@ -61,10 +61,6 @@ export const gitWorktreeProvider: WorkspaceProvider = {
   instructions(workspace: Workspace): string {
     return workspace.kind === "none" ? "" : workspaceInstructions(asGitWorkspace(workspace));
   },
-
-  note(): string {
-    return "Workers get their own checkout; you need not tell them where.";
-  },
 };
 
 async function gitWithTimeout(cwd: string, timeout: number, ...args: string[]): Promise<string> {
@@ -210,19 +206,9 @@ export async function prepareWorkspace(input: {
 /** This block is repeated on resumes too: a session may remember an old cwd. */
 export function workspaceInstructions(workspace: GitWorktreeWorkspace): string {
   return [
-    "Worker workspace (authoritative for this run):",
+    "## Workspace",
     `Working directory: ${workspace.workingDir}`,
     `Git worktree root: ${workspace.root}`,
     `Initial branch: ${workspace.branch}`,
-    "Move to this working directory before doing any work. Run every edit, build,",
-    "test and Git command in this worktree, not the original/shared checkout.",
-    "This overrides paths and working directories in earlier session context or task history.",
-    "Keep branch changes inside this worktree; never force-checkout a branch used by another worktree.",
-    "Install dependencies here if needed; do not share node_modules or copy ignored/private files from the source.",
-    "New worktrees leave Git LFS assets as small pointer files by default; reused trees keep their existing assets.",
-    "Fetch LFS assets only when this task needs them. With git-lfs available, run git lfs pull --include=\"<needed paths>\" --exclude=\"\" in this worktree.",
-    "Do not run an unrestricted git lfs pull or disable LFS filters in shared Git config. Later Git operations may still require git-lfs.",
-    "Do not remove this worktree: follow-up workers need its branch and uncommitted work.",
-    "Do not reinstall or upgrade the running Conductor app unless the task explicitly authorizes deployment.",
   ].join("\n");
 }

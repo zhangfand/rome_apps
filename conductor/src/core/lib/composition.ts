@@ -11,25 +11,6 @@ export interface SetupSchemaExtension {
   rootProperties?: Record<string, unknown>;
 }
 
-export interface SharedPromptContract {
-  name: string;
-  /** Legacy/fallback form for a project without a work repository. */
-  content?: string;
-  /** Preferred form: immutable contract content in the project's work repo. */
-  artifact?: TaskSnapshotMirrorRef;
-}
-
-export interface PromptContractProvider {
-  /** Contract ids accepted by conductor:create_job. */
-  names: readonly string[];
-  /** Contracts a worker role always needs, even when a Job does not name them. */
-  defaultForWorker(agent: string): readonly string[];
-  /** Contracts the Task coordinator may need over the lifetime of a delivery. */
-  forCoordinator: readonly string[];
-  /** Resolve selected ids to pinned work-repository refs (or a safe fallback). */
-  resolve(task: TaskView, names: readonly string[]): Promise<readonly SharedPromptContract[]>;
-}
-
 export interface TaskSnapshotMirrorRef {
   repo: string;
   path: string;
@@ -62,8 +43,6 @@ export interface CoreComposition {
   providerFor(kind: WorkspaceKind): WorkspaceProvider;
   setupSchema?: SetupSchemaExtension;
   projectPromptNote?(task: TaskView, audience: "worker" | "orchestrator"): string;
-  /** Domain contracts supplied by immutable reference, scoped to their consumer. */
-  promptContracts?: PromptContractProvider;
   /** Optional domain-owned mirror for a newly generated ledger Snapshot. */
   archiveTaskSnapshot?(task: TaskView, input: {
     coversThroughSeq: number;

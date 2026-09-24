@@ -34,7 +34,4 @@ export const noWorkspaceProvider: WorkspaceProvider = {
   instructions(): string {
     return "";
   },
-  note(): string {
-    return "";
-  },
 };

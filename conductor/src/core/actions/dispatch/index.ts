@@ -22,15 +22,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         taskId: { type: "string" },
         seenSeq: { type: "number", description: "The seq of the newest fact you read." },
         agent: { type: "string", description: "The logical agent that should handle this Job." },
-        instructions: { type: "string", description: "Self-contained instructions: context, goal, constraints, definition of done, and expected handoff." },
-        ...(composition.promptContracts ? {
-          contracts: {
-            type: "array",
-            uniqueItems: true,
-            items: { type: "string", enum: [...composition.promptContracts.names] },
-            description: "Shared format contracts this Job must read from the project's work repository.",
-          },
-        } : {}),
+        instructions: { type: "string", description: "What this Job must do. When a work-repository artifact already carries the handoff, cite its path and commit instead of restating it; otherwise state the goal, constraints, definition of done, and expected handoff." },
         note: { type: "string", description: "One line for people: why this Job is the next useful work." },
       },
       required: ["taskId", "seenSeq", "agent", "instructions"],
@@ -43,12 +35,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
       const agent = String(args.agent ?? "").trim();
       const instructions = String(args.instructions ?? "").trim();
       const note = typeof args.note === "string" && args.note.trim() ? args.note.trim() : undefined;
-      const contracts = Array.isArray(args.contracts)
-        ? [...new Set(args.contracts.map(String).map((value) => value.trim()).filter(Boolean))]
-        : [];
       if (!instructions) return { status: "error", error: "instructions are required" };
-      const unknownContract = contracts.find((name) => !composition.promptContracts?.names.includes(name));
-      if (unknownContract) return { status: "error", error: `unknown prompt contract: ${unknownContract}` };
 
       const settings = createSettingsRepository(appContext.db, composition.parseConfig).get();
       if (!settings) return { status: "error", error: "Conductor is not configured. Run conductor:configure_conductor first." };
@@ -67,7 +54,6 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps, c
         jobId,
         agent,
         instructions,
-        ...(contracts.length ? { contracts } : {}),
         ...(note ? { note } : {}),
       };
       const result = createLedgerRepository(appContext.db).compareAndAppend(loaded.task.id, input.seenSeq, [{

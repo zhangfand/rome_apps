@@ -1,5 +1,4 @@
 import { describe, expect, it } from "@rstest/core";
-import type { ConductorConfig } from "../../core/lib/config.js";
 import { parseAppConfig } from "../config.js";
 import type { Fact, NewFact } from "../../core/lib/facts.js";
 import { foldTask } from "../../core/lib/fold.js";
@@ -86,7 +85,6 @@ describe("the none provider", () => {
   it("validates without touching anything, and says nothing in either prompt", async () => {
     await expect(noWorkspaceProvider.validate({ kind: "none" })).resolves.toBeUndefined();
     expect(noWorkspaceProvider.instructions({ kind: "none" })).toBe("");
-    expect(noWorkspaceProvider.note()).toBe("");
   });
 });
 
@@ -104,77 +102,43 @@ describe("the git-worktree provider keeps its guards", () => {
 describe("prompts follow the workspace kind", () => {
   const task = foldTask([f({ kind: "Created", by: "zhangfan", source: "do it", payload: { brief: "Find out X", projectId: "p", project: { workingDir: "/repo", workspace: "none" } } })]);
   const gitTask = foldTask([f({ kind: "Created", by: "zhangfan", source: "do it", payload: { brief: "Add slugify", projectId: "p", project: { workingDir: "/repo" } } })]);
-  const config = { ...parseAppConfig({ projects: { p: { workingDir: "/repo" } } }) } as { ok: true; config: ConductorConfig };
 
-  it("tells a worker about its worktree, and tells a workspace-less worker nothing", () => {
+  it("tells a worker only where its worktree is, and a workspace-less worker nothing", () => {
     const withTree = buildWorkerPrompt({ task: gitTask, instructions: "do it", workspace: tree, resuming: false, providerFor, defaultWorkspaceKind: "git-worktree" });
-    expect(withTree).toContain("Worker workspace (authoritative for this run)");
+    expect(withTree).toContain("## Workspace");
     expect(withTree).toContain("/trees/t-1-w-1");
+    // Worktree rules are worker protocol, carried by the worker Agent's system prompt.
+    expect(withTree).not.toContain("Move to this working directory");
+    expect(withTree).not.toContain("git lfs");
 
     const without = buildWorkerPrompt({ task, instructions: "do it", workspace: { kind: "none" }, resuming: false, providerFor, defaultWorkspaceKind: "git-worktree" });
-    expect(without).not.toContain("Worker workspace");
+    expect(without).not.toContain("## Workspace");
     expect(without).not.toContain("worktree");
-    // What every worker still gets, whatever its world.
-    expect(without).toContain("## Original request");
-    expect(without).toContain("Find out X");
+    // The Job prompt passes the handoff, not the Task's original request.
+    expect(without).toContain("do it");
+    expect(without).not.toContain("Find out X");
   });
 
-  it("omits the checkout sentence from the orchestrator's wake on a workspace-less project", () => {
-    const args = { config: config.config, now: new Date(t0), why: "new facts", freeSlots: 3 };
-    expect(buildOrchestratorPrompt({ ...args, task: gitTask, providerFor, defaultWorkspaceKind: "git-worktree" })).toContain("Workers get their own checkout");
-    expect(buildOrchestratorPrompt({ ...args, task, providerFor, defaultWorkspaceKind: "git-worktree" })).not.toContain("Workers get their own checkout");
+  it("keeps workspace policy out of the orchestrator's wake", () => {
+    const args = { now: new Date(t0), why: "new facts" };
+    expect(buildOrchestratorPrompt({ ...args, task: gitTask })).not.toContain("Workers get their own checkout");
+    expect(buildOrchestratorPrompt({ ...args, task })).not.toContain("Workers get their own checkout");
   });
 
   it("keeps operating policy in the coordinator Agent instead of the wake prompt", () => {
-    const legacy = parseAppConfig({ projects: { p: { workingDir: "/repo", sop: "legacy project policy" } }, sop: "legacy global policy" });
-    expect(legacy.ok).toBe(true);
-    if (!legacy.ok) return;
-    const prompt = buildOrchestratorPrompt({
-      task: gitTask,
-      config: legacy.config,
-      now: new Date(t0),
-      why: "new facts",
-      providerFor,
-      defaultWorkspaceKind: "git-worktree",
-    });
+    const prompt = buildOrchestratorPrompt({ task: gitTask, now: new Date(t0), why: "new facts" });
     expect(prompt).not.toContain("## SOP");
-    expect(prompt).not.toContain("legacy project policy");
-    expect(prompt).not.toContain("legacy global policy");
+    expect(prompt).not.toContain("## Agents you may create a Job for");
+    expect(prompt).not.toContain("Decide the next step");
   });
 
-  it("gives the lead and workers immutable shared-contract references", () => {
-    const sharedContracts = ["product-spec-format.md", "technical-spec-format.md", "work-repo-contract.md"].map((name, index) => ({
-      name,
-      artifact: {
-        repo: "owner/work", path: `_conductor/contracts/${name}`,
-        commit: String(index + 1).repeat(40), sha256: "a".repeat(64), bytes: 100 + index,
-        url: `https://example.test/${name}`,
-      },
-    }));
-    const worker = buildWorkerPrompt({
-      task,
-      instructions: "write the spec",
-      workspace: { kind: "none" },
-      resuming: false,
-      providerFor,
-      defaultWorkspaceKind: "git-worktree",
-      sharedContracts,
-    });
-    const lead = buildOrchestratorPrompt({
-      task,
-      config: config.config,
-      now: new Date(t0),
-      why: "new facts",
-      providerFor,
-      defaultWorkspaceKind: "git-worktree",
-      sharedContracts,
-    });
-    for (const contract of sharedContracts) {
-      expect(worker).toContain(contract.artifact.path);
-      expect(lead).toContain(contract.artifact.path);
+  it("gives neither the lead nor workers shared format contracts", () => {
+    const worker = buildWorkerPrompt({ task, instructions: "write the spec", workspace: { kind: "none" }, resuming: false, providerFor, defaultWorkspaceKind: "git-worktree" });
+    const lead = buildOrchestratorPrompt({ task, now: new Date(t0), why: "new facts" });
+    for (const prompt of [worker, lead]) {
+      expect(prompt).not.toContain("_conductor/contracts/");
+      expect(prompt).not.toContain("Shared artifact contracts");
     }
-    expect(worker).not.toContain("# Product spec format");
-    expect(lead).not.toContain("# Product spec format");
   });
 });
 
