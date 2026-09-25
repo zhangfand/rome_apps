@@ -1,7 +1,7 @@
 name: acknowledge_task_update
 type: custom
 description: >-
-  Mark the current Task update handled without changing its workflow posture.
+  Mark the newest facts handled, telling no one; the Task rests until a worker, CI, review, or child Task writes its next fact.
 entry: ./index.ts
 complexity: simple
 speed: fast

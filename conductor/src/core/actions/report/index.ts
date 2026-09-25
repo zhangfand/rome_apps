@@ -10,7 +10,7 @@ export function createAction(config: ActionConfig, deps: AppActionRuntimeDeps): 
       properties: {
         taskId: { type: "string" },
         seenSeq: { type: "number", description: "The seq of the newest fact you read." },
-        report: { type: "string", description: "What was delivered, where to find it, how it was verified, and what the person should do next." },
+        report: { type: "string", description: "The action only the person can take next, and what it rests on: the artifact, where to find it, and how it was verified." },
       },
       required: ["taskId", "seenSeq", "report"],
       additionalProperties: false,

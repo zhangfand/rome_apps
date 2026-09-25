@@ -153,6 +153,19 @@ describe("Conductor agent boundaries", () => {
     expect(lead).toContain("The Task is complete only when the delivered result is accepted");
   });
 
+  it("rests silently on external work and reports only what the person must act on", () => {
+    const lead = read("engineer-lead.yaml").replace(/\s+/g, " ");
+    expect(lead).toContain("Waiting is not news for the person");
+    expect(lead).toContain("record `conductor:acknowledge_task_update`: it marks the newest facts handled, tells no one");
+    expect(lead).toContain("it never stands for waiting on the person");
+    expect(lead).toContain("Report to the person only when they have something to act on");
+    expect(lead).toContain("Progress, a pushed head, or pending CI or review is never a reason to report");
+    expect(lead).not.toContain("Never use ACK to stand for waiting on");
+    const report = readFileSync(path.resolve(here, "../actions/report/action.yaml"), "utf8").replace(/\s+/g, " ");
+    expect(report).toContain("Not for progress updates");
+    expect(report).not.toContain("or external event");
+  });
+
   it("keeps tool mechanics in action descriptions rather than the lead charter", () => {
     const lead = read("engineer-lead.yaml");
     const dispatch = readFileSync(path.resolve(here, "../actions/dispatch/action.yaml"), "utf8");
