@@ -38,11 +38,13 @@ export interface PersonCtx {
  * Does a candidate's population apply to this person? Returns a specificity
  * score (higher = more specific) or -1 when it does not apply. Sex- or
  * age-specific candidates never apply when that attribute is unknown, and
- * pregnancy-specific ones never apply (the app does not track pregnancy).
+ * pregnancy- or condition-specific ones never apply (the app tracks neither
+ * pregnancy nor diagnoses such as 高血压/痛风).
  */
 export function populationScore(pop: Population | undefined, who: PersonCtx): number {
   if (!pop) return 0;
   if (pop.pregnancy) return -1;
+  if (pop.condition) return -1;
   let score = 0;
   if (pop.sex) {
     if (!who.sex || who.sex !== pop.sex) return -1;
@@ -71,6 +73,8 @@ export interface ResolvedRange {
   locator: string | null;
   population: Population | null;
   conditions: string | null;
+  /** Verbatim source text behind the numbers (verified candidates only). */
+  evidenceQuote?: string | null;
   /** Printed text for report ranges. */
   text: string | null;
   /** Unit printed next to the report range (may differ from `unit` when the value was converted). */
@@ -105,6 +109,7 @@ export function resolveCandidate(c: RangeCandidate, def: IndicatorDef, sources?:
     locator: c.locator ?? null,
     population: c.population ?? null,
     conditions: c.conditions ?? null,
+    evidenceQuote: c.evidenceQuote ?? null,
     text: null,
   };
 }

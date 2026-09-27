@@ -14,7 +14,7 @@ import { List, ListRow } from "@rome-os/ui/list-row";
 import { PageDescription, PageHeader, PageHeading, PageTitle, Section, SectionDescription, SectionHeader, SectionHeading, SectionTitle } from "@rome-os/ui/page";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rome-os/ui/table";
 import { Empty, ErrorState, LoadingRows } from "../components/common";
-import { Citation, LevelBadge, formatBounds, populationText } from "../components/provenance";
+import { Citation, EvidenceQuote, LevelBadge, formatBounds, populationText } from "../components/provenance";
 import { formatUnit } from "../lib/format";
 import { useApi, useDebounced } from "../lib/hooks";
 import { Link, paths } from "../lib/router";
@@ -245,6 +245,7 @@ function LibraryDetail({ code }: { code: string }) {
                     <TableCell>{populationText(r.candidate.population) ?? "所有成人"}</TableCell>
                     <TableCell className="whitespace-normal">
                       <Citation source={r.source} locator={r.candidate.locator} />
+                      <EvidenceQuote text={r.candidate.evidenceQuote} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -302,7 +303,15 @@ function LibraryDetail({ code }: { code: string }) {
                     </li>
                   ))}
                 </ul>
+                {t.categories.some((c) => c.note_zh) ? (
+                  <ul className="text-xs text-muted-foreground">
+                    {t.categories.filter((c) => c.note_zh).map((c) => (
+                      <li key={c.label_zh}>{c.label_zh}：{c.note_zh}</li>
+                    ))}
+                  </ul>
+                ) : null}
                 <Citation source={t.source} locator={t.locator} />
+                <EvidenceQuote text={t.evidenceQuote} />
               </li>
             ))}
           </ul>

@@ -187,8 +187,10 @@ describe("API: provenance, library, remap", () => {
     const d = await call("GET", `reports/${r.id}`);
     const byName = (n: string) => d.body.results.find((x: any) => x.rawName === n);
     const mapped = byName("某检验项目甲");
-    expect(mapped.verdict).toMatchObject({ basis: "legacy", disagreement: false });
-    expect(mapped.verdict.usedRange.levelZh).toBe("未核实");
+    // GGT has a verified national range (WS/T 404.1) and the row printed none.
+    expect(mapped.verdict).toMatchObject({ basis: "standard", disagreement: false });
+    expect(mapped.verdict.usedRange.levelZh).toBe("国家标准");
+    expect(mapped.verdict.usedRange.evidenceQuote).toContain("GGT");
     const withRef = byName("某检验项目乙");
     expect(withRef.verdict.basis).toBe("report");
   });
@@ -213,7 +215,10 @@ describe("API: provenance, library, remap", () => {
     const glu = lib.body.indicators.find((i: any) => i.code === "GLU");
     expect(glu.legacy.source.level).toBe("unverified");
     expect(glu.explain.source.levelZh ?? glu.explain.source.level).toBeTruthy();
-    expect(glu.verified).toBe(false);
+    expect(glu.verified).toBe(true); // 糖尿病诊断切点 (中国糖尿病防治指南 2024)
+    expect(glu.thresholds.map((t: any) => t.id)).toContain("glu_fpg_cn");
+    const cea = lib.body.indicators.find((i: any) => i.code === "CEA");
+    expect(cea.verified).toBe(false);
     const one = await call("GET", "library/ecg_p_axis");
     expect(one.body).toMatchObject({ code: "ECG_P_AXIS", categoryZh: "心电图", ranges: [], loinc: null });
     expect((await call("GET", "library/NOPE")).status).toBe(404);

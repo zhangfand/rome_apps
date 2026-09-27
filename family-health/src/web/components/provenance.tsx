@@ -95,6 +95,7 @@ export function populationText(p: PopulationInfo | null | undefined): string | n
     else if (max != null) parts.push(`${max} 岁及以下`);
   }
   if (p.pregnancy) parts.push("孕期");
+  if (p.condition) parts.push(`仅限${p.condition}`);
   if (p.note) parts.push(p.note);
   return parts.length ? parts.join("，") : null;
 }
@@ -116,7 +117,24 @@ export function Citation({ source, locator }: { source: SourceInfo | null | unde
           </a>
         </>
       ) : null}
+      {source.level !== "report" && source.level !== "unverified" ? (
+        <span className="block">
+          {source.status ? `状态：${source.status}` : null}
+          {source.verifiedVia ? `${source.status ? "；" : ""}${source.verifiedVia === "primary" ? "已对照官方原文核对" : "对照转载或镜像全文核对，待官方原文复核"}` : null}
+        </span>
+      ) : null}
     </p>
+  );
+}
+
+/** Verbatim source text behind a number (from the verified research). */
+export function EvidenceQuote({ text }: { text: string | null | undefined }) {
+  if (!text) return null;
+  return (
+    <blockquote className="border-l-2 border-border pl-2 text-xs leading-relaxed text-muted-foreground">
+      <span className="text-foreground">原文：</span>
+      {text}
+    </blockquote>
   );
 }
 
@@ -141,6 +159,7 @@ function RangeLine({ r, label }: { r: ResolvedRange; label?: string }) {
       {pop ? <p className="text-xs text-muted-foreground">适用人群：{pop}</p> : null}
       {r.conditions ? <p className="text-xs text-muted-foreground">条件：{r.conditions}</p> : null}
       <Citation source={r.source} locator={r.locator} />
+      <EvidenceQuote text={r.evidenceQuote} />
     </div>
   );
 }
@@ -164,6 +183,7 @@ function ThresholdLine({ t, secondary }: { t: ThresholdHit; secondary?: boolean 
       ) : null}
       {t.note_zh ? <p className="text-xs text-muted-foreground">{t.note_zh}</p> : null}
       <Citation source={t.source} locator={t.locator} />
+      {!secondary ? <EvidenceQuote text={t.evidenceQuote} /> : null}
     </div>
   );
 }

@@ -110,6 +110,7 @@ export interface PopulationInfo {
   sex?: "male" | "female";
   age?: { min?: number; max?: number; maxInclusive?: boolean };
   pregnancy?: boolean;
+  condition?: string;
   note?: string;
 }
 
@@ -126,6 +127,8 @@ export interface SourceInfo {
   retrieved: string;
   verifiedVia?: "primary" | "secondary";
   evidenceQuote?: string;
+  status?: string;
+  notes?: string;
   levelZh?: string;
   usedBy?: number;
 }
@@ -143,6 +146,7 @@ export interface ResolvedRange {
   locator: string | null;
   population: PopulationInfo | null;
   conditions: string | null;
+  evidenceQuote?: string | null;
   text: string | null;
   textUnit?: string | null;
 }
@@ -153,6 +157,7 @@ export interface ThresholdScaleItem {
   high: number | null;
   inclusivity: string;
   bounds?: Record<string, { low?: number; high?: number; inclusivity?: string }>;
+  note_zh?: string;
 }
 
 export interface ThresholdHit {
@@ -168,6 +173,7 @@ export interface ThresholdHit {
   source: SourceInfo | null;
   locator: string | null;
   alternativeOf: string | null;
+  evidenceQuote?: string | null;
   decidedBy: string[];
   scale: ThresholdScaleItem[];
   unit: string;
@@ -207,6 +213,7 @@ export interface RangeCandidateInfo {
   sourceId: string;
   locator?: string;
   conditions?: string;
+  evidenceQuote?: string;
 }
 
 export interface LibraryEntry {
@@ -228,7 +235,7 @@ export interface LibraryEntry {
   ranges: Array<{ candidate: RangeCandidateInfo; resolved: ResolvedRange | null; source: SourceInfo | null; levelZh: string }>;
   conflict: { note_zh: string; nationalRangeId?: string; internationalRangeId?: string; resolution: string } | null;
   legacy: { ranges: Array<{ sex: "male" | "female" | null; range: NumericRange }>; source: SourceInfo | null } | null;
-  thresholds: Array<{ id: string; name_zh: string; kind: string; unit: string; population: PopulationInfo; categories: ThresholdScaleItem[]; level: SourceLevel; levelZh: string; locator?: string; alternativeOf?: string; source: SourceInfo | null }>;
+  thresholds: Array<{ id: string; name_zh: string; kind: string; unit: string; population: PopulationInfo; categories: ThresholdScaleItem[]; level: SourceLevel; levelZh: string; locator?: string; alternativeOf?: string; evidenceQuote?: string; source: SourceInfo | null }>;
   critical: Array<{ op: string; threshold: number; level: "urgent" | "soon"; message: string; sex: string | null; source: SourceInfo | null }>;
   verified: boolean;
   loincAttribution?: string | null;

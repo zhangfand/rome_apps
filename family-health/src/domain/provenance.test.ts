@@ -116,15 +116,36 @@ describe("standard range precedence", () => {
 });
 
 describe("flag regression", () => {
-  it("fallback range equals the old dictionary default for every indicator (no verified ranges yet)", () => {
+  it("fallback range: verified standard when one applies, otherwise the old dictionary default", () => {
     for (const def of INDICATORS) {
       if (def.direction === "info") continue;
       for (const sex of ["male", "female", null] as const) {
-        const a = fallbackRange(def, { sex });
-        const b = defaultRange(def, sex);
-        expect([a?.low ?? null, a?.high ?? null], `${def.code} ${sex}`).toEqual([b?.low ?? null, b?.high ?? null]);
+        for (const age of [33, 65, null]) {
+          const a = fallbackRange(def, { sex, age });
+          const std = standardRange(def, { sex, age }).primary;
+          const b = std ? { low: std.low ?? undefined, high: std.high ?? undefined } : defaultRange(def, sex);
+          expect([a?.low ?? null, a?.high ?? null], `${def.code} ${sex} ${age}`).toEqual([b?.low ?? null, b?.high ?? null]);
+        }
       }
     }
+  });
+
+  it("only these indicators changed their fallback numbers when verified ranges arrived", () => {
+    const changed = new Set<string>();
+    for (const def of INDICATORS) {
+      if (def.direction === "info" || !def.ref) continue;
+      for (const sex of ["male", "female"] as const) {
+        for (const age of [33, 65]) {
+          const a = fallbackRange(def, { sex, age });
+          const b = defaultRange(def, sex);
+          if (a?.low !== b?.low || a?.high !== b?.high) changed.add(def.code);
+        }
+      }
+    }
+    // Reviewed differences between the original dictionary and the standards:
+    // ALP (WS/T 404.1 女性按年龄), TBIL/DBIL (WS/T 404.4 只有上限), CREA/UREA
+    // (WS/T 404.5 按 60 岁分段), APOA1/APOB (血脂指南 2023 描述性范围).
+    expect([...changed].sort()).toEqual(["ALP", "APOA1", "APOB", "CREA", "DBIL", "TBIL", "UREA"]);
   });
 
   it("verdict().flag equals computeFlag for a spread of values", () => {
@@ -347,9 +368,53 @@ describe("threshold categorisation (synthetic fixtures)", () => {
     expect(cat("EGFR", 35).primary).toMatchObject({ label_zh: "G3(测试)", severity: "moderate" });
   });
 
-  it("returns nothing for unknown codes, missing values and the (empty) real threshold file", () => {
+  it("returns nothing for unknown codes and missing values", () => {
     expect(cat("ALT", 40).primary).toBeNull();
     expect(categorize("BMI", null).primary).toBeNull();
-    expect(categorize("BMI", 31.7)).toEqual({ primary: null, alternatives: [], targets: [] });
+    expect(categorize("NOPE", 1).primary).toBeNull();
+  });
+});
+
+describe("real thresholds (verified research)", () => {
+  const who = { sex: "male" as const, age: 33 };
+  it("BMI: national standard first, 肥胖症分级 second", () => {
+    const c = categorize("BMI", 31.7, who);
+    expect(c.primary).toMatchObject({ thresholdId: "bmi_cn", label_zh: "肥胖", level: "national_cn" });
+    expect(c.alternatives.map((h) => [h.thresholdId, h.label_zh])).toContainEqual(["bmi_obesity_grade_cn", "轻度肥胖症"]);
+    expect(categorize("BMI", 23.9, who).primary?.label_zh).toBe("体重正常");
+    expect(categorize("BMI", 24, who).primary?.label_zh).toBe("超重");
+  });
+  it("blood pressure: the higher of SBP / DBP grades wins", () => {
+    expect(categorize("SBP", 135, who, { siblings: { DBP: 92 } }).primary?.label_zh).toBe("1级高血压(轻度)");
+    expect(categorize("SBP", 118, who, { siblings: { DBP: 78 } }).primary?.label_zh).toBe("正常血压");
+    expect(categorize("DBP", 85, who, { siblings: { SBP: 118 } }).primary?.label_zh).toBe("正常高值");
+    expect(categorize("SBP", 182, who, { siblings: { DBP: 95 } }).primary?.label_zh).toBe("3级高血压(重度)");
+  });
+  it("lipids: one band per value, HDL-C 降低, TG shows the 5.6 line second", () => {
+    expect(categorize("LDL_C", 2.0, who).primary?.label_zh).toBe("理想水平");
+    expect(categorize("LDL_C", 3.0, who).primary?.label_zh).toBe("合适水平");
+    expect(categorize("LDL_C", 3.4, who).primary?.label_zh).toBe("边缘升高");
+    expect(categorize("HDL_C", 0.72, who).primary?.label_zh).toBe("降低");
+    expect(categorize("HDL_C", 1.2, who).primary?.severity).toBe("normal");
+    const tg = categorize("TG", 7.33, who);
+    expect(tg.primary).toMatchObject({ thresholdId: "thr_tg_primary_low_risk", label_zh: "升高" });
+    expect(tg.alternatives.map((h) => h.thresholdId)).toContain("thr_tg_severe_pancreatitis");
+    expect(categorize("TG", 5.6, who).alternatives.map((h) => h.thresholdId)).not.toContain("thr_tg_severe_pancreatitis");
+    expect(categorize("TC", 6.91, who).primary?.label_zh).toBe("升高");
+  });
+  it("glucose, HbA1c, waist and uric acid", () => {
+    expect(categorize("GLU", 6.5, who).primary?.label_zh).toBe("空腹血糖受损（IFG）");
+    expect(categorize("HBA1C", 5.6, who).primary?.label_zh).toBe("未达糖尿病诊断切点");
+    expect(categorize("WAIST", 88, who).primary?.label_zh).toBe("中心型肥胖前期");
+    expect(categorize("WAIST", 88, { sex: "female", age: 33 }).primary?.label_zh).toBe("中心型肥胖");
+    expect(categorize("UA", 430, who).primary?.severity).not.toBe("normal");
+  });
+  it("condition-specific thresholds (高血压患者, 痛风患者 …) never apply automatically", () => {
+    expect(categorize("BAPWV_L", 1900, who).primary).toBeNull();
+    const abi = categorize("ABI_L", 0.85, who);
+    expect(abi.primary?.thresholdId).toBe("abi_pad_htn2024");
+    expect([abi.primary, ...abi.alternatives].map((h) => h?.thresholdId)).not.toContain("abi_tod_htn2024");
+    expect(categorize("UA", 400, who).targets).toEqual([]);
+    expect(categorize("LDL_C", 3.0, who).targets).toEqual([]);
   });
 });

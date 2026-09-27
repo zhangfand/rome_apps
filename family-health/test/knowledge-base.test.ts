@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { INDICATOR_DATA } from "../src/data/indicators.js";
+import { INDICATOR_DATA, UNKNOWN_VERIFIED_CODES } from "../src/data/indicators.js";
 import { IndicatorEntrySchema, validateKnowledgeBase, type IndicatorEntry, type KnowledgeBase, type Source } from "../src/data/schema.js";
 import { renderSourcesMd } from "../src/data/sources-md.js";
 import { LOINC_ATTRIBUTION, SOURCES } from "../src/data/sources.js";
@@ -33,6 +33,16 @@ describe("knowledge base validation", () => {
       if (e.loinc) expect(unverified.has(e.loinc.sourceId), e.code).toBe(false);
     }
     for (const t of THRESHOLDS) expect(unverified.has(t.sourceId), t.id).toBe(false);
+  });
+
+  it("every verified range and threshold carries a verbatim evidence quote and maps to a dictionary code", () => {
+    expect(UNKNOWN_VERIFIED_CODES).toEqual([]);
+    for (const e of INDICATOR_DATA) for (const r of e.ranges ?? []) if (r.low != null || r.high != null) expect(r.evidenceQuote, `${e.code}/${r.id}`).toBeTruthy();
+    for (const t of THRESHOLDS) expect(t.evidenceQuote, t.id).toBeTruthy();
+    for (const s of SOURCES.filter((x) => x.level !== "unverified")) {
+      expect(s.url, s.id).toBeTruthy();
+      expect(s.verifiedVia, s.id).toBeTruthy();
+    }
   });
 
   const good: Source = { id: "test-ok", org: "TEST", title: "Synthetic", identifier: "TEST-1", scope: ["reference_range"], level: "national_cn", retrieved: "2026-01-01" };

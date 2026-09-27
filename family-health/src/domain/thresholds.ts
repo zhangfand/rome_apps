@@ -37,6 +37,8 @@ export interface ThresholdHit {
   source: Source | null;
   locator: string | null;
   alternativeOf: string | null;
+  /** Verbatim source text behind the cut-points. */
+  evidenceQuote: string | null;
   /** Codes that contributed (for combined thresholds). */
   decidedBy: string[];
   /** All categories of this threshold, for display ("≥28 肥胖"). */
@@ -102,6 +104,7 @@ function hitFor(t: Threshold, values: Record<string, number>, sources?: Map<stri
     source: getSource(t.sourceId, sources) ?? null,
     locator: t.locator ?? null,
     alternativeOf: t.alternativeOf ?? null,
+    evidenceQuote: t.evidenceQuote ?? null,
     decidedBy: best.codes,
     scale: t.categories.map((c) => ({ label_zh: c.label_zh, low: c.low ?? null, high: c.high ?? null, inclusivity: c.inclusivity ?? "[)", ...(c.bounds ? { bounds: c.bounds } : {}) })),
     unit: t.unit,

@@ -8,6 +8,8 @@ dist/
 # Never commit family medical data: uploads, rendered pages, local DBs,
 # fixture/spike output, or coverage artifacts.
 data/
+# ...but src/data/ is the reviewable knowledge base (standards, no personal data).
+!src/data/
 uploads/
 pages/
 fixtures-out/
