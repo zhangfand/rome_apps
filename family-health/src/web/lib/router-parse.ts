@@ -7,6 +7,7 @@ export type Route =
   | { name: "report"; id: string }
   | { name: "upload"; memberId: string | null }
   | { name: "interventions"; memberId: string | null }
+  | { name: "library"; code: string | null }
   | { name: "notFound"; path: string };
 
 export function parseRoute(path: string): Route {
@@ -25,6 +26,7 @@ export function parseRoute(path: string): Route {
   }
   if (a === "upload") return { name: "upload", memberId: b ?? null };
   if (a === "interventions") return { name: "interventions", memberId: b ?? null };
+  if (a === "library") return { name: "library", code: b ? b.toUpperCase() : null };
   return { name: "notFound", path };
 }
 
@@ -36,6 +38,7 @@ export const paths = {
   report: (id: string) => `reports/${enc(id)}`,
   upload: (memberId?: string | null) => (memberId ? `upload/${enc(memberId)}` : "upload"),
   interventions: (memberId?: string | null) => (memberId ? `interventions/${enc(memberId)}` : "interventions"),
+  library: (code?: string | null) => (code ? `library/${enc(code)}` : "library"),
 };
 
 function enc(s: string) {

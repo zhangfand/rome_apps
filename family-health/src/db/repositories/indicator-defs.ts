@@ -5,7 +5,7 @@ import type { IndicatorDef } from "../../domain/types.js";
 import { createAppDbSchema } from "../schema.js";
 
 /**
- * Upsert the canonical indicator dictionary (src/domain/indicators.ts) into
+ * Upsert the canonical indicator dictionary (src/data/indicators.ts via domain/indicators.ts) into
  * `indicator_defs`. Idempotent; safe to call on every startup. Rows for codes
  * that were removed from the dictionary are kept so historical results still
  * resolve to a name.
@@ -31,6 +31,12 @@ export function syncIndicatorDefs(ctx: AppDbContext, defs: IndicatorDef[] = INDI
         derived: d.derived ?? false,
         explain: d.explain,
         sortOrder: i,
+        explainSourceId: d.explainSourceId ?? null,
+        refSourceId: d.refSourceId ?? null,
+        ranges: d.ranges ?? [],
+        conflict: d.conflict ?? null,
+        loinc: d.loinc ?? null,
+        side: d.side ?? null,
         updatedAt: now,
       };
       const { code: _code, ...update } = row;

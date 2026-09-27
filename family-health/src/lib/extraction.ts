@@ -89,7 +89,7 @@ interface CollectedRow {
   norm: NormalizedRow;
 }
 
-const CONFIDENCE: Record<string, number> = { exact: 1, candidate: 0.9, forced: 0.75, ambiguous: 0.6 };
+export const CONFIDENCE: Record<string, number> = { exact: 1, candidate: 0.9, forced: 0.75, ambiguous: 0.6 };
 
 export interface ExtractionOutcome {
   status: "needs_review" | "failed";
@@ -268,6 +268,8 @@ export async function runExtraction(reportId: string, deps: ExtractionDeps): Pro
       flag: c.norm.flag,
       section: c.row.section,
       page: c.row.page,
+      // The lab's own ↑/↓/H/L/* from a separate column; kept so re-mapping never loses it.
+      printedMarker: c.row.flag ?? null,
       // A physiologically impossible value (misread digit / unit) is marked for review.
       confidence: c.norm.match ? (checkPlausible(c.norm.indicatorCode, c.norm.valueNum) ? 0.5 : CONFIDENCE[c.norm.match] ?? null) : null,
       source: "extracted",

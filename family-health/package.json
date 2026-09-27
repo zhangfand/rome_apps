@@ -9,7 +9,8 @@
     "build": "rome build",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "db:generate": "drizzle-kit generate",
-    "test": "vitest run"
+    "test": "vitest run",
+    "sources:md": "tsx scripts/gen-sources-md.ts"
   },
   "dependencies": {
     "@rome-os/app-runtime": "^0.6.6",
@@ -30,6 +31,7 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "drizzle-kit": "^0.31.9",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^5.0.1"
   }

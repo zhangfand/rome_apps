@@ -5,23 +5,9 @@ export type Sex = "male" | "female";
 export type Relation = "本人" | "配偶" | "父亲" | "母亲" | "子女" | "其他";
 export const RELATIONS: readonly Relation[] = ["本人", "配偶", "父亲", "母亲", "子女", "其他"];
 
-export type CategoryKey =
-  | "general"
-  | "blood_routine"
-  | "urine"
-  | "liver"
-  | "kidney"
-  | "uric_acid"
-  | "lipid"
-  | "glucose"
-  | "thyroid"
-  | "tumor"
-  | "bone"
-  | "coag"
-  | "electrolyte"
-  | "cardio"
-  | "vitamin"
-  | "infection";
+import type { CATEGORY_KEYS, Conflict, RangeCandidate } from "../data/schema.js";
+
+export type CategoryKey = (typeof CATEGORY_KEYS)[number];
 
 /**
  * Numeric reference interval in the indicator's canonical unit. Either bound
@@ -79,6 +65,16 @@ export interface IndicatorDef {
   derived?: boolean;
   /** One or two plain-language Chinese sentences: what it measures and why it matters. */
   explain: string;
+  /** Source of `explain` (see src/data/sources.ts). */
+  explainSourceId?: string;
+  /** Source of the legacy fallback `ref` (always `legacy-unverified` today). */
+  refSourceId?: string;
+  /** Candidate reference ranges with sources (verified research). */
+  ranges?: RangeCandidate[];
+  conflict?: Conflict;
+  loinc?: { code: string; longName: string; zhName?: string; sourceId: string };
+  /** Left/right measurement. */
+  side?: "L" | "R";
 }
 
 /** Parsed flag of a single result. */

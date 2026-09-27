@@ -4,43 +4,69 @@ import { formatNumber, formatRange, formatUnit } from "../lib/format";
 import { Link, paths } from "../lib/router";
 import type { FindingTimeline, IndicatorSummary } from "../lib/types";
 import { Delta, FlagBadge } from "./common";
+import { DisagreementMark, ProvenancePopover } from "./provenance";
 import { Sparkline } from "./charts";
 
 export function IndicatorRow({ item, memberId }: { item: IndicatorSummary; memberId: string }) {
   const latest = item.latest;
   const value = latest ? (latest.value != null ? formatNumber(latest.value) : latest.valueText ?? "—") : "—";
+  const prov = latest?.provenance ?? null;
+  const unverifiedRef = item.refLevel === "unverified";
+  // The whole row links to the detail page (stretched link); value, range and flag
+  // sit above that link as their own buttons that explain where the number comes from.
   return (
-    <ListRow asChild interactive size="md">
-      <Link to={paths.indicator(memberId, item.code)} aria-label={`${item.name} 详情`}>
-        <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="truncate font-medium text-foreground">{item.name}</span>
-              {item.derived ? <Badge variant="outline">计算值</Badge> : null}
-            </div>
-            <div className="truncate text-xs text-muted-foreground">
-              {item.ref ? `参考 ${formatRange(item.ref)}${item.unit ? ` ${formatUnit(item.unit)}` : ""}` : formatUnit(item.unit) || " "}
-            </div>
+    <ListRow asChild interactive size="md" className="relative">
+      <div>
+      <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <Link
+              to={paths.indicator(memberId, item.code)}
+              aria-label={`${item.name} 详情`}
+              className="truncate font-medium text-foreground after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
+            >
+              {item.name}
+            </Link>
+            {item.derived ? <Badge variant="outline">计算值</Badge> : null}
           </div>
-          <div className="flex items-center justify-end gap-2 sm:justify-start">
+          <div className="truncate text-xs text-muted-foreground">
+            {item.ref ? (
+              <ProvenancePopover provenance={prov} label={`${item.name} 参考范围的来源`}>
+                参考 {formatRange(item.ref)}
+                {item.unit ? ` ${formatUnit(item.unit)}` : ""}
+                {unverifiedRef ? "（未核实）" : ""}
+              </ProvenancePopover>
+            ) : (
+              formatUnit(item.unit) || " "
+            )}
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 sm:justify-start">
+          <ProvenancePopover provenance={prov} label={`${item.name} 数值 ${value} 的来源`}>
             <span className="tabular-nums text-foreground">
               {value}
               {latest?.value != null && item.unit ? <span className="ml-1 text-xs text-muted-foreground">{formatUnit(item.unit)}</span> : null}
             </span>
-            {latest?.source === "measurement" ? (
-              <Badge variant="muted" title="最新值来自聊天/自测记录">自测</Badge>
-            ) : (
+          </ProvenancePopover>
+          {latest?.source === "measurement" ? (
+            <Badge variant="muted" title="最新值来自聊天/自测记录">
+              自测
+            </Badge>
+          ) : (
+            <ProvenancePopover provenance={prov} label={`${item.name} 判断结果的来源`} className="no-underline">
               <FlagBadge flag={latest?.flag} direction={item.direction} />
-            )}
-          </div>
-          <div className="col-start-1 row-start-2 sm:col-start-auto sm:row-start-auto">
-            <Sparkline series={item.series} direction={item.direction} />
-          </div>
-          <div className="col-start-2 row-start-2 min-w-[4.5rem] text-right sm:col-start-auto sm:row-start-auto">
-            <Delta delta={item.delta} trend={item.trend} />
-          </div>
+              <DisagreementMark provenance={prov} />
+            </ProvenancePopover>
+          )}
         </div>
-      </Link>
+        <div className="col-start-1 row-start-2 sm:col-start-auto sm:row-start-auto">
+          <Sparkline series={item.series} direction={item.direction} />
+        </div>
+        <div className="col-start-2 row-start-2 min-w-[4.5rem] text-right sm:col-start-auto sm:row-start-auto">
+          <Delta delta={item.delta} trend={item.trend} />
+        </div>
+      </div>
+      </div>
     </ListRow>
   );
 }

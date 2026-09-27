@@ -10,6 +10,7 @@ import { Spinner } from "@rome-os/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@rome-os/ui/table";
 import { Timestamp } from "@rome-os/ui/timestamp";
 import { Disclaimer, ErrorState, FlagBadge, LoadingRows } from "../components/common";
+import { DisagreementMark, LevelBadge, ProvenancePopover, rangeText } from "../components/provenance";
 import { TrendChart } from "../components/charts";
 import { apiGet, apiSend, errorMessage } from "../lib/api";
 import { formatNumber, formatRange, formatUnit, prettyUnits } from "../lib/format";
@@ -168,15 +169,33 @@ export function IndicatorDetailView({ memberId, code }: { memberId: string; code
             {d.name}
             {d.derived ? <Badge variant="outline">计算值</Badge> : null}
           </PageTitle>
-          <PageDescription>
+          <PageDescription className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
             {latest ? (
               <>
-                最新 {latest.value != null ? formatNumber(latest.value) : latest.valueText} {formatUnit(d.unit)}（{latest.date}）
+                最新
+                <ProvenancePopover provenance={latest.provenance} label={`${d.name} 最新数值的来源`}>
+                  {latest.value != null ? formatNumber(latest.value) : latest.valueText} {formatUnit(d.unit)}
+                </ProvenancePopover>
+                （{latest.date}）
+                {latest.source !== "measurement" ? (
+                  <ProvenancePopover provenance={latest.provenance} label={`${d.name} 判断结果的来源`} className="no-underline">
+                    <FlagBadge flag={latest.flag} direction={d.direction} />
+                    <DisagreementMark provenance={latest.provenance} />
+                  </ProvenancePopover>
+                ) : null}
               </>
             ) : (
               "暂无数据"
             )}
-            {d.band ? ` · 参考范围 ${d.bandSource === "report" && d.bandText ? d.bandText : formatRange(d.band)} ${formatUnit(d.unit)}${d.bandSource === "report" ? "（报告标注）" : ""}` : ""}
+            {d.band ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <ProvenancePopover provenance={latest?.provenance} label={`${d.name} 参考范围的来源`}>
+                  参考范围 {d.bandSource === "report" && d.bandText ? d.bandText : formatRange(d.band)} {formatUnit(d.unit)}
+                </ProvenancePopover>
+                <LevelBadge level={d.bandSource === "report" ? "report" : d.bandSource === "standard" ? d.standard?.primary?.level ?? "unverified" : "unverified"} />
+              </>
+            ) : null}
           </PageDescription>
         </PageHeading>
       </PageHeader>
@@ -207,6 +226,7 @@ export function IndicatorDetailView({ memberId, code }: { memberId: string; code
                 <TableHead>日期</TableHead>
                 <TableHead className="text-right">数值</TableHead>
                 <TableHead>单位</TableHead>
+                <TableHead>参考范围</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead>来源</TableHead>
               </TableRow>
@@ -215,10 +235,29 @@ export function IndicatorDetailView({ memberId, code }: { memberId: string; code
               {rows.map((p) => (
                 <TableRow key={`${p.source}-${p.resultId ?? p.measurementId ?? p.date}`}>
                   <TableCell className="tabular-nums">{p.date}</TableCell>
-                  <TableCell className="text-right tabular-nums">{p.value != null ? formatNumber(p.value) : p.valueText ?? "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    <ProvenancePopover provenance={p.provenance} label={`${p.date} 数值的来源`}>
+                      {p.value != null ? formatNumber(p.value) : p.valueText ?? "—"}
+                    </ProvenancePopover>
+                  </TableCell>
                   <TableCell>{formatUnit(p.unit)}</TableCell>
                   <TableCell>
-                    <FlagBadge flag={p.flag} direction={d.direction} />
+                    {p.provenance?.usedRange ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <ProvenancePopover provenance={p.provenance} label={`${p.date} 参考范围的来源`}>
+                          <span className="tabular-nums">{rangeText(p.provenance.usedRange)}</span>
+                        </ProvenancePopover>
+                        <LevelBadge level={p.provenance.usedRange.level} />
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <ProvenancePopover provenance={p.provenance} label={`${p.date} 判断结果的来源`} className="no-underline">
+                      <FlagBadge flag={p.flag} direction={d.direction} />
+                      <DisagreementMark provenance={p.provenance} />
+                    </ProvenancePopover>
                   </TableCell>
                   <TableCell>
                     {p.source === "measurement" ? (

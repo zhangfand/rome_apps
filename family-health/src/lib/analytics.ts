@@ -10,11 +10,13 @@ import { checkCritical, checkFindingRedFlags, type CriticalAlert, type FindingAl
 import { ageAt, computeDerived } from "../domain/derived.js";
 import { getFinding, parseSeverity, severityLabel } from "../domain/findings.js";
 import { computeFlag, isConcerning } from "../domain/flags.js";
-import { CATEGORIES, INDICATORS, defaultRange, getIndicator } from "../domain/indicators.js";
+import { CATEGORIES, INDICATORS, getIndicator } from "../domain/indicators.js";
 import { getPanel, panelIndicators } from "../domain/panels.js";
 import type { Flag, IndicatorDef, NumericRange, Sex } from "../domain/types.js";
 import type { DatedResult, FindingRow, InterventionRow, MeasurementRow, MemberRow } from "../db/repositories/store.js";
+import { fallbackRange, standardRange } from "../domain/provenance.js";
 import { daysBetween } from "./dates.js";
+import { measurementVerdict, resultVerdict, type Provenance } from "./verdicts.js";
 
 export interface MemberCtx {
   sex: Sex | null;
@@ -40,6 +42,9 @@ export interface SnapshotValue {
   refLow?: number | null;
   refHigh?: number | null;
   refText?: string | null;
+  rawName?: string;
+  section?: string | null;
+  printedMarker?: string | null;
 }
 
 export interface ExamSnapshot {
@@ -76,6 +81,9 @@ export function buildSnapshots(results: DatedResult[], member: MemberCtx): ExamS
       refLow: r.refLow,
       refHigh: r.refHigh,
       refText: r.refText,
+      rawName: r.rawName,
+      section: r.section,
+      printedMarker: r.printedMarker,
     });
   }
   const snaps = [...byReport.values()].sort((a, b) => a.examDate.localeCompare(b.examDate));
@@ -111,6 +119,8 @@ export interface SeriesPoint {
   page?: number | null;
   provider?: string;
   note?: string;
+  /** Which range decided the flag, with sources (see lib/verdicts.ts). */
+  provenance?: Provenance;
 }
 
 export function indicatorSeries(code: string, snaps: ExamSnapshot[], measurements: MeasurementRow[], member: MemberCtx): SeriesPoint[] {
@@ -119,6 +129,20 @@ export function indicatorSeries(code: string, snaps: ExamSnapshot[], measurement
   for (const s of snaps) {
     const v = s.values.get(code);
     if (!v) continue;
+    const who = { sex: member.sex, age: ageAt(member.birthDate, s.examDate) };
+    const siblings: Record<string, number> = {};
+    for (const [c, sv] of s.values) if (sv.value != null) siblings[c] = sv.value;
+    const provenance =
+      v.source === "report"
+        ? resultVerdict(
+            { rawName: v.rawName ?? "", rawValue: v.rawValue ?? "", rawUnit: v.rawUnit ?? "", refText: v.refText ?? null, section: v.section, indicatorCode: code, flag: v.flag, printedMarker: v.printedMarker, page: v.page },
+            who,
+            { reportId: s.reportId, provider: s.provider, examDate: s.examDate },
+            siblings,
+          )
+        : v.value != null
+          ? measurementVerdict(code, v.value, who, siblings)
+          : undefined;
     points.push({
       date: s.examDate,
       value: v.value,
@@ -130,6 +154,7 @@ export function indicatorSeries(code: string, snaps: ExamSnapshot[], measurement
       resultId: v.resultId,
       page: v.page ?? null,
       provider: s.provider,
+      provenance,
     });
   }
   for (const m of measurements) {
@@ -143,6 +168,7 @@ export function indicatorSeries(code: string, snaps: ExamSnapshot[], measurement
       source: "measurement",
       measurementId: m.id,
       note: m.note || undefined,
+      provenance: measurementVerdict(code, m.value, { sex: member.sex, age: ageAt(member.birthDate, m.measuredAt.slice(0, 10)) }),
     });
   }
   return points.sort((a, b) => a.date.localeCompare(b.date) || (a.source === "measurement" ? 1 : -1));
@@ -184,6 +210,7 @@ export interface IndicatorSummary {
   concerning: boolean;
   series: Array<{ date: string; value: number; source: SeriesPoint["source"]; flag: Flag | null }>;
   ref: NumericRange | null;
+  refLevel: string | null;
 }
 
 export function summarize(code: string, snaps: ExamSnapshot[], measurements: MeasurementRow[], member: MemberCtx): IndicatorSummary | null {
@@ -194,7 +221,9 @@ export function summarize(code: string, snaps: ExamSnapshot[], measurements: Mea
   const latest = points.at(-1) ?? null;
   const latestExam = reportPoints.at(-1) ?? null;
   const prevExam = reportPoints.at(-2) ?? null;
-  const range = defaultRange(def, member.sex) ?? healthyWeightRange(def.code, member) ?? null;
+  const who = { sex: member.sex, age: ageAt(member.birthDate, latestExam?.date) };
+  const std = standardRange(def, who);
+  const range = fallbackRange(def, who) ?? healthyWeightRange(def.code, member) ?? null;
   let delta: number | null = null;
   let trend: Trend | null = null;
   if (latestExam?.value != null && prevExam?.value != null) {
@@ -217,6 +246,8 @@ export function summarize(code: string, snaps: ExamSnapshot[], measurements: Mea
     concerning: isConcerning(latestExam?.flag, def),
     series: points.filter((p): p is SeriesPoint & { value: number } => p.value != null).map((p) => ({ date: p.date, value: p.value, source: p.source, flag: p.flag })),
     ref: range,
+    /** Where `ref` comes from: verified standard level, `unverified` legacy fallback, or `computed` healthy-weight range. */
+    refLevel: std.primary ? std.primary.level : std.legacy ? "unverified" : range ? "computed" : null,
   };
 }
 
@@ -351,7 +382,7 @@ export function memberOverview(
         latest: v.value,
         delta: round(v.value - p.value, (def.decimals ?? 2) + 1),
         pct: round(pct * 100, 1),
-        trend: trendOf(def, p.value, v.value, defaultRange(def, member.sex)),
+        trend: trendOf(def, p.value, v.value, fallbackRange(def, { sex: member.sex, age: ageAt(member.birthDate, latest.examDate) })),
       });
     }
   }
@@ -410,9 +441,11 @@ export function indicatorDetail(code: string, member: MemberCtx, snaps: ExamSnap
   const points = indicatorSeries(code, snaps, measurements, member);
   // Reference band: most recent printed range from a report, else the dictionary default.
   const printed = [...snaps].reverse().map((s) => s.values.get(code)).find((v) => v && v.source === "report" && (v.refLow != null || v.refHigh != null));
+  const who = { sex: member.sex, age: ageAt(member.birthDate, points.at(-1)?.date ?? today) };
+  const std = standardRange(def, who);
   const band: NumericRange | null = printed
     ? { low: printed.refLow ?? undefined, high: printed.refHigh ?? undefined }
-    : defaultRange(def, member.sex) ?? null;
+    : fallbackRange(def, who) ?? null;
   const first = points[0]?.date;
   const last = points.at(-1)?.date ?? today;
   const overlapping = first
@@ -429,7 +462,10 @@ export function indicatorDetail(code: string, member: MemberCtx, snaps: ExamSnap
     derived: !!def.derived,
     valueType: def.valueType,
     band,
-    bandSource: printed ? "report" : band ? "default" : null,
+    /** `report` (printed on the latest report), `standard` (verified), `default` (legacy, unverified). */
+    bandSource: printed ? "report" : std.primary ? "standard" : band ? "default" : null,
+    /** Standard ranges with sources (national first; international alternative + conflict). */
+    standard: std,
     /** The range exactly as printed on the most recent report (e.g. `<1.7`). */
     bandText: printed?.refText ?? null,
     points,

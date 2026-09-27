@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CATEGORIES, INDICATORS, defaultRange } from "./indicators.js";
-import { ambiguousAliasKeys, mapIndicator, searchIndicators, sectionCategory } from "./mapping.js";
+import { ALLOWED_SHARED_ALIASES, ambiguousAliasKeys, mapIndicator, searchIndicators, sectionCategory } from "./mapping.js";
 import { normalizeUnit, toCanonical } from "./units.js";
 
 describe("indicator dictionary integrity", () => {
@@ -42,12 +42,8 @@ describe("indicator dictionary integrity", () => {
   });
 
   it("only shares aliases where specimen/unit disambiguation is intended", () => {
-    const allowed = new Set([
-      "glu", "葡萄糖", "wbc", "白细胞", "rbc", "红细胞", "尿白细胞",
-      "中性粒细胞", "淋巴细胞", "单核细胞", "嗜酸性粒细胞", "嗜碱性粒细胞",
-      "红细胞分布宽度", "红细胞体积分布宽度",
-    ]);
-    const unexpected = ambiguousAliasKeys().filter((a) => !allowed.has(a.key));
+    const allowed = new Map(ALLOWED_SHARED_ALIASES.map((a) => [a.key, new Set(a.codes)]));
+    const unexpected = ambiguousAliasKeys().filter((a) => !allowed.has(a.key) || a.codes.some((c) => !allowed.get(a.key)!.has(c)));
     expect(unexpected).toEqual([]);
   });
 });

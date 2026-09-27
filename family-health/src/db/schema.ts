@@ -91,6 +91,13 @@ export function createAppDbSchema(tablePrefix: string = "family_health") {
     derived: integer("derived", { mode: "boolean" }).notNull().default(false),
     explain: text("explain").notNull().default(""),
     sortOrder: integer("sort_order").notNull().default(0),
+    // Provenance (knowledge base, src/data/). Additive columns; synced from the data files at startup.
+    explainSourceId: text("explain_source_id"),
+    refSourceId: text("ref_source_id"),
+    ranges: text("ranges", { mode: "json" }).$type<unknown[]>().notNull().default([]),
+    conflict: text("conflict", { mode: "json" }).$type<unknown>(),
+    loinc: text("loinc", { mode: "json" }).$type<unknown>(),
+    side: text("side"),
     updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
   });
 
@@ -120,6 +127,8 @@ export function createAppDbSchema(tablePrefix: string = "family_health") {
       edited: integer("edited", { mode: "boolean" }).notNull().default(false),
       /** The value exactly as first extracted, kept for provenance once a reviewer edits it. */
       originalRawValue: text("original_raw_value"),
+      /** ↑/↓/H/L/* printed in a separate 提示 column (the lab's own verdict), as extracted. */
+      printedMarker: text("printed_marker"),
       confirmed: integer("confirmed", { mode: "boolean" }).notNull().default(false),
       sortOrder: integer("sort_order").notNull().default(0),
       createdAt: integer("created_at", { mode: "timestamp" }).notNull(),

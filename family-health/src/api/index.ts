@@ -8,18 +8,23 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import type { RomeAppApiHandler, RomeAppApiRequest, RomeAppContext } from "@rome-os/app-runtime";
+import { ageAt } from "../domain/derived.js";
 import { FINDINGS, getFinding } from "../domain/findings.js";
 import { CATEGORIES, INDICATORS, getIndicator } from "../domain/indicators.js";
 import { mapIndicator, searchIndicators } from "../domain/mapping.js";
 import { GOAL_PANELS, getPanel, sanitizeGoals } from "../domain/panels.js";
 import { checkPlausible } from "../domain/plausibility.js";
+import type { PersonCtx } from "../domain/provenance.js";
 import { RELATIONS } from "../domain/types.js";
 import { stripValueMarker } from "../domain/values.js";
 import { FamilyHealthStore, type FindingRow, type ReportRow, type ResultRow } from "../db/repositories/store.js";
+import { createAgentCaller } from "../lib/agent.js";
 import { normalizeExamDate, resolveDate, todayIso } from "../lib/dates.js";
 import { STALE_EXTRACTION_MS, isStaleExtraction, renormalizeResult } from "../lib/extraction.js";
 import { guardStoredInsight, reportAlerts } from "../lib/insights.js";
+import { libraryDetail, libraryIndex } from "../lib/library.js";
 import { processUploadIsolated } from "../lib/media-runner.js";
+import { remapReport } from "../lib/remap.js";
 import { clearDemoData, seedDemoData } from "../lib/seed.js";
 import {
   DISCLAIMER,
@@ -42,6 +47,7 @@ import {
 } from "../lib/service.js";
 import { reportDir, resolveStoredPath } from "../lib/storage.js";
 import { syncGuardianTimeZone } from "../lib/timezone.js";
+import { resultVerdict, siblingValues } from "../lib/verdicts.js";
 
 const APP = "family-health";
 /** Hard cap per uploaded file (the host's own body limit may be lower). */
@@ -89,7 +95,13 @@ export function publicReport(r: ReportRow, now = new Date()) {
   };
 }
 
-function publicResult(r: ResultRow) {
+interface VerdictCtx {
+  who: PersonCtx;
+  report: { reportId: string; provider: string | null; examDate: string | null } | null;
+  siblings: Record<string, number>;
+}
+
+function publicResult(r: ResultRow, ctx?: VerdictCtx) {
   const def = getIndicator(r.indicatorCode);
   return {
     id: r.id,
@@ -116,6 +128,9 @@ function publicResult(r: ResultRow) {
     confidence: r.confidence,
     source: r.source,
     confirmed: r.confirmed,
+    printedMarker: r.printedMarker,
+    /** Which range decided the flag and where it comes from (see domain/provenance.ts). */
+    verdict: ctx ? resultVerdict(r, ctx.who, ctx.report, ctx.siblings) : null,
   };
 }
 
@@ -126,10 +141,19 @@ function publicFinding(f: FindingRow) {
 function reportDetail(store: FamilyHealthStore, r: ReportRow) {
   const { alerts, findingAlerts } = reportAlerts(store, r.id);
   const member = store.getMember(r.memberId);
+  const rows = store.listReportResults(r.id);
+  const ctx: VerdictCtx = {
+    who: {
+      sex: member?.sex === "male" || member?.sex === "female" ? member.sex : null,
+      age: member?.birthDate && r.examDate ? ageAt(member.birthDate, r.examDate) : null,
+    },
+    report: { reportId: r.id, provider: r.provider || null, examDate: r.examDate },
+    siblings: siblingValues(rows),
+  };
   return {
     report: publicReport(r),
     member: member ? publicMember(member) : null,
-    results: store.listReportResults(r.id).map(publicResult),
+    results: rows.map((row) => publicResult(row, ctx)),
     findings: store.listReportFindings(r.id).map(publicFinding),
     alerts,
     findingAlerts,
@@ -394,6 +418,14 @@ class FamilyHealthApi implements RomeAppApiHandler {
     });
     this.on("DELETE", "measurements/:id", (_req, p) => json({ deleted: s().deleteMeasurement(p.id) }));
 
+    // ---- 指标库 (knowledge base audit)
+    this.on("GET", "library", () => json(libraryIndex()));
+    this.on("GET", "library/:code", (_req, p) => {
+      const d = libraryDetail(p.code);
+      if (!d) throw new UserFacingError("未知指标", "indicator_not_found");
+      return json(d);
+    });
+
     // ---- reports
     this.on("GET", "reports", (req) => {
       const memberId = req.query.get("memberId") ?? undefined;
@@ -500,6 +532,13 @@ class FamilyHealthApi implements RomeAppApiHandler {
         s().upsertInsight({ scope: "report", scopeId: r.id, memberId: r.memberId, status: "failed", content: null, markdown: null, error: `无法启动解读：${(err as Error).message}`, model: null, promptVersion: "report-v1", inputHash: null });
       }
       return json(reportDetail(s(), s().getReport(r.id)!));
+    });
+
+    // Re-map rows to indicator codes without re-running extraction.
+    this.on("POST", "reports/:id/remap", async (_req, p) => {
+      const r = this.report(p.id);
+      const outcome = await remapReport(r.id, { store: s(), callAgent: createAgentCaller(this.ctx), log: this.ctx.log });
+      return json({ ...outcome, detail: reportDetail(s(), s().getReport(r.id)!) });
     });
 
     this.on("POST", "reports/:id/reopen", (_req, p) => {

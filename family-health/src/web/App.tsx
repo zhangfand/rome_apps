@@ -14,6 +14,7 @@ import { ThemeColorsProvider } from "./lib/theme";
 import type { Meta } from "./lib/types";
 import { IndicatorDetailView } from "./views/IndicatorDetail";
 import { InterventionsView } from "./views/Interventions";
+import { LibraryView } from "./views/Library";
 import { MemberView } from "./views/Member";
 import { NotFound } from "./views/NotFound";
 import { OverviewView } from "./views/Overview";
@@ -22,7 +23,7 @@ import { ReportsView } from "./views/Reports";
 import { UploadView } from "./views/Upload";
 
 
-function section(route: Route): "overview" | "reports" | "interventions" | null {
+function section(route: Route): "overview" | "reports" | "interventions" | "library" | null {
   switch (route.name) {
     case "overview":
     case "member":
@@ -34,6 +35,8 @@ function section(route: Route): "overview" | "reports" | "interventions" | null 
       return "reports";
     case "interventions":
       return "interventions";
+    case "library":
+      return "library";
     default:
       return null;
   }
@@ -55,6 +58,8 @@ function View({ route }: { route: Route }) {
       return <UploadView memberId={route.memberId} />;
     case "interventions":
       return <InterventionsView memberId={route.memberId} />;
+    case "library":
+      return <LibraryView code={route.code} />;
     default:
       return <NotFound />;
   }
@@ -81,6 +86,9 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
               </PageNavLink>
               <PageNavLink asChild active={active === "interventions"}>
                 <Link to={paths.interventions()}>干预记录</Link>
+              </PageNavLink>
+              <PageNavLink asChild active={active === "library"}>
+                <Link to={paths.library()}>指标库</Link>
               </PageNavLink>
             </PageNav>
             <main className="flex flex-col gap-6">

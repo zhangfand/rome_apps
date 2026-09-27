@@ -6,11 +6,13 @@
  *   2. Qualitative results: 阴性/正常 (or the indicator's own normal set) are
  *      normal, anything positive is `abnormal`.
  *   3. Numeric results are compared with the report's printed range, falling
- *      back to the dictionary default for the member's sex.
+ *      back to the standard range (verified knowledge base, national standard
+ *      first; see provenance.ts) and then to the legacy dictionary default.
  *   4. A bare `*` / 异常 marker without a usable range yields `abnormal`.
  */
-import { defaultRange } from "./indicators.js";
+import type { Source } from "../data/schema.js";
 import type { ParsedRange } from "./refRange.js";
+import { fallbackRange } from "./standard-range.js";
 import type { Flag, IndicatorDef, NumericRange, Sex } from "./types.js";
 import type { ParsedValue } from "./values.js";
 
@@ -20,6 +22,9 @@ export interface FlagInput {
   reportRange?: ParsedRange | NumericRange | null;
   def?: IndicatorDef | null;
   sex?: Sex | null;
+  age?: number | null;
+  /** Source index override (tests). */
+  sources?: Map<string, Source>;
 }
 
 function hasBounds(r: NumericRange | null | undefined): r is NumericRange {
@@ -59,7 +64,7 @@ function qualitativeNormals(def?: IndicatorDef | null, reportRange?: ParsedRange
  * Compute the flag for one result. Returns null when there is nothing to
  * compare against (no range, no marker) or the value could not be parsed.
  */
-export function computeFlag({ value, reportRange, def, sex }: FlagInput): Flag | null {
+export function computeFlag({ value, reportRange, def, sex, age, sources }: FlagInput): Flag | null {
   if (value.marker === "H" || value.marker === "L") return value.marker;
 
   if (value.qualitative) {
@@ -71,7 +76,7 @@ export function computeFlag({ value, reportRange, def, sex }: FlagInput): Flag |
 
   let range: NumericRange | undefined;
   if (hasBounds(reportRange)) range = reportRange;
-  else if (def && def.direction !== "info") range = defaultRange(def, sex);
+  else if (def && def.direction !== "info") range = fallbackRange(def, { sex, age }, sources);
 
   if (!hasBounds(range)) return value.marker === "abnormal" ? "abnormal" : null;
   const cmp = compareToRange(value.num, range, value.censor);

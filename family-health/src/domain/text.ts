@@ -105,7 +105,7 @@ export function nameCandidates(raw: string): string[] {
   const stripped: string[] = [];
   for (const c of out) {
     const s = c
-      .replace(/^(血清|血浆|全血|静脉血|末梢血|空腹|尿液?)(?=[一-鿿A-Za-z])/, (m) =>
+      .replace(/^(血清|血浆|全血|静脉血|末梢血|空腹|尿液?)(?=[一-鿿A-Za-zα-ωΑ-Ω])/, (m) =>
         // Keep 空腹 / 尿 when they are the discriminating part of the name.
         m === "空腹" || m.startsWith("尿") ? m : "",
       )

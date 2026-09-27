@@ -17,13 +17,18 @@ import type { Sex } from "./types.js";
 
 export type AlertLevel = "urgent" | "soon";
 
-interface Rule {
+export interface Rule {
   code: string;
   op: ">=" | "<=" | ">" | "<";
   threshold: number;
   level: AlertLevel;
   message: string;
   sex?: Sex;
+  /**
+   * Source of the threshold (src/data/sources.ts). Absent = the original,
+   * unverified app rule (`legacy-unverified`); set only from verified research.
+   */
+  sourceId?: string;
 }
 
 const R = (code: string, op: Rule["op"], threshold: number, level: AlertLevel, message: string, sex?: Sex): Rule => ({
@@ -196,4 +201,14 @@ export function checkFindingRedFlags(finding: { findingKey?: string | null; seve
     return { findingKey: key, level: "soon", message: "胆囊息肉 ≥10mm，建议到肝胆外科就诊评估。" };
   }
   return null;
+}
+
+/** Critical-value rules for one indicator, with their source id (legacy-unverified unless researched). */
+export function criticalRulesFor(code: string): Array<Rule & { sourceId: string }> {
+  return CRITICAL_RULES.filter((r) => r.code === code).map((r) => ({ ...r, sourceId: r.sourceId ?? "legacy-unverified" }));
+}
+
+/** Every sourceId referenced by critical rules (validated against sources.ts in tests). */
+export function criticalSourceIds(): string[] {
+  return [...new Set(CRITICAL_RULES.map((r) => r.sourceId ?? "legacy-unverified"))];
 }

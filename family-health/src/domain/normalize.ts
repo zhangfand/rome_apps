@@ -41,6 +41,11 @@ export interface NormalizedRow {
   refHigh: number | null;
   refText: string | null;
   flag: Flag | null;
+  /**
+   * The printed range as used for the flag, in `unit` (canonical when the
+   * value was converted), keeping inclusivity and any qualitative expectation.
+   */
+  reportRange: ParsedRange | null;
 }
 
 function convertRange(range: NumericRange, rawUnit: string | null | undefined, def: IndicatorDef): NumericRange | null {
@@ -51,7 +56,7 @@ function convertRange(range: NumericRange, rawUnit: string | null | undefined, d
   return { ...range, low: low?.value, high: high?.value };
 }
 
-function arrowMarker(arrow: string | null | undefined): "H" | "L" | "abnormal" | null {
+export function arrowMarker(arrow: string | null | undefined): "H" | "L" | "abnormal" | null {
   if (!arrow) return null;
   const a = arrow.trim();
   if (/↑|^h$|高/i.test(a)) return "H";
@@ -93,6 +98,7 @@ export function normalizeRow(row: RawRow, ctx: { sex?: Sex | null } = {}): Norma
   let unitStatus: ConversionStatus | null = null;
   let refLow: number | null = reportRange?.low ?? null;
   let refHigh: number | null = reportRange?.high ?? null;
+  let usedRange: ParsedRange | null = reportRange;
 
   if (def && value.num != null && def.valueType === "numeric") {
     const c = toCanonical(value.num, row.rawUnit, def);
@@ -104,6 +110,7 @@ export function normalizeRow(row: RawRow, ctx: { sex?: Sex | null } = {}): Norma
         const conv = convertRange(reportRange, row.rawUnit, def);
         refLow = conv?.low ?? null;
         refHigh = conv?.high ?? null;
+        usedRange = conv ? { ...reportRange, ...conv } : { ...reportRange, low: undefined, high: undefined };
       }
     }
   } else if (!def && value.num != null) {
@@ -123,6 +130,7 @@ export function normalizeRow(row: RawRow, ctx: { sex?: Sex | null } = {}): Norma
     refLow,
     refHigh,
     refText: row.refText?.trim() || null,
+    reportRange: usedRange,
     flag,
   };
 }

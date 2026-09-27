@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { dateToTs, flagVariant, formatNumber, formatRange, todayIso, tsToIso } from "../lib/format";
 import { niceScale } from "../lib/scale";
+import { BasisLine } from "./provenance";
 import { useThemeColors, type ThemeColors } from "../lib/theme";
 import type { Flag, NumericRange, SeriesPoint } from "../lib/types";
 
@@ -105,6 +106,16 @@ function TooltipBox({ active, payload, unit, colors }: { active?: boolean; paylo
       </div>
       <div style={{ color: colors.muted }}>{source}</div>
       {p.note ? <div style={{ color: colors.muted }}>{p.note}</div> : null}
+      {p.provenance ? (
+        // A full provenance popover cannot live inside a hover tooltip (it vanishes when the
+        // pointer moves); show the basis compactly and point to the table below.
+        <div className="mt-1 flex flex-col gap-0.5">
+          <BasisLine p={p.provenance} />
+          <span className="text-[11px]" style={{ color: colors.muted }}>
+            点击下方“原始数据”表里的数字查看来源
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }

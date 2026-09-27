@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Eye, EyeOff, Pencil, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Info, Pencil, Plus, RefreshCw, Shuffle, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@rome-os/ui/alert";
 import { Badge } from "@rome-os/ui/badge";
@@ -15,13 +15,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Timestamp } from "@rome-os/ui/timestamp";
 import { ConfirmDialog, DemoBadge, ErrorState, FlagBadge, LoadingRows, RedFlagBanner, StatusBadge } from "../components/common";
 import { ReportInsightView } from "../components/insight";
+import { DisagreementMark, LevelBadge, ProvenancePopover, rangeText } from "../components/provenance";
 import { EditableCell, IndicatorPicker, PageViewer } from "../components/review";
 import { apiSend, errorMessage } from "../lib/api";
 import { formatDateLong, formatNumber, formatUnit } from "../lib/format";
 import { useApi, usePolling } from "../lib/hooks";
 import { useMeta } from "../lib/meta";
 import { Link, go, paths } from "../lib/router";
-import type { FindingRow, Meta, ReportDetail, ReportInsightContent, ResultRow } from "../lib/types";
+import type { FindingRow, Meta, RemapOutcome, ReportDetail, ReportInsightContent, ResultRow } from "../lib/types";
 
 type Mutate = (method: "POST" | "PATCH" | "DELETE", path: string, body?: unknown, ok?: string) => Promise<void>;
 
@@ -183,14 +184,22 @@ function ResultEditRow({ row, mutate, onJump }: { row: ResultRow; mutate: Mutate
       <TableCell className="align-top px-2">
         <div className="flex items-center gap-1.5">
           <EditableCell value={row.displayValue} label={`${row.rawName} 结果`} onSave={(v) => patch({ rawValue: v })} />
-          <FlagBadge flag={row.flag} direction={row.direction} className="shrink-0" />
+          <ProvenancePopover provenance={row.verdict} label={`${row.rawName} 判断结果的来源`} className="shrink-0 no-underline">
+            <FlagBadge flag={row.flag} direction={row.direction} />
+            <DisagreementMark provenance={row.verdict} />
+          </ProvenancePopover>
         </div>
       </TableCell>
       <TableCell className="align-top px-2">
         <EditableCell value={row.rawUnit} label={`${row.rawName} 单位`} onSave={(v) => patch({ rawUnit: v })} />
       </TableCell>
       <TableCell className="align-top px-2">
-        <EditableCell value={row.refText ?? ""} label={`${row.rawName} 参考范围`} onSave={(v) => patch({ refText: v })} />
+        <div className="flex items-center gap-1">
+          <EditableCell value={row.refText ?? ""} label={`${row.rawName} 参考范围`} onSave={(v) => patch({ refText: v })} />
+          <ProvenancePopover provenance={row.verdict} label={`${row.rawName} 参考范围的来源`} className="shrink-0 p-0.5 text-muted-foreground no-underline">
+            <Info className="size-3.5" aria-hidden="true" />
+          </ProvenancePopover>
+        </div>
       </TableCell>
       <TableCell className="align-top px-2">
         <MappingCell row={row} patch={patch} />
@@ -217,7 +226,10 @@ function ResultEditCard({ row, mutate, onJump }: { row: ResultRow; mutate: Mutat
           <EditedNote row={row} />
         </button>
         <div className="flex shrink-0 items-center gap-1">
-          <FlagBadge flag={row.flag} direction={row.direction} />
+          <ProvenancePopover provenance={row.verdict} label={`${row.rawName} 判断结果的来源`} className="no-underline">
+            <FlagBadge flag={row.flag} direction={row.direction} />
+            <DisagreementMark provenance={row.verdict} />
+          </ProvenancePopover>
           <IconButton label={`删除 ${row.rawName}`} icon={<Trash2 />} size="sm" onClick={() => void mutate("DELETE", `results/${row.id}`, undefined, "已删除")} />
         </div>
       </div>
@@ -226,6 +238,11 @@ function ResultEditCard({ row, mutate, onJump }: { row: ResultRow; mutate: Mutat
         <EditableCell value={row.rawUnit} label={`${row.rawName} 单位`} onSave={(v) => patch({ rawUnit: v })} />
         <EditableCell value={row.refText ?? ""} label={`${row.rawName} 参考范围`} onSave={(v) => patch({ refText: v })} />
       </div>
+      {row.verdict ? (
+        <ProvenancePopover provenance={row.verdict} label={`${row.rawName} 判断依据`} className="self-start text-xs text-muted-foreground">
+          判断依据：{row.verdict.basis === "report" ? "报告单" : row.verdict.usedRange?.levelZh ?? "无"}
+        </ProvenancePopover>
+      ) : null}
       <MappingCell row={row} patch={patch} />
     </li>
   );
@@ -353,11 +370,27 @@ function ResultsByCategory({ detail, meta }: { detail: ReportDetail; meta: Meta 
                         r.rawName
                       )}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{r.valueNum != null ? formatNumber(r.valueNum) : r.valueText ?? r.rawValue}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <ProvenancePopover provenance={r.verdict} label={`${r.name ?? r.rawName} 数值的来源`}>
+                        {r.valueNum != null ? formatNumber(r.valueNum) : r.valueText ?? r.rawValue}
+                      </ProvenancePopover>
+                    </TableCell>
                     <TableCell>{formatUnit(r.unit || r.rawUnit)}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.refText ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {r.refText || r.verdict?.usedRange ? (
+                        <ProvenancePopover provenance={r.verdict} label={`${r.name ?? r.rawName} 参考范围的来源`}>
+                          {r.refText ?? (r.verdict?.usedRange ? rangeText(r.verdict.usedRange) : "—")}
+                          {!r.refText && r.verdict?.usedRange ? <LevelBadge level={r.verdict.usedRange.level} className="ml-1" /> : null}
+                        </ProvenancePopover>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
                     <TableCell>
-                      <FlagBadge flag={r.flag} direction={r.direction} />
+                      <ProvenancePopover provenance={r.verdict} label={`${r.name ?? r.rawName} 判断结果的来源`} className="no-underline">
+                        <FlagBadge flag={r.flag} direction={r.direction} />
+                        <DisagreementMark provenance={r.verdict} />
+                      </ProvenancePopover>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -413,6 +446,37 @@ function InsightSection({ detail, mutate }: { detail: ReportDetail; mutate: Muta
   );
 }
 
+function RemapSummary({ result, onClose }: { result: RemapOutcome; onClose: () => void }) {
+  const shown = result.changed.slice(0, 8);
+  return (
+    <Alert variant="info" className="mb-3">
+      <Shuffle />
+      <AlertTitle>重新匹配完成</AlertTitle>
+      <AlertDescription>
+        <p>
+          已匹配 {result.before.mapped} → {result.after.mapped} 项，未匹配 {result.before.unmapped} → {result.after.unmapped} 项；
+          {result.preserved ? `你修改过或手动添加的 ${result.preserved} 行保持不变。` : ""}
+        </p>
+        {shown.length ? (
+          <ul className="mt-1 list-disc pl-4">
+            {shown.map((c) => (
+              <li key={c.id}>
+                {c.raw_name}：{c.from ?? "未匹配"} → {c.to ?? "未匹配"}
+              </li>
+            ))}
+            {result.changed.length > shown.length ? <li>还有 {result.changed.length - shown.length} 项</li> : null}
+          </ul>
+        ) : (
+          <p>没有需要改变的项目。</p>
+        )}
+        <Button variant="ghost" size="sm" className="mt-1" onClick={onClose}>
+          知道了
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 // ------------------------------------------------------------------ main view
 
 export function ReportDetailView({ reportId }: { reportId: string }) {
@@ -430,6 +494,8 @@ export function ReportDetailView({ reportId }: { reportId: string }) {
   }, [data, firstDataPage]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmReextract, setConfirmReextract] = useState(false);
+  const [confirmRemap, setConfirmRemap] = useState(false);
+  const [remapResult, setRemapResult] = useState<RemapOutcome | null>(null);
   const [busy, setBusy] = useState(false);
 
   const status = data?.report.status;
@@ -446,6 +512,20 @@ export function ReportDetailView({ reportId }: { reportId: string }) {
       toast.error(errorMessage(err));
     }
   };
+
+  async function remap() {
+    setBusy(true);
+    try {
+      const res = await apiSend<RemapOutcome & { detail: ReportDetail }>("POST", `reports/${reportId}/remap`);
+      setData(res.detail);
+      setRemapResult(res);
+      toast.success(res.changed.length ? `重新匹配完成：${res.changed.length} 项有变化` : "重新匹配完成：没有变化");
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function extract() {
     setBusy(true);
@@ -614,9 +694,15 @@ export function ReportDetailView({ reportId }: { reportId: string }) {
               <SectionHeader>
                 <SectionHeading>
                   <SectionTitle>识别结果（{data.results.length}）</SectionTitle>
-                  <SectionDescription>逐行核对数值和单位；点击一行可跳到对应页面。修改后自动保存。</SectionDescription>
+                  <SectionDescription>逐行核对数值和单位；点击一行可跳到对应页面。修改后自动保存。把鼠标放在“正常/偏高”等标记上（手机上点一下），可以看到是按哪个参考范围判断的。</SectionDescription>
                 </SectionHeading>
+                <SectionActions className="w-full sm:w-auto">
+                  <Button variant="outline" size="sm" onClick={() => setConfirmRemap(true)} disabled={busy}>
+                    <Shuffle /> 重新匹配指标
+                  </Button>
+                </SectionActions>
               </SectionHeader>
+              {remapResult ? <RemapSummary result={remapResult} onClose={() => setRemapResult(null)} /> : null}
               <ResultsEditor detail={data} mutate={mutate} onJump={setPage} activePage={page} />
             </Section>
           </div>
@@ -691,6 +777,15 @@ export function ReportDetailView({ reportId }: { reportId: string }) {
         confirmLabel="删除"
         onConfirm={remove}
         onClose={() => setConfirmDelete(false)}
+      />
+      <ConfirmDialog
+        open={confirmRemap}
+        title="重新匹配指标？"
+        description="只按最新的指标库重新匹配项目名称（如“P电轴”不再被当成血磷），不会重新识别图片，也不会改动你修改过或手动添加的行。"
+        confirmLabel="重新匹配"
+        destructive={false}
+        onConfirm={remap}
+        onClose={() => setConfirmRemap(false)}
       />
       <ConfirmDialog
         open={confirmReextract}
