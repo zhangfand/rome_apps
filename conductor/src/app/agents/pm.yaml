@@ -7,6 +7,7 @@ tier: large
 reasoningEffort: high
 permissionMode: bypassPermissions
 tools:
+  - TodoWrite
   - Read
   - Write
   - Edit

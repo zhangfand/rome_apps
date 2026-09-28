@@ -22,6 +22,12 @@ describe("Conductor agent boundaries", () => {
     expect(manifest).not.toContain("app/skills/pm");
   });
 
+  it("lets every default worker keep its own todo list, which the board shows as progress", () => {
+    for (const worker of ["coder.yaml", "pm.yaml", "assistant.yaml"]) {
+      expect(read(worker)).toMatch(/^tools:\n(?: {2}- \w+\n)*? {2}- TodoWrite\n/m);
+    }
+  });
+
   it("runs the engineering lead on the large model tier", () => {
     expect(read("engineer-lead.yaml")).toContain("tier: large");
   });
