@@ -22,6 +22,7 @@ import {
 import { formatDuration, formatRelative, truncate } from "../lib/format";
 import { LightMarkdown } from "./light-markdown";
 import { WorkerLink } from "./worker-link";
+import { WorkerProgressInline } from "./worker-progress";
 import type { StateJson, TaskDetailJson, TaskSummary } from "../lib/types";
 
 const QUICK_REPLIES = {
@@ -259,6 +260,7 @@ export function Board({
                       className="text-aux text-muted-foreground"
                     />
                   )}
+                  <WorkerProgressInline sessionId={task.liveWorker?.romeSession?.id} />
                   <span className="max-w-[52ch] truncate text-aux text-muted-foreground">{truncate(phase, 140)}</span>
                   <span className="ml-auto text-aux">
                     {task.liveWorker
