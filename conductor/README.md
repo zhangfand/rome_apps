@@ -61,11 +61,21 @@ than one Run/attempt over its lifetime.
 
 | by | kinds |
 |---|---|
-| person (`<channel user>` or `github:<login>`) | `Created`, `Reply`, `Completed`, `Cancelled` |
+| person (`<channel user>` or `github:<login>`) | `Created`, `Reply`, `Steered`, `Completed`, `Cancelled` |
 | `orchestrator` | `JobCreated`, `Asked`, `Reported`, `Completed`, `Cancelled`, `ACK` (plus legacy `Noted`) |
 | `runtime` | `Dispatched`, `JobFailed`, `Lost`, `Event` |
 | worker id | `Opened`, `Returned`, `Failed` |
 | `conductor:ledger-compactor` | `Snapshot` |
+
+`Steered` is a person's message for one worker, written only from the task
+page (`POST tasks/:id/steer`); no agent and no ingest request can write one. It
+wakes the lead like a `Reply`. When the lead's next Job for that worker's agent
+resumes its session, the job scheduler puts the waiting steers verbatim at the
+top of the prompt and lists their seqs in `Dispatched.steerSeqs`. `steersOf()`
+in `fold.ts` derives each steer's standing: `delivered`, `not_delivered` once
+the Task ends or any other run starts first, otherwise `waiting`. A steer is
+never re-sent to another worker. Mid-step delivery waits for Rome to let an app
+message a running `system:summon` session.
 
 `Returned` is semi-structured: the generic result `status ∈ succeeded |
 failed | blocked | waiting | unparsed` and a one-paragraph `summary`, plus an

@@ -33,6 +33,16 @@ One rule lives only here: when `factBody().title` merely restates the kind
 it already says that word. Keep the title when it carries payload
 (`succeeded · PR #21 at fc621e0`, `Waiting until 09:41:25`).
 
+## Steering a worker
+
+While a worker runs, the task page offers **Steer worker** beside Reply. The
+composer captures that worker's id when it opens, so a worker that comes back
+while the person types still gets the steer: it waits for that worker to pick
+the work back up. Each steer in the history says who it was for and whether it
+was delivered, is waiting, or was not delivered because the work moved on
+(`steerTitle()` in `src/web/core/lib/facts.ts`). A task with no running worker
+offers Reply only. Steering does not stop or restart a worker.
+
 ## Deliberately absent
 
 `Stop worker` and a per-task "pick it up now" button were both designed and then

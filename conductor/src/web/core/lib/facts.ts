@@ -42,6 +42,7 @@ export const TONE_TEXT: Record<Tone, string> = {
 const LABELS: Record<string, string> = {
   Created: "request",
   Reply: "reply",
+  Steered: "steer",
   JobCreated: "job",
   Dispatched: "started work",
   JobFailed: "job failed",
@@ -116,7 +117,8 @@ export function factTone(fact: FactJson): Tone {
   }
   switch (fact.kind) {
     case "Created":
-    case "Reply": return "person";
+    case "Reply":
+    case "Steered": return "person";
     case "JobCreated":
     case "Waited":
     case "Returned": return "neutral";
@@ -189,6 +191,7 @@ export function factBody(fact: FactJson): FactContent {
   switch (fact.kind) {
     case "Created": return { title: "", body: s("brief") };
     case "Reply": return { title: "", body: s("text") };
+    case "Steered": return { title: steerTitle(fact), body: s("text") };
     case "Completed": return { title: "", body: [s("reason"), s("evidence") ? `Evidence: ${s("evidence")}` : ""].filter(Boolean).join("\n\n") };
     case "Cancelled": return { title: "", body: s("reason") };
     case "JobCreated": return {
@@ -289,4 +292,14 @@ function value(payload: Record<string, unknown>, key: string): string {
 
 function sentenceCase(text: string): string {
   return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : "Came back";
+}
+
+/** Who a steer was for and whether it reached them, in the person's terms. */
+export function steerTitle(fact: FactJson): string {
+  const worker = value(fact.payload, "workerId") || "the worker";
+  switch (fact.delivery) {
+    case "delivered": return `For worker ${worker} · delivered`;
+    case "not_delivered": return `For worker ${worker} · not delivered: the work moved on without this worker`;
+    default: return `For worker ${worker} · waiting for it to pick the work back up`;
+  }
 }

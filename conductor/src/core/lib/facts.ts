@@ -15,8 +15,12 @@ import type { ProjectBinding } from "./projects.js";
  * Facts are append-only. A task's state is a fold over its facts.
  */
 
-/** Written by a person. */
-export const PERSON_KINDS = ["Created", "Reply", "Completed", "Cancelled"] as const;
+/**
+ * Written by a person. `Reply` is addressed to the Task; `Steered` is
+ * addressed to one worker on it and is handed to that worker, word for word,
+ * when it picks the work back up.
+ */
+export const PERSON_KINDS = ["Created", "Reply", "Steered", "Completed", "Cancelled"] as const;
 
 /** Written by the orchestrator. Every one of these changes the Task's workflow posture. */
 export const DECISION_KINDS = ["JobCreated", "Asked", "Reported", "Waited", "Completed", "Cancelled"] as const;
@@ -38,7 +42,7 @@ export const RUNTIME_KINDS = ["Dispatched", "JobFailed", "Opened", "Returned", "
 export const CONTEXT_KINDS = ["Snapshot"] as const;
 
 export const FACT_KINDS = [
-  "Created", "Reply", "Completed", "Cancelled",
+  "Created", "Reply", "Steered", "Completed", "Cancelled",
   "JobCreated", "Dispatched", "Asked", "Reported", "Waited", "ACK", "Noted",
   "JobFailed", "Opened", "Returned", "Failed", "Lost", "Event",
   "Snapshot",
@@ -164,6 +168,18 @@ export type CreatedFact = FactOf<"Created", {
   issue?: IssueOrigin;
 }>;
 export type ReplyFact = FactOf<"Reply", { text: string }>;
+/**
+ * A person's message for one worker on the Task. The runtime never decides
+ * whether that worker continues; when the lead's next Job resumes the worker's
+ * session, the runtime puts `text` verbatim at the top of its prompt and lists
+ * this fact's seq in that Dispatched fact's `steerSeqs`.
+ */
+export type SteeredFact = FactOf<"Steered", {
+  /** The worker the person addressed, following its resumed continuations. */
+  workerId: string;
+  /** The person's words, verbatim. */
+  text: string;
+}>;
 /** Completed / Cancelled may be written by a person or by the orchestrator. */
 export type CompletedFact = FactOf<"Completed", { reason?: string; evidence?: string }>;
 export type CancelledFact = FactOf<"Cancelled", { reason?: string }>;
@@ -245,6 +261,8 @@ export type DispatchedFact = FactOf<"Dispatched", {
   /** Worker whose session this one continues, if any. */
   resumeWorkerId?: string;
   resumeSessionId?: string;
+  /** Steered facts delivered verbatim at the top of `prompt`, oldest first. */
+  steerSeqs?: number[];
   workspace?: Workspace;
   projectId?: string;
   project?: ProjectBinding["project"];
@@ -315,7 +333,7 @@ export type EventFact = FactOf<"Event", {
 }>;
 
 export type Fact =
-  | CreatedFact | ReplyFact | CompletedFact | CancelledFact
+  | CreatedFact | ReplyFact | SteeredFact | CompletedFact | CancelledFact
   | JobCreatedFact | AskedFact | ReportedFact | WaitedFact | AckFact | NotedFact
   | DispatchedFact | JobFailedFact | OpenedFact | ReturnedFact | FailedFact | LostFact | EventFact
   | SnapshotFact;
@@ -364,6 +382,8 @@ export function describeFact(fact: Fact, opts: { full?: boolean } = {}): string 
           : fact.payload.brief;
       case "Reply":
         return fact.payload.text;
+      case "Steered":
+        return `for worker ${fact.payload.workerId}: ${fact.payload.text}`;
       case "Completed":
         return [fact.payload.reason, fact.payload.evidence ? `evidence: ${fact.payload.evidence}` : ""].filter(Boolean).join(" — ");
       case "Cancelled":
@@ -375,10 +395,11 @@ export function describeFact(fact: Fact, opts: { full?: boolean } = {}): string 
       }
       case "Dispatched": {
         const resume = fact.payload.resumeWorkerId ? ` (continuing ${fact.payload.resumeWorkerId}'s session)` : "";
+        const steers = fact.payload.steerSeqs?.length ? `\nDelivered the person's steers ${fact.payload.steerSeqs.map((seq) => `#${seq}`).join(", ")} verbatim.` : "";
         const note = fact.payload.note ? `${fact.payload.note}\n` : "";
         const text = opts.full ? fact.payload.instructions : clip(fact.payload.instructions, 600);
         const job = fact.payload.jobId ? ` for job ${fact.payload.jobId}` : "";
-        return `${note}worker ${fact.payload.workerId}${job} as ${fact.payload.agent}${resume}\nInstructions:\n${text}`;
+        return `${note}worker ${fact.payload.workerId}${job} as ${fact.payload.agent}${resume}${steers}\nInstructions:\n${text}`;
       }
       case "Asked":
         return fact.payload.question;

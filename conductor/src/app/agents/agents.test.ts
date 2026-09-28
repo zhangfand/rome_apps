@@ -49,6 +49,14 @@ describe("Conductor agent boundaries", () => {
     expect(lead).not.toContain("conductor:stop_worker");
   });
 
+  it("tells the lead that runtime delivers a person's steer and the lead still decides", () => {
+    const lead = read("engineer-lead.yaml").replace(/\s+/g, " ");
+    expect(lead).toContain("A Steered fact is the person's own words for one worker");
+    expect(lead).toContain("word for word, ahead of your instructions, when your next Job for its agent resumes its session; do not restate them in that Job");
+    expect(lead).toContain("Whether the worker continues is still your decision");
+    expect(lead).toContain("is never sent to another worker; carry its point forward yourself if it still applies");
+  });
+
   it("caps review-driven code changes at three rounds per PR", () => {
     const lead = read("engineer-lead.yaml").replace(/\s+/g, " ");
     expect(lead).toContain("Limit review-driven code changes on one PR to three rounds");
@@ -216,6 +224,7 @@ describe("Conductor agent boundaries", () => {
       "read_task_history",
       "reconcile_tasks",
       "record_person_reply",
+      "record_person_steer",
       "report_to_person",
       "run_job",
       "stop_worker",

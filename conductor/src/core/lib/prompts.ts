@@ -21,9 +21,24 @@ export function buildWorkerPrompt(input: {
   providerFor(kind: string): WorkspaceProvider;
   defaultWorkspaceKind: string;
   projectNote?: string;
+  /**
+   * The person's waiting steers for the worker this run resumes, oldest
+   * first. Rendered verbatim ahead of everything else the worker is told.
+   */
+  steers?: ReadonlyArray<{ by: string; createdAt: Date; text: string }>;
 }): string {
   const { task, instructions, workspace, resuming, providerFor } = input;
   const lines: string[] = [];
+  if (input.steers?.length) {
+    lines.push(
+      "## Messages from the person",
+      `While you were working, the person wrote ${input.steers.length === 1 ? "this message" : "these messages"} for you. Each is their exact words, oldest first.`,
+      "",
+    );
+    input.steers.forEach((steer, index) => {
+      lines.push(`### Message ${index + 1} from ${steer.by} at ${steer.createdAt.toISOString()}`, steer.text, "");
+    });
+  }
   lines.push(
     resuming
       ? `Continuing job ${input.jobId ?? "(legacy)"} on task ${task.id} with new instructions.`

@@ -5,7 +5,7 @@ import { createRuntimeControlRepository } from "../db/repositories/runtime-contr
 import type { CoreComposition } from "./composition.js";
 import type { ConductorConfig } from "./config.js";
 import { type DispatchedFact, type JobFailedFact, RUNTIME } from "./facts.js";
-import { fold, sessionLeftBy, type TaskView } from "./fold.js";
+import { fold, sessionLeftBy, type TaskView, waitingSteersFor } from "./fold.js";
 import { buildWorkerPrompt } from "./prompts.js";
 import { handedOverWorkspace, projectWorkspaceKind } from "./workspaces.js";
 
@@ -74,6 +74,9 @@ export async function dispatchPendingJobs(input: {
         ? reusableWorkerForAgent(task, job.agent)
         : undefined;
       const resumeSessionId = previousWorkerId ? sessionLeftBy(task, previousWorkerId) : undefined;
+      // A person's steer reaches only the worker it was written for, and only
+      // when this run continues that worker's session.
+      const steers = resumeSessionId && previousWorkerId ? waitingSteersFor(task, previousWorkerId) : [];
       const workerId = `w-${crypto.randomUUID().slice(0, 8)}`;
       const workspaceKind = projectWorkspaceKind(project, composition.defaultWorkspaceKind);
 
@@ -99,6 +102,7 @@ export async function dispatchPendingJobs(input: {
           providerFor: composition.providerFor,
           defaultWorkspaceKind: composition.defaultWorkspaceKind,
           projectNote: composition.projectPromptNote?.(task, "worker"),
+          steers,
         });
         const payload: DispatchedFact["payload"] = {
           jobId: job.jobId,
@@ -110,6 +114,7 @@ export async function dispatchPendingJobs(input: {
           ...(resumeSessionId && previousWorkerId
             ? { resumeWorkerId: previousWorkerId, resumeSessionId }
             : {}),
+          ...(steers.length ? { steerSeqs: steers.map((steer) => steer.seq) } : {}),
           workspace,
           projectId: task.projectId,
           project,
@@ -135,6 +140,7 @@ export async function dispatchPendingJobs(input: {
           agent: job.agent,
           workspace: workspaceKind,
           resumed: Boolean(resumeSessionId),
+          steers: steers.length,
           executionId: receipt.executionId,
         });
         outcome.dispatched.push({ taskId: task.id, jobId: job.jobId, workerId });

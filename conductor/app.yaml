@@ -49,6 +49,7 @@ actions:
   - app/actions/create
   - app/actions/fork-task
   - app/actions/reply
+  - app/actions/steer
   - app/actions/complete
   - app/actions/cancel
   - app/actions/snapshot

@@ -139,6 +139,31 @@ describe("person Task writes", () => {
   });
 });
 
+describe("person steers", () => {
+  it("records a steer through its own action and reports each steer's delivery on the task", async () => {
+    const { sqlite, handler, actions } = configuredHandler({ projects: { app: { workspace: "none" } }, defaultProject: "app" });
+    insertFact(sqlite, "t-1", "Created", { brief: "ship it", projectId: "app" });
+    insertFact(sqlite, "t-1", "Dispatched", { workerId: "w-1", jobId: "j-1", agent: "coding:coding", instructions: "work", prompt: "work" });
+    insertFact(sqlite, "t-1", "Steered", { workerId: "w-1", text: "use v2" });
+
+    expect((await handler.handle(apiRequest("POST", ["tasks", "t-1", "steer"], { text: "use v2" }))).status).toBe(400);
+    expect((await handler.handle(apiRequest("POST", ["tasks", "t-1", "steer"], { workerId: "w-1", text: "  " }))).status).toBe(400);
+    const denied = apiRequest("POST", ["tasks", "t-1", "steer"], { workerId: "w-1", text: "use v2" });
+    denied.caller = { kind: "anonymous" };
+    expect((await handler.handle(denied)).status).toBe(403);
+    expect(actions).toEqual([]);
+
+    const sent = await handler.handle(apiRequest("POST", ["tasks", "t-1", "steer"], { workerId: "w-1", text: " use v2 " }));
+    expect(sent.status).toBe(200);
+    expect(actions).toEqual(["conductor:record_person_steer"]);
+
+    const task = await (await handler.handle(apiRequest("GET", ["tasks", "t-1"]))).json() as { facts: Array<{ kind: string; delivery?: string }> };
+    expect(task.facts.find((fact) => fact.kind === "Steered")).toMatchObject({ delivery: "waiting" });
+    expect(task.facts.find((fact) => fact.kind === "Created")).not.toHaveProperty("delivery");
+    sqlite.close();
+  });
+});
+
 describe("configuration writes", () => {
   it("lets only the guardian browse host directories", async () => {
     const { sqlite, handler } = configuredHandler(undefined);

@@ -71,6 +71,11 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
   const [hideRoutine, setHideRoutine] = useState(true);
   const [titleExpanded, setTitleExpanded] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  // The worker a steer is being written for. Captured when the composer opens,
+  // so a worker that comes back while the person types still gets the steer.
+  const [steerWorker, setSteerWorker] = useState<string | null>(null);
+  const [steer, setSteer] = useState("");
+  const steerRef = useRef<HTMLTextAreaElement>(null);
   const composerInitialized = useRef(false);
   const usage = useTaskUsageAnalysis(task, detailTab === "Usage");
 
@@ -127,6 +132,28 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
       }
       setReply("");
       setComposerOpen(false);
+      await load();
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const sendSteer = async () => {
+    if (!steer.trim() || !steerWorker) return;
+    setSending(true);
+    setError(null);
+    try {
+      const response = await fetchAppApi(`tasks/${encodeURIComponent(taskId)}/steer`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: steer, workerId: steerWorker }),
+      });
+      if (!response.ok) {
+        setError(await responseError(response));
+        return;
+      }
+      setSteer("");
+      setSteerWorker(null);
       await load();
     } finally {
       setSending(false);
@@ -222,6 +249,15 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
     }, 0);
   };
 
+  const openSteer = (workerId: string) => {
+    setDetailTab("Overview");
+    setSteerWorker(workerId);
+    window.setTimeout(() => {
+      steerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      steerRef.current?.focus({ preventScroll: true });
+    }, 0);
+  };
+
   return (
     <div className="flex flex-col gap-3.5">
       <Button variant="ghost" size="xs" className="w-fit text-muted-foreground" onClick={() => navigateToApp("/")}>← back to board</Button>
@@ -272,6 +308,9 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
         {task.state === "open" && (
           <div className="flex flex-wrap gap-2">
             <Button onClick={openComposer}>Reply</Button>
+            {task.liveWorker && (
+              <Button variant="outline" onClick={() => openSteer(task.liveWorker!.workerId)}>Steer worker</Button>
+            )}
             <Button variant="outline" disabled={sending} onClick={() => void closeTask("complete")}>Mark complete</Button>
             <Button variant="ghost" disabled={sending} onClick={() => void closeTask("cancel")}>Cancel task</Button>
           </div>
@@ -282,7 +321,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
             setForkOpen((current) => !current);
           }}>Replay from checkpoint</Button>
         </div>
-        {error && !composerOpen && <DetailError message={error} />}
+        {error && !composerOpen && !steerWorker && <DetailError message={error} />}
       </section>
 
       {forkOpen && (
@@ -328,6 +367,19 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
         <TabsContent value="Overview" className="flex flex-col gap-4 pt-2">
           <OverviewMetrics task={task} workerCount={sessions.size} now={now} />
           <RecentActivity entries={recent} onViewAll={() => setDetailTab("Activity")} />
+          {task.state === "open" && steerWorker && (
+            <SteerComposer
+              composerRef={steerRef}
+              workerId={steerWorker}
+              running={task.liveWorker?.workerId === steerWorker}
+              text={steer}
+              setText={setSteer}
+              sending={sending}
+              error={error}
+              onSend={sendSteer}
+              onClose={() => setSteerWorker(null)}
+            />
+          )}
           {task.state === "open" && composerOpen && (
             <ReplyComposer
               composerRef={composerRef}
@@ -469,6 +521,43 @@ function ReplyComposer({ composerRef, reply, setReply, sending, error, onSend, o
         <Button className="w-fit" onClick={() => void onSend()} disabled={sending || !reply.trim()}>
           {sending && <Spinner />}
           {sending ? "Sending…" : "Send reply"}
+        </Button>
+        {error && <DetailError message={error} />}
+      </CardFooter>
+    </Card>
+  );
+}
+
+function SteerComposer({ composerRef, workerId, running, text, setText, sending, error, onSend, onClose }: {
+  composerRef: RefObject<HTMLTextAreaElement | null>;
+  workerId: string;
+  /** False once the worker has come back; the steer then waits for it to be resumed. */
+  running: boolean;
+  text: string;
+  setText: (value: string) => void;
+  sending: boolean;
+  error: string | null;
+  onSend: () => Promise<void>;
+  onClose: () => void;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Steer worker {safeText(workerId)}</CardTitle>
+        <CardAction><Button variant="ghost" size="xs" onClick={onClose}>Close</Button></CardAction>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2.5">
+        <p className="text-aux text-muted-foreground">
+          {running
+            ? "The worker gets your exact words when it finishes its current step and picks the work back up. Conductor sees them too, and decides whether the worker continues."
+            : "This worker has come back. Your words wait for it to pick the work back up. If the work moves on without it, they are marked not delivered."}
+        </p>
+        <Textarea ref={composerRef} className="min-h-[104px]" value={text} onChange={(event) => setText(event.target.value)} aria-label={`Message for worker ${workerId}`} />
+      </CardContent>
+      <CardFooter className="flex-col items-stretch gap-2.5">
+        <Button className="w-fit" onClick={() => void onSend()} disabled={sending || !text.trim()}>
+          {sending && <Spinner />}
+          {sending ? "Sending…" : "Send to worker"}
         </Button>
         {error && <DetailError message={error} />}
       </CardFooter>
