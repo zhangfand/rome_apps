@@ -38,6 +38,7 @@ import { workerAgentNames, workerSessions, type WorkerSession } from "../lib/wor
 import { webDomain } from "../domain";
 import { StateChip, taskTitle } from "./board";
 import { WorkerLink } from "./worker-link";
+import { WorkerChecklist } from "./worker-progress";
 import { useTaskUsageAnalysis } from "../lib/use-task-usage-analysis";
 import { TaskUsageSummary } from "./task-usage";
 import { TaskUsageExplorer } from "./task-usage-explorer";
@@ -356,6 +357,12 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
               <SegmentedControl options={VIEW_OPTIONS} value={historyView} onValueChange={setHistoryView} size="sm" aria-label="History view" />
             </div>
           </div>
+          {task.liveWorker?.romeSession && (
+            <WorkerChecklist
+              sessionId={task.liveWorker.romeSession.id}
+              worker={<WorkerLink workerId={task.liveWorker.workerId} session={task.liveWorker.romeSession} label={task.liveWorker.agent} icon />}
+            />
+          )}
           {historyView === "Stream" ? (
             <StreamView rounds={rounds} sessions={sessions} workerAgents={workerAgents} coordinatorAgent={task.coordinatorAgent} openEntries={openEntries} toggle={(seq) => setOpenEntries((current) => toggleSet(current, seq))} />
           ) : historyView === "Lanes" ? (

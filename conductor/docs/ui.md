@@ -69,6 +69,19 @@ pull requests, so their polling likewise only runs while that tab is mounted.
 The reply composer is closed by default unless the Task is waiting for a person;
 the primary Reply action returns to Overview and opens it.
 
+## Worker progress
+
+A live worker's own todo list shows as `n/m done · <current step>` on its
+Running row and as a checklist at the top of the Activity tab. It is display
+only: the browser reads Rome's `GET /api/sessions/<session>/messages` for the
+live worker's session and takes `traceSummary.plan` from the newest turn's trace
+row. Rome writes that summary from each agent's todo tool (Claude `TodoWrite`,
+Codex plan updates) while the turn runs. Nothing is written to the task, and no
+agent reads it. Only the newest turn counts, because an older turn belongs to an
+earlier Job; a worker that has not written a list shows nothing extra. Each
+visible worker is polled every 15s while the page is shown, and step text goes
+through `safeText()` like every other payload string.
+
 ## Settings and Runtime
 
 **Settings** (`/config`) holds what the guardian changes; **Runtime**
