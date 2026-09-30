@@ -44,6 +44,7 @@ import { WorkerChecklist } from "./worker-progress";
 import { useTaskUsageAnalysis } from "../lib/use-task-usage-analysis";
 import { TaskUsageSummary } from "./task-usage";
 import { TaskUsageExplorer } from "./task-usage-explorer";
+import { TaskLibrary } from "./task-library";
 import { groupActivityRounds, orderActivity, type ActivityOrder, type ActivityRound } from "../lib/activity";
 
 type HistoryView = "Stream" | "Lanes" | "Table";
@@ -405,6 +406,7 @@ export function TaskDetail({ taskId, tasks, onTaskChanged }: {
           {webDomain().taskDetailPanels.map((Panel, index) => (
             <Panel key={Panel.displayName ?? Panel.name ?? index} taskId={taskId} task={task} />
           ))}
+          <TaskLibrary facts={task.facts} />
         </TabsContent>
       </Tabs>
     </div>
