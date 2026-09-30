@@ -347,6 +347,14 @@ function taskSummary(task: TaskView, now: Date, composition: CoreComposition, co
     workRepo: presentation?.workRepo,
     createdBy: task.createdBy,
     coordinatorAgent: task.replay?.coordinatorAgent ?? task.parent?.coordinatorAgent ?? config?.orchestratorAgent,
+    // Lineage only: the parent's pinned coordinator variant is internal and
+    // already folded into coordinatorAgent above.
+    parent: task.parent ? {
+      taskId: task.parent.taskId,
+      planItemId: task.parent.planItemId,
+      ...(task.parent.specRef ? { specRef: task.parent.specRef } : {}),
+      ...(task.parent.planRef ? { planRef: task.parent.planRef } : {}),
+    } : undefined,
     replay: task.replay,
     coordinatorInstance: coordinatorInstance ? {
       id: coordinatorInstance.id,

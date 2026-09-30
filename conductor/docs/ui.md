@@ -82,6 +82,31 @@ earlier Job; a worker that has not written a list shows nothing extra. Each
 visible worker is polled every 15s while the page is shown, and step text goes
 through `safeText()` like every other payload string.
 
+## Parent and child Tasks
+
+A Task an engineering lead starts with `create-tasks` carries its parent link
+(`parent: { taskId, planItemId, specRef?, planRef? }` on the Task summary).
+Everything below is derived from those links and the summaries the app already
+polls (`src/web/core/lib/lineage.ts`); nothing is written to a task, and one
+live Run per Task is untouched.
+
+- A parent's Overview opens with **Tasks it started**, grouped Needs you /
+  Running / Resting / Done (closed, collapsed with a count) — the board's own
+  groups, from `bucketTask()`. Rows stay in creation order so they do not jump
+  while read, and show the state, plan-item id, title, time, one activity line,
+  a running child's worker todo progress, and domain row details. The GitHub
+  domain fills that slot (`childTaskRowDetails`) with the child's pull requests
+  and CI; those reads only poll while the parent page is mounted.
+- When a parent has nothing of its own running or waiting on the person, its
+  "Where it stands" and its Resting row on the board say what it waits on:
+  "Waiting on 2 of the 3 tasks it started: 1 running, 1 needs you."
+- A child's header reads "started by conductor for ‹parent› · plan item X",
+  with its spec and plan linked when the domain can resolve them
+  (`artifactUrl`); it is never credited to "you".
+- The board and task list stay flat: a child keeps its own row in its own
+  group, with a "↳ ‹parent›" link, so a child that needs the person is never
+  folded away under a resting parent. Do not nest children on the board.
+
 ## Settings and Runtime
 
 **Settings** (`/config`) holds what the guardian changes; **Runtime**

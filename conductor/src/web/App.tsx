@@ -21,6 +21,7 @@ configureWebDomain(githubWebDomain);
 
 const POLL_MS = 10_000;
 const FRESH_MS = 60_000;
+const NO_TASKS: readonly TaskSummary[] = [];
 type Route =
   | { page: "board" }
   | { page: "tasks" }
@@ -100,7 +101,7 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
       </nav>
 
       {current.page === "detail" ? (
-        <TaskDetail key={current.taskId} taskId={current.taskId} onTaskChanged={feed.updateTask} />
+        <TaskDetail key={current.taskId} taskId={current.taskId} tasks={feed.state?.tasks ?? NO_TASKS} onTaskChanged={feed.updateTask} />
       ) : page === "runtime" ? (
         <Runtime state={feed.state} />
       ) : page === "shadow" ? (

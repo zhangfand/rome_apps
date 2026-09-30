@@ -23,6 +23,7 @@ import { formatDuration, formatRelative, truncate } from "../lib/format";
 import { LightMarkdown } from "./light-markdown";
 import { WorkerLink } from "./worker-link";
 import { WorkerProgressInline } from "./worker-progress";
+import { childrenOf, waitingOnChildren } from "../lib/lineage";
 import type { StateJson, TaskDetailJson, TaskSummary } from "../lib/types";
 
 const QUICK_REPLIES = {
@@ -161,6 +162,7 @@ export function Board({
                   </CardAction>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2">
+                  <ParentHint task={task} tasks={state.tasks} />
                   <LightMarkdown
                     markdown={text}
                     compact
@@ -251,6 +253,7 @@ export function Board({
                 <CardContent className="relative flex flex-wrap items-center gap-2.5 py-4">
                   {freshIds.has(task.id) && <FreshEdge />}
                   <TaskTitleLink task={task} />
+                  <ParentHint task={task} tasks={state.tasks} />
                   {task.liveWorker?.romeSession && (
                     <WorkerLink
                       workerId={task.liveWorker.workerId}
@@ -288,7 +291,8 @@ export function Board({
               <CardContent className="relative flex flex-wrap items-center gap-2.5 py-4">
                 {freshIds.has(task.id) && <FreshEdge />}
                 <TaskTitleLink task={task} />
-                <span className="max-w-[56ch] truncate text-aux text-muted-foreground">{safeText(task.waiting?.reason ?? latestRestingText(task))}</span>
+                <ParentHint task={task} tasks={state.tasks} />
+                <span className="max-w-[56ch] truncate text-aux text-muted-foreground">{restingText(task, state.tasks)}</span>
                 <span className="ml-auto text-aux text-muted-foreground">{restingWhen(task, now)}</span>
               </CardContent>
             </Fragment>
@@ -344,6 +348,40 @@ export function TaskTitleLink({ task, className }: { task: TaskSummary; classNam
 
 export function taskTitle(task: TaskSummary): string {
   return safeText(task.brief.split("\n")[0].trim() || "Untitled task");
+}
+
+/**
+ * "↳ <parent title>" on a Task a lead started, linking to that parent. Children
+ * keep their own rows in their own groups, so one that needs the person is
+ * never folded away under a resting parent.
+ */
+export function ParentHint({ task, tasks, className }: { task: TaskSummary; tasks: readonly TaskSummary[]; className?: string }) {
+  if (!task.parent) return null;
+  const parentId = task.parent.taskId;
+  const parent = tasks.find((item) => item.id === parentId);
+  const title = parent ? taskTitle(parent) : parentId;
+  return (
+    <Button
+      variant="link"
+      size="xs"
+      align="start"
+      title={`Part of ${title}`}
+      className={cn("min-w-0 max-w-[40ch] shrink px-0 text-aux font-normal text-muted-foreground hover:text-foreground", className)}
+      onClick={(event) => {
+        event.stopPropagation();
+        navigateToApp(`/${parentId}`);
+      }}
+    >
+      <span aria-hidden>↳</span>
+      <span className="min-w-0 truncate">{title}</span>
+    </Button>
+  );
+}
+
+/** A resting parent reports on the Tasks it started instead of its own last bookkeeping step. */
+function restingText(task: TaskSummary, tasks: readonly TaskSummary[]): string {
+  if (task.waiting) return safeText(task.waiting.reason);
+  return waitingOnChildren(childrenOf(tasks, task.id)) ?? latestRestingText(task);
 }
 
 function latestRestingText(task: TaskSummary): string {
