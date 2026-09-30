@@ -15,7 +15,12 @@ import type {
 const REFRESH_MS = 60_000;
 const STALE_MS = 3 * 60_000;
 
-export function PullRequestsPanel({ taskId }: { taskId: string }) {
+/**
+ * Read-only status of the pull requests a Task's history mentions, refreshed
+ * every minute while the page is visible. Polling stops when the caller
+ * unmounts, so a view that is not shown never reads GitHub.
+ */
+function usePullRequestStatuses(taskId: string) {
   const [data, setData] = useState<PullRequestStatuses>();
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
@@ -54,6 +59,12 @@ export function PullRequestsPanel({ taskId }: { taskId: string }) {
     };
   }, [load]);
 
+  return { data, error, loading, load };
+}
+
+export function PullRequestsPanel({ taskId }: { taskId: string }) {
+  const { data, error, loading, load } = usePullRequestStatuses(taskId);
+
   if (!data) {
     if (!error) return null;
     return (
@@ -81,6 +92,45 @@ export function PullRequestsPanel({ taskId }: { taskId: string }) {
         />
       ))}
     </section>
+  );
+}
+
+/**
+ * One quiet line per pull request under a child row on its parent's page:
+ * "#1203 · Draft · CI pending 3/7". Renders nothing until the child has a
+ * pull request, so a row without one looks unchanged.
+ */
+export function ChildTaskPullRequests({ taskId }: { taskId: string }) {
+  const { data } = usePullRequestStatuses(taskId);
+  const pulls = data?.pullRequests ?? [];
+  if (!pulls.length) return null;
+  return (
+    <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-aux">
+      {pulls.map((pull) => {
+        const state = pull.merged ? "merged" : pull.draft ? "draft" : pull.state;
+        const PullIcon = state === "merged" ? GitMerge : GitPullRequest;
+        return (
+          <a
+            key={`${pull.owner}/${pull.repo}#${pull.number}`}
+            href={pull.html_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={pull.error ?? pull.title ?? `Pull request #${pull.number}`}
+            className="inline-flex items-baseline gap-1.5 text-muted-foreground hover:text-foreground"
+          >
+            <PullIcon className="size-3 shrink-0 self-center" aria-hidden />
+            <span className="font-mono text-foreground">#{pull.number}</span>
+            {state && <span>· {capitalize(state)}</span>}
+            {pull.ci && pull.ci !== "NONE" && (
+              <span className={ciTone(pull.ci)}>
+                · {ciLabel(pull.ci)}{pull.checks?.total ? ` ${pull.checks.completed}/${pull.checks.total}` : ""}
+              </span>
+            )}
+            {pull.error && <TriangleAlert className="size-3 self-center text-warning-fg" aria-label="status unavailable" />}
+          </a>
+        );
+      })}
+    </span>
   );
 }
 

@@ -117,6 +117,42 @@ describe("task usage session reads", () => {
   });
 });
 
+describe("task lineage reads", () => {
+  it("sends a child's parent link on the Task and on the board state, without the internal coordinator variant", async () => {
+    const { sqlite, handler } = configuredHandler({ projects: { app: { workspace: "none" } }, defaultProject: "app" });
+    insertFact(sqlite, "t-parent", "Created", { brief: "deliver the outcome", projectId: "app" });
+    insertFact(sqlite, "t-child", "Created", {
+      brief: "one plan item",
+      projectId: "app",
+      parent: {
+        taskId: "t-parent",
+        planItemId: "slack-oauth-t1",
+        specRef: "slack-oauth/product-spec.md@0ee9e18e",
+        planRef: "slack-oauth/technical-spec.md#t1",
+        coordinatorAgent: "conductor:engineer-lead-replay-v1",
+      },
+    });
+    const lineage = {
+      taskId: "t-parent",
+      planItemId: "slack-oauth-t1",
+      specRef: "slack-oauth/product-spec.md@0ee9e18e",
+      planRef: "slack-oauth/technical-spec.md#t1",
+    };
+
+    const detail = await handler.handle(apiRequest("GET", ["tasks", "t-child"]));
+    expect(detail.status).toBe(200);
+    const child = await detail.json() as { parent?: unknown; coordinatorAgent?: string };
+    expect(child.parent).toEqual(lineage);
+    expect(child.coordinatorAgent).toBe("conductor:engineer-lead-replay-v1");
+
+    const state = await handler.handle(apiRequest("GET", ["state"]));
+    const body = await state.json() as { tasks: Array<{ id: string; parent?: unknown }> };
+    expect(body.tasks.find((task) => task.id === "t-child")?.parent).toEqual(lineage);
+    expect(body.tasks.find((task) => task.id === "t-parent")?.parent).toBeUndefined();
+    sqlite.close();
+  });
+});
+
 describe("person Task writes", () => {
   it("requires a Task revision and maps a conditional-write conflict to HTTP 409", async () => {
     const { sqlite, handler, actions } = configuredHandler(

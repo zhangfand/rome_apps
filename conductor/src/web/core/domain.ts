@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import type { ConfigJson, FactJson, TaskDetailJson, WorkspaceInspection } from "./lib/types";
+import type { ConfigJson, FactJson, TaskDetailJson, TaskSummary, WorkspaceInspection } from "./lib/types";
 
 /**
  * The contract a domain fills to own a whole settings section on a project's
@@ -30,6 +30,18 @@ export interface WebDomain {
   eventTitle(fact: FactJson): string | undefined;
   legacyOriginSource: string;
   taskDetailPanels: Array<ComponentType<{ taskId: string; task: TaskDetailJson }>>;
+  /**
+   * Compact lines under one row of a parent's "Tasks it started" list, for
+   * example a child's pull request. Mounted only while that parent page is
+   * shown, so any polling they do stops when the person leaves it.
+   */
+  childTaskRowDetails: Array<ComponentType<{ taskId: string; task: TaskSummary }>>;
+  /**
+   * A browsable link for a spec or plan reference recorded on a child Task
+   * (a work-repository path, possibly pinned to a commit). Core links only
+   * absolute http(s) URLs by itself.
+   */
+  artifactUrl?(ref: string, task: TaskSummary): string | undefined;
   /** Each renders a whole `Section` for the project detail page. */
   projectSettingsFields: Array<ComponentType<ProjectSettingsSlotProps>>;
 }
@@ -43,6 +55,7 @@ const genericDomain: WebDomain = {
   eventTitle: () => undefined,
   legacyOriginSource: "external source",
   taskDetailPanels: [],
+  childTaskRowDetails: [],
   projectSettingsFields: [],
 };
 

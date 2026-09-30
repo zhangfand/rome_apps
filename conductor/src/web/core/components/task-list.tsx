@@ -10,7 +10,7 @@ import { formatRelative } from "../lib/format";
 import type { TaskSummary } from "../lib/types";
 import { formatCost, formatTokens, type TaskTokenUsage } from "../lib/task-usage";
 import { useTaskUsage } from "../lib/use-task-usage";
-import { FreshEdge, TaskTitleLink } from "./board";
+import { FreshEdge, ParentHint, TaskTitleLink } from "./board";
 
 type Filter = "All" | "Needs you" | "Running" | "Resting" | "Closed";
 const FILTER_BUCKET: Partial<Record<Filter, TaskBucket>> = {
@@ -73,6 +73,7 @@ export function TaskList({ tasks, now, freshIds }: { tasks: TaskSummary[]; now: 
                   </TableCell>
                   <TableCell className="max-w-0 whitespace-normal">
                     <TaskTitleLink task={task} className="flex" />
+                    <ParentHint task={task} tasks={tasks} className="flex" />
                     <span className="block truncate text-aux text-muted-foreground">{latestText(task)}</span>
                   </TableCell>
                   <TableCell className="text-aux text-muted-foreground">{safeText(task.projectId ?? "—")}</TableCell>

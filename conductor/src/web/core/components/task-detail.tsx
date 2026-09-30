@@ -37,6 +37,8 @@ import type { FactJson, TaskDetailJson, TaskSummary } from "../lib/types";
 import { workerAgentNames, workerSessions, type WorkerSession } from "../lib/workers";
 import { webDomain } from "../domain";
 import { StateChip, taskTitle } from "./board";
+import { ChildTasksSection } from "./child-tasks";
+import { artifactHref, childrenOf, waitingOnChildren } from "../lib/lineage";
 import { WorkerLink } from "./worker-link";
 import { WorkerChecklist } from "./worker-progress";
 import { useTaskUsageAnalysis } from "../lib/use-task-usage-analysis";
@@ -55,7 +57,12 @@ const ORDER_OPTIONS: Array<{ value: ActivityOrder; label: string }> = [
 ];
 const DETAIL_REPLIES = ["accepted, thanks", "please revise", "hold for now"];
 
-export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskChanged: (task: TaskSummary) => void }) {
+export function TaskDetail({ taskId, tasks, onTaskChanged }: {
+  taskId: string;
+  /** Every Task summary the app polls; the source for this Task's parent and children. */
+  tasks: readonly TaskSummary[];
+  onTaskChanged: (task: TaskSummary) => void;
+}) {
   const [task, setTask] = useState<TaskDetailJson | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reply, setReply] = useState("");
@@ -210,6 +217,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
       : undefined;
   const originLabel = originSource ? ` · ${safeText(originSource)}${originNumber !== undefined ? ` #${originNumber}` : ""}` : "";
   const from = origin ? task.createdBy : "you";
+  const children = childrenOf(tasks, task.id);
   const title = taskTitle(task);
   // Past roughly three lines at the heading size the title is clamped, with a
   // toggle to read the rest; shorter titles never show the toggle.
@@ -247,7 +255,9 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
           )}
           <div className="flex flex-wrap gap-3.5 text-aux text-muted-foreground">
           <span>{safeText(task.projectId ?? "no project")}{task.projectSubtitle ? ` · ${safeText(task.projectSubtitle)}` : ""}</span>
-          <span>from {safeText(from)}{originLabel}</span>
+          {task.parent
+            ? <Lineage task={task} parent={tasks.find((item) => item.id === task.parent!.taskId)} />
+            : <span>from {safeText(from)}{originLabel}</span>}
           <span>opened {formatRelative(task.createdAt, now)}</span>
           </div>
         </div>
@@ -256,7 +266,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
             <AlertTitle>Where it stands</AlertTitle>
             <AlertDescription>
               <div className="flex flex-col items-start gap-2">
-                <LightMarkdown markdown={whereItStands(task)} compact className="max-w-[78ch]" />
+                <LightMarkdown markdown={whereItStands(task, children)} compact className="max-w-[78ch]" />
                 {task.liveWorker?.romeSession && (
                   <WorkerLink
                     workerId={task.liveWorker.workerId}
@@ -327,6 +337,7 @@ export function TaskDetail({ taskId, onTaskChanged }: { taskId: string; onTaskCh
         </div>
 
         <TabsContent value="Overview" className="flex flex-col gap-4 pt-2">
+          <ChildTasksSection parentId={task.id} tasks={tasks} now={now} />
           <OverviewMetrics task={task} workerCount={sessions.size} now={now} />
           <RecentActivity entries={recent} onViewAll={() => setDetailTab("Activity")} />
           {task.state === "open" && composerOpen && (
@@ -635,7 +646,45 @@ function HistoryTitle({ item, title, sessions }: { item: FactJson; title: string
   return <span className="text-[15px] font-semibold">{title}</span>;
 }
 
-function whereItStands(task: TaskDetailJson): string {
+/**
+ * Where a Task a lead started came from: its parent, its plan item, and the
+ * spec and plan it was created against. A lead, not the person, opened it.
+ */
+function Lineage({ task, parent }: { task: TaskDetailJson; parent?: TaskSummary }) {
+  const lineage = task.parent!;
+  const refs = [
+    { label: "spec", ref: lineage.specRef },
+    { label: "plan", ref: lineage.planRef },
+  ].filter((item): item is { label: string; ref: string } => Boolean(item.ref));
+  return (
+    <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+      <span>started by conductor for</span>
+      <Button
+        variant="link"
+        size="xs"
+        className="h-auto min-w-0 max-w-[48ch] px-0 text-aux text-foreground"
+        title={parent ? taskTitle(parent) : lineage.taskId}
+        onClick={() => navigateToApp(`/${lineage.taskId}`)}
+      >
+        <span className="truncate">{parent ? taskTitle(parent) : lineage.taskId}</span>
+      </Button>
+      <span>· plan item <code className="font-mono">{safeText(lineage.planItemId)}</code></span>
+      {refs.map(({ label, ref }) => {
+        const href = artifactHref(ref, task);
+        return (
+          <span key={label}>
+            ·{" "}
+            {href
+              ? <a className="underline-offset-2 hover:text-foreground hover:underline" href={href} target="_blank" rel="noopener noreferrer" title={ref}>{label}</a>
+              : <span title={ref}>{label}</span>}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function whereItStands(task: TaskDetailJson, children: readonly TaskSummary[]): string {
   if (task.state === "completed") return `This task is complete. ${latestText(task)}`;
   if (task.state === "cancelled") return `This task was cancelled. ${latestText(task)}`;
   if (task.liveWorker) return `Work is moving now. ${latestText(task)}`;
@@ -645,6 +694,9 @@ function whereItStands(task: TaskDetailJson): string {
   if (hasOutstandingPersonDecision(task) && task.lastDecision?.kind === "Asked") return `${attentionText(task)} Conductor is waiting for your answer.`;
   if (hasOutstandingPersonDecision(task) && task.lastDecision?.kind === "Reported") return `${attentionText(task)} Conductor is waiting for your reply. Nothing is running.`;
   if (task.latest.kind === "Reply" && task.needsAttention) return `Your reply was sent. Conductor is picking it up now.`;
+  // Nothing of its own is running, but the Tasks it started may be.
+  const onChildren = waitingOnChildren(children);
+  if (onChildren) return onChildren;
   return `${latestText(task)} Nothing is running right now.`;
 }
 

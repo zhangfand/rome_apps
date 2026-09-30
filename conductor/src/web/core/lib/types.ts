@@ -19,6 +19,13 @@ export interface TaskSummary {
   createdBy: string;
   /** Agent id configured to coordinate this task (for example conductor:engineer-lead). */
   coordinatorAgent?: string;
+  /** Present when an engineering lead started this Task as a plan item of a larger one. */
+  parent?: {
+    taskId: string;
+    planItemId: string;
+    specRef?: string;
+    planRef?: string;
+  };
   replay?: {
     sourceTaskId: string;
     sourceThroughSeq: number;
