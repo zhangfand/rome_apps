@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@rstest/core";
-import { activityAuthorLabel, authorLabel, bucketTask, factLabel, taskStateLabel } from "./facts.js";
+import { activityAuthorLabel, authorLabel, bucketTask, factBody, factLabel, factTone, taskStateLabel } from "./facts.js";
 import type { FactJson, TaskSummary } from "./types.js";
 
 const item = (kind: string, payload: Record<string, unknown> = {}): FactJson => ({
@@ -86,5 +86,21 @@ describe("user-facing label maps", () => {
     expect(activityAuthorLabel({ by: "w-12ab34cd", kind: "Returned" }, undefined, workers)).toBe("coding:coding");
     expect(activityAuthorLabel({ by: "guardian-id", kind: "Reply" }, undefined, workers)).toBe("guardian-id");
     expect(activityAuthorLabel({ by: "source:octo", kind: "Created" }, undefined, workers)).toBe("source");
+  });
+});
+
+describe("a person's steer", () => {
+  const steer = (delivery?: FactJson["delivery"]): FactJson => ({
+    seq: 7, id: "f7", taskId: "t-1", kind: "Steered", by: "guardian",
+    payload: { workerId: "w-1", text: "use v2" }, createdAt: "2026-09-28T00:00:00.000Z",
+    ...(delivery ? { delivery } : {}),
+  });
+
+  it("shows the person's words, who they were for, and whether they reached the worker", () => {
+    expect(factTone(steer("waiting"))).toBe("person");
+    expect(factLabel("Steered")).toBe("steer");
+    expect(factBody(steer("waiting"))).toEqual({ title: "For worker w-1 · waiting for it to pick the work back up", body: "use v2" });
+    expect(factBody(steer("delivered")).title).toBe("For worker w-1 · delivered");
+    expect(factBody(steer("not_delivered")).title).toBe("For worker w-1 · not delivered: the work moved on without this worker");
   });
 });

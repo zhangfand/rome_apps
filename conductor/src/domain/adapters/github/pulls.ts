@@ -45,6 +45,7 @@ function textOf(fact: Fact): string {
     }
     case "Reported": return fact.payload.report;
     case "Reply": return fact.payload.text;
+    case "Steered": return fact.payload.text;
     case "ACK": return fact.payload.summary;
     case "Noted": return fact.payload.note;
     case "Event": return fact.payload.summary;

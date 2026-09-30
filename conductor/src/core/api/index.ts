@@ -10,7 +10,7 @@ import { ensureRoutine, persistConfiguration } from "../actions/setup/index.js";
 import type { CoreComposition } from "../lib/composition.js";
 import type { ConductorConfig } from "../lib/config.js";
 import { type Fact } from "../lib/facts.js";
-import { fold, foldTask, needsAttention, type TaskView } from "../lib/fold.js";
+import { fold, foldTask, needsAttention, steersOf, type TaskView } from "../lib/fold.js";
 import { ingestAtomically, type IngestRequest } from "../lib/ingest.js";
 import { browseDirectories, DirectoryBrowserError } from "../lib/directory-browser.js";
 import { createFrontdeskShadowRepository } from "../db/repositories/frontdesk-shadow.js";
@@ -23,6 +23,7 @@ import { frontdeskShadowLimit, frontdeskShadowReport } from "../frontdesk/report
  *   GET tasks/:id          one task with every fact
  *   GET tasks/:id/<domain> app-owned, guardian-only task reads
  *   POST tasks/:id/reply   a person's reply, through conductor:record_person_reply
+ *   POST tasks/:id/steer   a person's message for one worker, through conductor:record_person_steer
  *   POST tasks/:id/complete close as done, through conductor:complete_task
  *   POST tasks/:id/cancel  close as not wanted, through conductor:cancel_task
  *   POST tasks/:id/fork    replay a historical checkpoint with a pinned coordinator prompt
@@ -81,7 +82,7 @@ class ConductorApiHandler implements RomeAppApiHandler {
         const task = foldTask(facts);
         const storedSessions = safe(() => createTaskSessionRepository(this.ctx.db).forTask(task.id)) ?? [];
         const coordinatorInstance = safe(() => createAgentInstanceRepository(this.ctx.db).forTaskCoordinator(task.id));
-        return json({ ...taskSummary(task, now, this.composition, settings.get(), storedSessions, coordinatorInstance), facts: task.facts.map(factJson) });
+        return json({ ...taskSummary(task, now, this.composition, settings.get(), storedSessions, coordinatorInstance), facts: taskFactsJson(task) });
       }
       const taskRoute = request.path[0] === "tasks"
         ? this.composition.taskRoutes?.find((candidate) => (
@@ -103,6 +104,16 @@ class ConductorApiHandler implements RomeAppApiHandler {
         const result = await this.ctx.runAction("conductor:record_person_reply", { taskId: request.path[1], seenSeq: body.seenSeq, text: body.text.trim(), source: body.text.trim() });
         if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `reply returned ${result.status}` }, 502);
         if (isConflictData(result.data)) return json(result.data, 409);
+        return json(result.data ?? {});
+      }
+      if (request.path[0] === "tasks" && request.path[2] === "steer" && request.path.length === 3) {
+        if (request.caller.kind !== "guardian") return json({ error: "forbidden" }, 403);
+        if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+        const body = readJsonBody<{ text?: unknown; workerId?: unknown }>(request);
+        if (!body || typeof body.text !== "string" || !body.text.trim()) return json({ error: "Enter a message for the worker." }, 400);
+        if (typeof body.workerId !== "string" || !body.workerId.trim()) return json({ error: "workerId is required." }, 400);
+        const result = await this.ctx.runAction("conductor:record_person_steer", { taskId: request.path[1], workerId: body.workerId.trim(), text: body.text.trim() });
+        if (result.status !== "ok") return json({ error: result.status === "error" ? result.error : `steer returned ${result.status}` }, result.status === "error" ? 400 : 502);
         return json(result.data ?? {});
       }
       if (request.path[0] === "tasks" && request.path[2] === "complete" && request.path.length === 3) {
@@ -289,7 +300,7 @@ function refreshedTask(facts: Fact[], composition: CoreComposition, config?: Con
   if (!facts.length) return json({ error: "task_not_found" }, 404);
   const now = new Date();
   const task = foldTask(facts);
-  return json({ ...taskSummary(task, now, composition, config, storedSessions, coordinatorInstance), facts: task.facts.map(factJson) });
+  return json({ ...taskSummary(task, now, composition, config, storedSessions, coordinatorInstance), facts: taskFactsJson(task) });
 }
 
 function mergeConfig(current: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
@@ -440,6 +451,17 @@ function taskUsageSessions(task: TaskView, stored: TaskSessionRef[], config?: Co
           ? "conductor:ledger-compactor"
           : dispatch?.kind === "Dispatched" ? dispatch.payload.agent : undefined,
     };
+  });
+}
+
+/** Every fact on a task; a person's steer also says where it stands. */
+function taskFactsJson(task: TaskView) {
+  const steers = new Map(steersOf(task).map((steer) => [steer.seq, steer]));
+  return task.facts.map((fact) => {
+    const steer = steers.get(fact.seq);
+    return steer
+      ? { ...factJson(fact), delivery: steer.delivery, ...(steer.deliveredTo ? { deliveredTo: steer.deliveredTo } : {}) }
+      : factJson(fact);
   });
 }
 

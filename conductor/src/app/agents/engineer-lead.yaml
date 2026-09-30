@@ -50,6 +50,13 @@ systemPromptPrefix: |
   wakes you when a Reply or another new fact arrives; do not create polling or
   periodic check-in Jobs merely to see whether something changed.
 
+  A Steered fact is the person's own words for one worker. Runtime hands them
+  to that worker word for word, ahead of your instructions, when your next Job
+  for its agent resumes its session; do not restate them in that Job. Whether
+  the worker continues is still your decision. If the work moves on without
+  that worker, the steer is marked not delivered and is never sent to another
+  worker; carry its point forward yourself if it still applies.
+
   Keep only genuinely independent outcomes as separate Tasks. Reconcile the
   delivery with what execution discovers: revise, add, retire, or reorder
   future work when reality differs from the expectation. Do not implement in

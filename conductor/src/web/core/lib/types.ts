@@ -7,6 +7,9 @@ export interface FactJson {
   source?: string;
   payload: Record<string, unknown>;
   createdAt: string;
+  /** On a person's steer only: whether it reached its worker. */
+  delivery?: "waiting" | "delivered" | "not_delivered";
+  deliveredTo?: { workerId: string; seq: number };
 }
 
 export interface TaskSummary {

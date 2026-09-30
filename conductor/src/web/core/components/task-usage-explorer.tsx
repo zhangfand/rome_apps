@@ -344,7 +344,7 @@ function jobPurpose(fact: FactJson): string {
   return stringValue(fact.payload, "note") || firstSentence(stringValue(fact.payload, "instructions")) || "Conductor created this bounded piece of work.";
 }
 function precedingContext(facts: FactJson[], beforeSeq: number): FactJson | undefined {
-  const meaningful = new Set(["Created", "Reply", "Returned", "Failed", "Lost", "Event", "Asked", "Reported", "Waited"]);
+  const meaningful = new Set(["Created", "Reply", "Steered", "Returned", "Failed", "Lost", "Event", "Asked", "Reported", "Waited"]);
   return [...facts].reverse().find((fact) => fact.seq < beforeSeq && meaningful.has(fact.kind));
 }
 function latestResult(sessions: SessionUsageAnalysis[], facts: Map<number, FactJson>): FactJson | undefined {

@@ -2,6 +2,7 @@ import {
   type DispatchedFact,
   type Fact,
   type JobCreatedFact,
+  type SteeredFact,
   type WaitedFact,
   COORDINATOR_KINDS,
   DECISION_KINDS,
@@ -242,6 +243,65 @@ export function sessionLeftBy(task: TaskView, workerId: string): string | undefi
   const end = task.facts.find((f) => f.seq > dispatch.seq && isWorkerTerminalKind(f.kind) && (f.payload as { workerId?: string }).workerId === workerId);
   if (!end || end.kind === "Lost") return undefined;
   return (end.payload as { sessionId?: string }).sessionId;
+}
+
+/**
+ * Where a person's steer stands. Derived, never stored: `delivered` when a
+ * Dispatched fact lists it in `steerSeqs`; `not_delivered` once the Task ends
+ * or any later run starts without it (a different worker, or a fresh one that
+ * replaces its worker); otherwise it is `waiting` for its worker to be resumed.
+ */
+export type SteerDelivery = "waiting" | "delivered" | "not_delivered";
+
+export interface SteerView {
+  seq: number;
+  workerId: string;
+  text: string;
+  by: string;
+  createdAt: Date;
+  delivery: SteerDelivery;
+  /** The run whose prompt carried it, once delivered. */
+  deliveredTo?: { workerId: string; seq: number };
+}
+
+export function steersOf(task: TaskView): SteerView[] {
+  const dispatches = task.facts.filter((f): f is DispatchedFact => f.kind === "Dispatched");
+  return task.facts.filter((f): f is SteeredFact => f.kind === "Steered").map((steer) => {
+    const base = {
+      seq: steer.seq,
+      workerId: steer.payload.workerId,
+      text: steer.payload.text,
+      by: steer.by,
+      createdAt: steer.createdAt,
+    };
+    const carrier = dispatches.find((d) => d.seq > steer.seq && d.payload.steerSeqs?.includes(steer.seq));
+    if (carrier) return { ...base, delivery: "delivered", deliveredTo: { workerId: carrier.payload.workerId, seq: carrier.seq } };
+    const movedOn = task.state !== "open" || dispatches.some((d) => d.seq > steer.seq);
+    return { ...base, delivery: movedOn ? "not_delivered" : "waiting" };
+  });
+}
+
+/** Steers still waiting for this worker, oldest first. */
+export function waitingSteersFor(task: TaskView, workerId: string): SteerView[] {
+  return steersOf(task).filter((steer) => steer.delivery === "waiting" && steer.workerId === workerId);
+}
+
+/**
+ * The run a steer addressed to `workerId` should wait for. A resumed run gets
+ * a new worker id but continues the same session, so a steer written after the
+ * resume started (the person was looking at the older run) follows the chain
+ * of continuations to its newest run.
+ */
+export function steerTarget(task: TaskView, workerId: string): string {
+  let current = workerId;
+  for (;;) {
+    const from = dispatchFor(task, current);
+    const next = task.facts.find((f): f is DispatchedFact =>
+      f.kind === "Dispatched" && f.payload.resumeWorkerId === current && (!from || f.seq > from.seq),
+    );
+    if (!next) return current;
+    current = next.payload.workerId;
+  }
 }
 
 /** Facts written by a person on this task, newest last. */

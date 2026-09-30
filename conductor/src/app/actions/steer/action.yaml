@@ -1,0 +1,10 @@
+name: record_person_steer
+type: custom
+description: >-
+  Record a person's message for one worker on an open Task. Called only by the
+  guardian's task page; no agent is granted this action.
+entry: ./index.ts
+complexity: simple
+speed: fast
+reliability: high
+sideEffects: write
