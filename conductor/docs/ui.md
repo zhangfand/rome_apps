@@ -69,6 +69,24 @@ pull requests, so their polling likewise only runs while that tab is mounted.
 The reply composer is closed by default unless the Task is waiting for a person;
 the primary Reply action returns to Overview and opens it.
 
+## Library
+
+The Work tab ends with a **Library**: everything the Task's history points at,
+in one list instead of one Activity entry at a time. `taskLibrary()` in
+`src/web/core/lib/library.ts` derives it in the browser from the facts the
+detail page already loads, so it adds no request and nothing to the ledger.
+
+It reads **structured fields only**: the pinned `reportRef` on a worker's
+return, the Task's origin (current `origin` or legacy `issue`), a child Task's
+`parent.specRef` / `parent.planRef` as recorded, a Snapshot's `workRepo`
+mirror, and an Event's `data.artifact`. Free text is never searched for file
+names, `repo@sha:path` strings, or blob URLs. The work repository has no fixed
+layout, so such inference would be a guess; specs and design docs therefore do
+not appear until a worker declares them in a structured field. Pull requests
+already have their own panel and are not repeated. Snapshots and archived source
+payloads sit under a collapsed "system records" toggle. Only http(s) values
+become links; any other recorded reference is shown as text.
+
 ## Worker progress
 
 A live worker's own todo list shows as `n/m done · <current step>` on its
