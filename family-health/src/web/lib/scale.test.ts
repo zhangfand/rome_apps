@@ -49,5 +49,7 @@ describe("library routes", () => {
     expect(parseRoute("library/ecg_p_axis")).toEqual({ name: "library", code: "ECG_P_AXIS" });
     expect(paths.library()).toBe("library");
     expect(paths.library("GLU")).toBe("library/GLU");
+    expect(parseRoute(paths.sources())).toEqual({ name: "sources", id: null });
+    expect(parseRoute(paths.sources("src_wst404_1_2012"))).toEqual({ name: "sources", id: "src_wst404_1_2012" });
   });
 });

@@ -23,6 +23,7 @@ import { normalizeExamDate, resolveDate, todayIso } from "../lib/dates.js";
 import { STALE_EXTRACTION_MS, isStaleExtraction, renormalizeResult } from "../lib/extraction.js";
 import { guardStoredInsight, reportAlerts } from "../lib/insights.js";
 import { libraryDetail, libraryIndex } from "../lib/library.js";
+import { sourceDetail, sourcesIndex } from "../lib/sources-view.js";
 import { processUploadIsolated } from "../lib/media-runner.js";
 import { remapReport } from "../lib/remap.js";
 import { clearDemoData, seedDemoData } from "../lib/seed.js";
@@ -423,6 +424,14 @@ class FamilyHealthApi implements RomeAppApiHandler {
     this.on("GET", "library/:code", (_req, p) => {
       const d = libraryDetail(p.code);
       if (!d) throw new UserFacingError("未知指标", "indicator_not_found");
+      return json(d);
+    });
+
+    // ---- 数据来源 (source -> indicators, research gaps)
+    this.on("GET", "sources", () => json(sourcesIndex()));
+    this.on("GET", "sources/:id", (_req, p) => {
+      const d = sourceDetail(p.id);
+      if (!d) throw new UserFacingError("未知来源", "source_not_found");
       return json(d);
     });
 

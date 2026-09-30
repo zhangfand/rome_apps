@@ -20,10 +20,11 @@ import { NotFound } from "./views/NotFound";
 import { OverviewView } from "./views/Overview";
 import { ReportDetailView } from "./views/ReportDetail";
 import { ReportsView } from "./views/Reports";
+import { SourcesView } from "./views/Sources";
 import { UploadView } from "./views/Upload";
 
 
-function section(route: Route): "overview" | "reports" | "interventions" | "library" | null {
+function section(route: Route): "overview" | "reports" | "interventions" | "library" | "sources" | null {
   switch (route.name) {
     case "overview":
     case "member":
@@ -37,6 +38,8 @@ function section(route: Route): "overview" | "reports" | "interventions" | "libr
       return "interventions";
     case "library":
       return "library";
+    case "sources":
+      return "sources";
     default:
       return null;
   }
@@ -60,6 +63,8 @@ function View({ route }: { route: Route }) {
       return <InterventionsView memberId={route.memberId} />;
     case "library":
       return <LibraryView code={route.code} />;
+    case "sources":
+      return <SourcesView id={route.id} />;
     default:
       return <NotFound />;
   }
@@ -89,6 +94,9 @@ export default function App({ bootstrap: _bootstrap }: { bootstrap: RomeAppBoots
               </PageNavLink>
               <PageNavLink asChild active={active === "library"}>
                 <Link to={paths.library()}>指标库</Link>
+              </PageNavLink>
+              <PageNavLink asChild active={active === "sources"}>
+                <Link to={paths.sources()}>数据来源</Link>
               </PageNavLink>
             </PageNav>
             <main className="flex flex-col gap-6">

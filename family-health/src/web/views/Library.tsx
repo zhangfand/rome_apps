@@ -134,25 +134,20 @@ function LevelSummary({ e }: { e: LibraryEntry }) {
 }
 
 function SourcesSection({ sources }: { sources: SourceInfo[] }) {
+  const check = sources.filter((x) => x.verifiedVia === "secondary").length;
   return (
     <Section>
       <SectionHeader>
         <SectionHeading>
-          <SectionTitle>数据来源（{sources.length}）</SectionTitle>
-          <SectionDescription>每个参考范围、判定标准和编码都引用下面的来源之一。</SectionDescription>
+          <SectionTitle>数据来源</SectionTitle>
+          <SectionDescription>
+            上面每个参考范围和判定标准都引用了 {sources.length} 份来源之一{check ? `，其中 ${check} 份待对照官方原文复核` : ""}。
+          </SectionDescription>
         </SectionHeading>
       </SectionHeader>
-      <ul className="flex flex-col gap-2">
-        {sources.map((s) => (
-          <li key={s.id} className="flex flex-col gap-1 rounded-lg border border-border p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <LevelBadge level={s.level} />
-              <span className="text-xs text-muted-foreground">被引用 {s.usedBy ?? 0} 次 · 核对于 {s.retrieved}</span>
-            </div>
-            <Citation source={s} />
-          </li>
-        ))}
-      </ul>
+      <Link to={paths.sources()} className="text-sm text-primary underline underline-offset-2">
+        查看全部数据来源和尚未核实的内容
+      </Link>
     </Section>
   );
 }

@@ -431,3 +431,46 @@ export interface Measurement {
   note: string;
   createdVia: string;
 }
+
+// ------------------------------------------------------------------ 数据来源
+
+export interface SourceNoteZh {
+  status?: string;
+  checkedHow: string;
+  caveats?: string[];
+}
+
+export interface SourceSummary extends SourceInfo {
+  note: SourceNoteZh | null;
+  needsOfficialCheck: boolean;
+  usage: { ranges: number; thresholds: number; explanations: number; legacyRanges: number; indicators: number };
+}
+
+export type GapKind = "no_standard" | "needs_check" | "not_imported";
+
+export interface SourcesIndex {
+  levels: Record<SourceLevel, string>;
+  counts: { total: number; verified: number; primary: number; needsOfficialCheck: number; byLevel: Record<SourceLevel, number> };
+  sources: SourceSummary[];
+  gapKinds: Record<GapKind, { title: string; description: string }>;
+  gaps: Array<{ id: string; kind: GapKind; title: string; detail: string; codes: string[]; indicators: Array<{ code: string; zh: string }> }>;
+  research: Array<{ file: string; topic: string; gaps: Array<{ what: string; tried: string }> }>;
+}
+
+export interface SourceDetail extends SourceSummary {
+  ranges: Array<{ code: string; zh: string; candidate: RangeCandidateInfo; resolved: ResolvedRange | null }>;
+  thresholds: Array<{
+    id: string;
+    name_zh: string;
+    kind: string;
+    unit: string;
+    population: PopulationInfo;
+    categories: ThresholdScaleItem[];
+    level: SourceLevel;
+    levelZh: string;
+    locator?: string;
+    evidenceQuote?: string;
+    indicators: Array<{ code: string; zh: string }>;
+  }>;
+  legacyInUse: Array<{ code: string; zh: string }>;
+}

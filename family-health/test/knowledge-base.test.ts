@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { INDICATOR_DATA, UNKNOWN_VERIFIED_CODES } from "../src/data/indicators.js";
 import { IndicatorEntrySchema, validateKnowledgeBase, type IndicatorEntry, type KnowledgeBase, type Source } from "../src/data/schema.js";
 import { renderSourcesMd } from "../src/data/sources-md.js";
+import { GAPS_ZH, SOURCE_NOTES_ZH } from "../src/data/source-notes-zh.js";
 import { LOINC_ATTRIBUTION, SOURCES } from "../src/data/sources.js";
 import { THRESHOLDS } from "../src/data/thresholds.js";
 import { criticalSourceIds } from "../src/domain/critical.js";
@@ -43,6 +44,13 @@ describe("knowledge base validation", () => {
       expect(s.url, s.id).toBeTruthy();
       expect(s.verifiedVia, s.id).toBeTruthy();
     }
+  });
+
+  it("every source has a plain-Chinese note and every gap points at real indicators", () => {
+    for (const s of SOURCES) expect(SOURCE_NOTES_ZH[s.id]?.checkedHow, s.id).toBeTruthy();
+    for (const k of Object.keys(SOURCE_NOTES_ZH)) expect(SOURCES.some((s) => s.id === k), `orphan note ${k}`).toBe(true);
+    const codes = new Set(INDICATOR_DATA.map((e) => e.code));
+    for (const g of GAPS_ZH) for (const c of g.codes) expect(codes.has(c), `${g.id}: ${c}`).toBe(true);
   });
 
   const good: Source = { id: "test-ok", org: "TEST", title: "Synthetic", identifier: "TEST-1", scope: ["reference_range"], level: "national_cn", retrieved: "2026-01-01" };

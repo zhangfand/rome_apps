@@ -30,6 +30,13 @@ const SOURCE_ALIAS = {
   src_ws_404_8_2015: "src_wst404_8_2015",
 };
 
+/**
+ * Corrections to the research's own labels, with the reason:
+ * src_cra_gout_2023 was marked "primary" but its notes say the text came from
+ * a third-party mirror of the journal PDF and the official page was not opened.
+ */
+const VERIFIED_VIA_OVERRIDE = { src_cra_gout_2023: "secondary" };
+
 /** Reference-interval items imported as `ranges` (research code -> app code). */
 const RANGE_CODES = {
   ALT: "ALT", AST: "AST", ALP: "ALP", GGT: "GGT", TP: "TP", ALB: "ALB", GLB: "GLB", AG_RATIO: "AG_RATIO", TBIL: "TBIL", DBIL: "DBIL",
@@ -199,7 +206,7 @@ for (const [f, retrieved] of Object.entries(FILES)) {
       identifier: s.identifier ?? s.citation ?? s.title,
       ...(s.url ? { url: s.url } : {}),
       level: s.level,
-      verifiedVia: s.verified_via ?? s.verifiedVia,
+      verifiedVia: VERIFIED_VIA_OVERRIDE[id] ?? s.verified_via ?? s.verifiedVia,
       retrieved: j.retrieved && /^\d{4}-\d{2}-\d{2}$/.test(j.retrieved) ? j.retrieved : retrieved,
       ...(s.status ? { status: s.status } : {}),
       ...(s.notes ? { notes: s.notes } : {}),

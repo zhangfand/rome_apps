@@ -223,6 +223,31 @@ describe("API: provenance, library, remap", () => {
     expect(one.body).toMatchObject({ code: "ECG_P_AXIS", categoryZh: "心电图", ranges: [], loinc: null });
     expect((await call("GET", "library/NOPE")).status).toBe(404);
   });
+
+  it("sources lists every cited source with usage, plain-Chinese notes and the research gaps", async () => {
+    const call = api();
+    const idx = await call("GET", "sources");
+    expect(idx.status).toBe(200);
+    const ids = idx.body.sources.map((s: any) => s.id);
+    expect(ids).toContain("legacy-unverified");
+    expect(ids).toContain("src_wst404_1_2012");
+    for (const s of idx.body.sources) expect(s.note?.checkedHow, s.id).toBeTruthy();
+    expect(idx.body.counts.needsOfficialCheck).toBe(idx.body.sources.filter((s: any) => s.verifiedVia === "secondary").length);
+    expect(idx.body.gaps.length).toBeGreaterThan(5);
+    expect(idx.body.research.flatMap((r: any) => r.gaps).length).toBeGreaterThan(0);
+
+    const one = await call("GET", "sources/src_wst404_1_2012");
+    expect(one.status).toBe(200);
+    expect(one.body.ranges.map((r: any) => r.code)).toEqual(expect.arrayContaining(["ALT", "AST", "ALP", "GGT"]));
+    expect(one.body.ranges.every((r: any) => r.candidate.evidenceQuote)).toBe(true);
+    const lipid = await call("GET", "sources/src_cn_lipid_guideline_2023");
+    expect(lipid.body.thresholds.map((t: any) => t.id)).toContain("thr_tg_primary_low_risk");
+    expect(lipid.body.needsOfficialCheck).toBe(true);
+    const legacy = await call("GET", "sources/legacy-unverified");
+    expect(legacy.body.legacyInUse.map((i: any) => i.code)).toContain("CEA");
+    expect(legacy.body.legacyInUse.map((i: any) => i.code)).not.toContain("ALT");
+    expect((await call("GET", "sources/nope")).status).toBe(404);
+  });
 });
 
 // ------------------------------------------------------------------ migration + regression

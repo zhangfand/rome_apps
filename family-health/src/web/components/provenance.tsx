@@ -9,6 +9,7 @@ import { ExternalLink } from "lucide-react";
 import { Badge } from "@rome-os/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@rome-os/ui/popover";
 import { formatNumber, formatUnit } from "../lib/format";
+import { Link, paths } from "../lib/router";
 import type { Flag, PopulationInfo, Provenance, ResolvedRange, SourceInfo, SourceLevel, ThresholdHit, ThresholdScaleItem } from "../lib/types";
 
 // ------------------------------------------------------------------ small pieces
@@ -68,7 +69,7 @@ export function rangeText(r: ResolvedRange): string {
 }
 
 /** Threshold category bounds, e.g. `≥28` or `24–<28` (inclusivity "[)" → low ≤ v < high). */
-function scaleText(c: ThresholdScaleItem, unit: string): string {
+export function scaleText(c: ThresholdScaleItem, unit: string): string {
   const inc = c.inclusivity || "[)";
   const lo = c.low;
   const hi = c.high;
@@ -100,7 +101,7 @@ export function populationText(p: PopulationInfo | null | undefined): string | n
   return parts.length ? parts.join("，") : null;
 }
 
-export function Citation({ source, locator }: { source: SourceInfo | null | undefined; locator?: string | null }) {
+export function Citation({ source, locator, detailLink = true }: { source: SourceInfo | null | undefined; locator?: string | null; detailLink?: boolean }) {
   if (!source) return null;
   const loc = locator ?? source.locator;
   return (
@@ -115,6 +116,14 @@ export function Citation({ source, locator }: { source: SourceInfo | null | unde
           <a href={source.url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-primary underline underline-offset-2">
             查看原文 <ExternalLink className="size-3" aria-hidden="true" />
           </a>
+        </>
+      ) : null}
+      {detailLink && source.level !== "report" ? (
+        <>
+          {" "}
+          <Link to={paths.sources(source.id)} className="text-primary underline underline-offset-2">
+            来源详情
+          </Link>
         </>
       ) : null}
       {source.level !== "report" && source.level !== "unverified" ? (

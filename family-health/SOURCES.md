@@ -229,7 +229,7 @@
 - 编号 / Identifier: doi:10.3760/cma.j.cn112138-20221027-00796
 - 链接 / URL: <https://99homecare.com/files/2023.pdf>
 - 适用内容 / Scope: 判定切点
-- 核对日期 / Retrieved: 2026-09-24（官方原文核对）
+- 核对日期 / Retrieved: 2026-09-24（转载或镜像全文核对，待官方原文复核）
 - 核对说明 / Notes: Text read from a third-party mirror of the journal PDF (journal header and 引用本文 line present in the file). Official landing page reportedly https://rs.yiigle.com/cmaid/1471591 (not fetched).
 - 源 ID: `src_cra_gout_2023`
 - 支持的条目 / Supports: 1 项

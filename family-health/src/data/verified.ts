@@ -179,7 +179,7 @@ export const VERIFIED_SOURCES: Source[] = [
     "identifier": "doi:10.3760/cma.j.cn112138-20221027-00796",
     "url": "https://99homecare.com/files/2023.pdf",
     "level": "cn_guideline",
-    "verifiedVia": "primary",
+    "verifiedVia": "secondary",
     "retrieved": "2026-09-24",
     "notes": "Text read from a third-party mirror of the journal PDF (journal header and 引用本文 line present in the file). Official landing page reportedly https://rs.yiigle.com/cmaid/1471591 (not fetched).",
     "scope": [
